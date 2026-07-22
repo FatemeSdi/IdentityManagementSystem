@@ -1,0 +1,102 @@
+﻿@model IdentityManagementSystem.UI.Controllers.UserInfo
+
+@{
+    ViewData["Title"] = "پروفایل";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">ویرایش پروفایل</div>
+    </div>
+    <div class="card-body">
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <script>
+                toastr.error('@ViewBag.ErrorMessage');
+            </script>
+        }
+        @if (ViewBag.SuccessMessage != null)
+        {
+            <script>
+                toastr.success('@ViewBag.SuccessMessage');
+            </script>
+        }
+        <div class="text-center chat-image mb-5">
+            <div class="avatar avatar-xxl chat-profile mb-3 brround">
+                <a class="" href="#"><img src="~/assets/images/users/22.jfif" alt="profile-user" class="brround"></a>
+            </div>
+            <div class="main-chat-msg-name">
+                <a href="#">
+                    <h5 class="mb-1 text-dark fw-semibold">@(Model?.Name ?? "نام کاربر") @(Model?.LastName ?? "")</h5>
+                </a>
+                <p class="text-muted mt-0 mb-0 pt-0 fs-13">@(Model?.Role ?? "بدون نقش")</p>
+            </div>
+        </div>
+        <form id="changePasswordForm" asp-action="ChangePassword" method="post">
+            <div class="form-group">
+                <label class="form-label">رمز عبور فعلی</label>
+                <div class="wrap-input100 validate-input input-group" id="Password-toggle">
+                    <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
+                        <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
+                    </a>
+                    <input class="input100 form-control" type="password" name="CurrentPassword" autocomplete="current-password">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">رمز عبور جدید</label>
+                <div class="wrap-input100 validate-input input-group" id="Password-toggle1">
+                    <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
+                        <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
+                    </a>
+                    <input class="input100 form-control" type="password" name="NewPassword" autocomplete="new-password">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">تایید رمز عبور</label>
+                <div class="wrap-input100 validate-input input-group" id="Password-toggle2">
+                    <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
+                        <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
+                    </a>
+                    <input class="input100 form-control" type="password" name="ConfirmNewPassword" autocomplete="new-password">
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-primary">ثبت</button>
+                <a href="javascript:void(0)" class="btn btn-danger">انصراف</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $("#changePasswordForm").submit(function (e) {
+                e.preventDefault();
+                var formData = $(this).serialize();
+
+                $.ajax({
+                    url: '@Url.Action("ChangePassword", "Home")',
+                    type: 'POST',
+                    data: formData,
+                    headers: {
+                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message);
+                            $("#changePasswordForm")[0].reset();
+                        } else {
+                            toastr.error(response.message);
+                        }
+                    },
+                    error: function (xhr) {
+                        var errorMessage = xhr.responseJSON?.message || 'خطایی رخ داد.';
+                        toastr.error(errorMessage);
+                    }
+                });
+            });
+        });
+    </script>
+}

@@ -1,0 +1,103 @@
+﻿﻿
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - ServicePMO</title>
+
+    <!-- BOOTSTRAP RTL CSS -->
+    <link href="~/assets/plugins/bootstrap/css/bootstrap.rtl.min.css" rel="stylesheet" />
+
+    <!-- STYLE CSS -->
+    <link href="~/assets/css/style.css" rel="stylesheet" />
+
+    <link href="~/lib/bootstrap/dist/css/toastr.min.css" rel="stylesheet" />
+
+    <!-- FONT-ICONS CSS -->
+    <link href="~/assets/css/icons.css" rel="stylesheet" />
+    <link href="~/assets/iconfonts/bootstrapicons/bootstrap-icons.css" rel="stylesheet" />
+    <link href="~/assets/iconfonts/font-awesome/css/font-awesome.min.css" rel="stylesheet" />
+    <link href="~/assets/iconfonts/ionicons/ionicons.css" rel="stylesheet" />
+    @*
+    <link rel="preload" href="~/assets/iconfonts/feather/fonts/feather-webfont.woff" as="font" type="font/woff" crossorigin>
+    <link rel="preload" href="~/assets/iconfonts/font-awesome/fonts/fontawesome-webfont.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="~/assets/iconfonts/materialdesignicons/fonts/Material-Design-Iconic-Font.woff2" as="font" type="font/woff2" crossorigin>
+ *@
+    <!-- COLOR SKIN CSS -->
+    <link id="theme" rel="stylesheet" type="text/css" media="all" href="~/assets/colors/color1.css" />
+
+    <!-- SITE CUSTOM CSS -->
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @* <link rel="stylesheet" href="~/ServiceUIPMO.styles.css" asp-append-version="true" /> *@
+
+    <style>
+        body {
+            direction: rtl;
+            text-align: right;
+            overflow-x: hidden;
+            background-image: url('/assets/images/macos.jpg');
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center center;
+            background-attachment: fixed;
+        }
+
+    </style>
+
+    @RenderSection("Styles", required: false)
+</head>
+
+<body>
+    <!-- PAGE -->
+    <div class="page">
+        <div class="page-main">
+
+            <!-- /app-Header -->
+            <div class="container mt-6">
+                <main role="main" class="pb-3">
+                    @RenderBody()
+                </main>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- JQUERY JS -->
+    <script src="~/assets/js/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+
+    <!-- BOOTSTRAP JS -->
+    <script src="~/assets/plugins/bootstrap/js/popper.min.js"></script>
+    <script src="~/assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+
+    <!-- SPARKLINE JS-->
+    <script src="~/assets/js/jquery.sparkline.min.js"></script>
+
+    <!-- Sticky js -->
+    <script src="~/assets/js/sticky.js"></script>
+
+    <!-- Color Theme js -->
+    <script src="~/assets/js/themeColors.js"></script>
+
+    <!-- CUSTOM JS -->
+    <script src="~/assets/js/custom.js"></script>
+
+    <!-- INTERNAL SELECT2 JS -->
+    <script src="~/assets/plugins/select2/select2.full.min.js"></script>
+
+    <!-- SHOW PASSWORD JS -->
+    @* <script src="~/assets/js/show-password.min.js"></script> *@
+
+    <!-- GENERATE OTP JS -->
+    <script src="~/assets/js/generate-otp.js"></script>
+
+    <!-- INPUT MASK JS-->
+    <script src="~/assets/plugins/input-mask/jquery.mask.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
+    <script src="~/lib/jquery-ajax-unobtrusive/dist/jquery.unobtrusive-ajax.min.js"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

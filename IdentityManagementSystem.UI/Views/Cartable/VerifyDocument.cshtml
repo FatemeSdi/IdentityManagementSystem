@@ -1,0 +1,69 @@
+﻿@model IdentityManagementSystem.UI.Controllers.CartableFormViewModel
+@{
+    ViewData["Title"] = "احراز سند";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="card">
+    <div class="card-header">
+        <h4 class="card-title">احراز سند</h4>
+    </div>
+    <div class="card-body">
+        @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
+        {
+            <div class="alert alert-danger">
+                @ViewBag.ErrorMessage
+            </div>
+        }
+
+        <form asp-action="VerifyDocument" method="post">
+            @Html.AntiForgeryToken()
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="DocumentNumber" class="form-label">شماره سند</label>
+                        <input asp-for="DocumentNumber" class="form-control" placeholder="18 رقم شماره سند را وارد کنید" />
+                        <span asp-validation-for="DocumentNumber" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label asp-for="VerifyCode" class="form-label">رمز تصدیق</label>
+                        <input asp-for="VerifyCode" class="form-control" placeholder="6 رقم رمز تصدیق را وارد کنید" />
+                        <span asp-validation-for="VerifyCode" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary mt-4 mb-0">بررسی و نمایش متن سند</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    
+    <script>
+        $(document).ready(function() {
+            // اعتبارسنجی client-side
+            $('#DocumentNumber').on('input', function() {
+                const value = $(this).val();
+                if (value.length !== 18 || !/^\d+$/.test(value)) {
+                    $(this).addClass('is-invalid');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+
+            $('#VerifyCode').on('input', function() {
+                const value = $(this).val();
+                if (value.length !== 6 || !/^\d+$/.test(value)) {
+                    $(this).addClass('is-invalid');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+        });
+    </script>
+}

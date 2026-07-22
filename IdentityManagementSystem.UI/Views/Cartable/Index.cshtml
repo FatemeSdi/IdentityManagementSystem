@@ -1,0 +1,657 @@
+﻿@using IdentityManagementSystem.UI.Controllers
+@model IdentityManagementSystem.UI.Controllers.PaginatedCartableViewModel
+@{
+    ViewData["Title"] = "کارتابل";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var formModel = ViewBag.FormModel as IdentityManagementSystem.UI.Controllers.CartableFormViewModel ?? new IdentityManagementSystem.UI.Controllers.CartableFormViewModel();
+    var verifyDocData = ViewBag.VerifyDocData as dynamic ?? null;
+    var showDocumentTab = ViewBag.ShowDocumentTab as bool? ?? false;
+    var documentError = ViewBag.DocumentError as string ?? null;
+}
+
+<link rel="stylesheet" href="~/css/IndexStyle.css" asp-append-version="true" />
+
+<div class="input-group mb-5">
+    @{
+        var currentSearch = Context.Request.Query["search"].ToString();
+        var currentFilter = ViewBag.FilterStatus as string ?? "";
+    }
+
+    <div class="input-group mb-5">
+        <form asp-action="Index" method="get" class="w-100 d-flex align-items-center">
+
+            <input type="text"
+                   class="form-control"
+                   name="search"
+                   value="@currentSearch"
+                   placeholder="جستجو..." />
+
+            <select name="filterStatus"
+                    class="form-select mx-2"
+                    style="max-width:200px; font-size:13px;">
+
+                <option value="">همه درخواست‌ها</option>
+                <option value="approved" selected="@(currentFilter == "approved")">تایید شده</option>
+                <option value="rejected" selected="@(currentFilter == "rejected")">رد شده</option>
+                <option value="pending" selected="@(currentFilter == "pending")">در انتظار بررسی</option>
+
+            </select>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="fa fa-search" aria-hidden="true" style="color:whitesmoke;"></i>
+            </button>
+
+        </form>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">درخواست‌ها</h2>
+        <button id="AddDoc" type="button" class="btn btn-primary btn-pill left-btn" data-bs-toggle="modal" data-bs-target="#scrollingmodal">سند جدید</button>
+    </div>
+    <div class="card-body">
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <script>
+                toastr.error('@ViewBag.ErrorMessage');
+            </script>
+        }
+        @if (ViewBag.SuccessMessage != null)
+        {
+            <script>
+                toastr.success('@ViewBag.SuccessMessage');
+            </script>
+        }
+        <div class="table-responsive text-center">
+            <div id="basic-datatable_wrapper" class="dataTables_wrapper dt-bootstrap5 no-footer">
+                <div class="row">
+                    <div class="col-sm-12">
+                        <table id="cartableTable" class="table table-bordered text-nowrap border-bottom">
+                            <thead>
+                                <tr role="row">
+                                    <th class="wd-10p border-bottom-0 sorting sorting_asc">شماره درخواست</th>
+                                    <th class="wd-15p border-bottom-0 sorting">تاریخ ایجاد</th>
+                                    <th class="wd-15p border-bottom-0 sorting">کد ملی</th>
+                                    <th class="wd-15p border-bottom-0 sorting">شماره همراه</th>
+                                    <th class="wd-15p border-bottom-0 sorting">شناسه سند</th>
+                                    <th class="wd-10p border-bottom-0 sorting">رمز تصدیق</th>
+                                    <th class="wd-10p border-bottom-0 sorting"> احراز هویت متقاضی </th>
+                                    <th class="wd-10p border-bottom-0 sorting">احراز اصالت سند </th>
+                                    <th class="wd-10p border-bottom-0 sorting">ارتباط متقاضی با سند </th>
+                                    <th class="wd-10p border-bottom-0 sorting">احراز وکالت</th>
+                                    <th class="wd-20p border-bottom-0 sorting">نمایش سند</th>
+                                    <th class="wd-20p border-bottom-0 sorting">تایید درخواست</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartableBody">
+                                @foreach (var item in Model.Items)
+                                {
+                                    var explanation = "";
+                                    if (!item.IsMatch.HasValue || !item.IsMatch.Value)
+                                    {
+                                        explanation += "کد ملی و شماره موبایل تطابق ندارند. ";
+                                    }
+                                    if (!item.IsExist.HasValue || !item.IsExist.Value)
+                                    {
+                                        explanation += "سند وجود ندارد. ";
+                                    }
+                                    if (!item.IsNationalIdInResponse.HasValue || !item.IsNationalIdInResponse.Value)
+                                    {
+                                        explanation += "کد ملی در سند یافت نشد. ";
+                                    }
+                                    if (!item.IsNationalIdInLawyers.HasValue || !item.IsNationalIdInLawyers.Value)
+                                    {
+                                        explanation += "کد ملی در سند یافت نشد. ";
+                                    }
+                                    if (string.IsNullOrEmpty(explanation))
+                                    {
+                                        explanation = "بدون مشکل";
+                                    }
+
+                                    <tr data-request-id="@item.RequestId">
+                                        <td>@item.RequestId</td>
+                                        <td class="px-4 py-3">
+                                            <span class="block">@item.CreatedAt.ToPersianTime()</span>
+                                            <span class="block text-sm text-muted">@item.CreatedAt.ToPersianDate()</span>
+                                        </td>
+                                        <td>@item.NationalId</td>
+                                        <td>@item.MobileNumber</td>
+                                        <td>@item.DocumentNumber</td>
+                                        <td>@item.VerificationCode</td>
+                                        <!-- احراز هویت متقاضی -->
+                                        <td class="text-center">
+                                            @if (item.IsMatch.HasValue)
+                                            {
+                                                if (item.IsMatch.Value)
+                                                {
+                                                    <i class="fa fa-check text-success" data-bs-toggle="tooltip" title="تایید شده"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="zmdi zmdi-close text-danger" data-bs-toggle="tooltip" title="تایید نشده"></i>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">نامشخص</span>
+                                            }
+                                        </td>
+                                        <!-- احراز اصالت سند -->
+                                        <td class="text-center">
+                                            @if (item.IsExist.HasValue)
+                                            {
+                                                if (item.IsExist.Value)
+                                                {
+                                                    <i class="fa fa-check text-success" data-bs-toggle="tooltip" title="وجود دارد"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="zmdi zmdi-close text-danger" data-bs-toggle="tooltip" title="وجود ندارد"></i>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">نامشخص</span>
+                                            }
+                                        </td>
+                                        <!--ارتباط متقاضی با سند  -->
+                                        <td class="text-center">
+                                            @if (item.IsNationalIdInResponse.HasValue)
+                                            {
+                                                if (item.IsNationalIdInResponse.Value)
+                                                {
+                                                    <i class="fa fa-check text-success" data-bs-toggle="tooltip" title="تایید شده"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="zmdi zmdi-close text-danger" data-bs-toggle="tooltip" title="تایید نشده"></i>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">نامشخص</span>
+                                            }
+                                        </td>
+                                        <!-- اصالت وکالت -->
+                                        <td class="text-center">
+                                            @if (item.IsNationalIdInLawyers.HasValue)
+                                            {
+                                                if (item.IsNationalIdInLawyers.Value)
+                                                {
+                                                    <i class="fa fa-check text-success" data-bs-toggle="tooltip" title="تایید شده"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="zmdi zmdi-close text-danger" data-bs-toggle="tooltip" title="تایید نشده"></i>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">نامشخص</span>
+                                            }
+                                        </td>
+                                        <!-- متن سند -->
+                                        <td class="text-center">
+                                            <button class="btn btn-sm btn-icon btn-light btn-view-doc"
+                                                    data-request-id="@item.RequestId"
+                                                    title="مشاهده متن سند">
+                                                <i class="fe fe-file-text"
+                                                   style="color:@(item.IsRead ? "green" : "blue");"
+                                                   data-bs-toggle="tooltip"
+                                                   title="@(item.IsRead ? "خوانده شده" : "خوانده نشده")">
+                                                </i>
+                                            </button>
+                                        </td>
+                                        <!-- تایید درخواست -->
+                                        <td class="text-center">
+                                            <div class="btn-group w-100 mb-1" role="group">
+                                                <button type="button"
+                                                        class="btn btn-sm @(item.ValidateByExpert == true ? "btn-success active" : "btn-outline-success") approve-btn flex-fill"
+                                                        data-request-id="@item.RequestId">
+                                                    تایید
+                                                </button>
+                                                <button type="button"
+                                                        class="btn btn-sm @(item.ValidateByExpert == false ? "btn-danger active" : "btn-outline-danger") reject-btn flex-fill"
+                                                        data-request-id="@item.RequestId">
+                                                    رد
+                                                </button>
+                                            </div>
+
+                                            @if (item.ValidateByExpert == false && !string.IsNullOrEmpty(item.RejectReasonDisplay))
+                                            {
+                                                <div class="mt-1">
+                                                    <small class="text-danger d-flex align-items-center justify-content-center gap-1">
+                                                        <i class="fa fa-exclamation-circle"></i>
+                                                        <span class="reject-reason-text"
+                                                              style="cursor: pointer; text-decoration: underline dotted;"
+                                                              data-reason="@item.RejectReasonDisplay"
+                                                              data-bs-toggle="tooltip"
+                                                              title="@item.RejectReasonDisplay">
+                                                            @(item.RejectReasonDisplay.Length > 45 ? item.RejectReasonDisplay.Substring(0, 45) + "..." : item.RejectReasonDisplay)
+                                                        </span>
+                                                    </small>
+                                                </div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <nav aria-label="Page navigation example">
+                    <ul class="pagination justify-content-end">
+                        <li class="page-item @(Model.CurrentPage == 1 ? "disabled" : "")">
+                            <a class="page-link"
+                               href="@Url.Action("Index", new
+                               {
+                                   page = Model.CurrentPage - 1,
+                                   search = Model.SearchQuery,
+                                   filterStatus = ViewBag.FilterStatus
+                               })">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        </li>
+                        @for (var i = Math.Max(1, Model.CurrentPage - 2);
+                                                i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2);
+                                                i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("Index", new
+                                   {
+                                       page = i,
+                                       search = Model.SearchQuery,
+                                       filterStatus = ViewBag.FilterStatus
+                                   })">@i
+                                </a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.CurrentPage == Model.TotalPages || Model.TotalPages == 0 ? "disabled" : "")">
+                            <a class="page-link" href="@Url.Action("Index", new
+                                                 {
+                                                     page = Model.CurrentPage + 1,
+                                                     search = Model.SearchQuery,
+                                                     filterStatus = ViewBag.FilterStatus
+                                                 })">
+                                <i class="fa fa-angle-right"></i>
+                                <span class="sr-only">بعدی</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal نمایش دلیل عدم تایید -->
+<div class="modal fade" id="rejectReasonModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 rounded-3">
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-semibold">
+                    <i class="fa fa-exclamation-circle me-1"></i>
+                    دلیل عدم تایید
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p id="rejectReasonText" class="mb-0 text-dark" style="font-size: 0.9rem; line-height: 1.5;"></p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+<!-- Modal نمایش سند -->
+<div class="modal fade" id="documentModal" tabindex="-1" aria-labelledby="documentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-primary" id="documentModalLabel">متن سند</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body" id="documentModalBody">
+                <p class="text-center text-muted">در حال بارگذاری...</p>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="documentChecked">
+                    <label class="form-check-label" for="documentChecked">متن سند بررسی شد</label>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-success" id="confirmDocument">تایید</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal رد درخواست -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-3">
+            <div class="modal-header border-bottom pb-3 pt-4 px-4">
+                <h5 class="modal-title fw-semibold text-dark" id="rejectModalLabel">عدم تایید درخواست</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body px-4 py-4">
+                <form id="rejectForm">
+                    <input type="hidden" id="rejectRequestId" />
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold mb-2">علت عدم تایید</label>
+                        <select class="form-select rounded-2" id="predefinedReason" asp-items="@ViewBag.RejectReasons">
+                            <option value="">---</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold mb-2">توضیحات تکمیلی</label>
+                        <textarea class="form-control rounded-2"
+                                  id="customDescription" rows="3"
+                                  placeholder="اختیاری"></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <button type="button" class="btn btn-light px-4 py-2 rounded-2" data-bs-dismiss="modal">انصراف</button>
+                        <button type="button" class="btn btn-danger px-4 py-2 rounded-2" id="confirmReject">تایید</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Adding New Document -->
+<div class="modal fade" id="scrollingmodal" tabindex="-1" aria-labelledby="scrollingmodalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-content border-0 rounded-3">
+            <div class="modal-header border-bottom pb-3 pt-4 px-4">
+                <h6 class="modal-title fw-semibold text-dark" id="scrollingmodalLabel">ایجاد درخواست جدید</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 py-4">
+                <form asp-action="ValidateSteps" method="post" id="needs-validation-form">
+                    @Html.AntiForgeryToken()
+
+                    <!-- فیلدهای مرحله اول -->
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-semibold mb-2">اطلاعات متقاضی</label>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <input type="text" class="form-control form-control-sm rounded-2"
+                                       id="NationalCode" name="NationalCode"
+                                       placeholder="کد ملی" required />
+                            </div>
+                            <div class="col-12">
+                                <input type="text" class="form-control form-control-sm rounded-2"
+                                       id="MobileNumber" name="MobileNumber"
+                                       placeholder="شماره موبایل" required />
+                            </div>
+                        </div>
+                        <small class="text-@(string.IsNullOrEmpty(formModel?.Step1Message) || formModel.Step1Message.Contains("معتبر") ? "success" : "danger") d-block mt-2">
+                            @formModel?.Step1Message
+                        </small>
+                    </div>
+
+                    <div class="border-top my-3"></div>
+
+                    <!-- فیلدهای مرحله دوم -->
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-semibold mb-2">اطلاعات سند</label>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <input type="text" class="form-control form-control-sm rounded-2"
+                                       id="DocumentNumber" name="DocumentNumber"
+                                       placeholder="شناسه سند" required />
+                            </div>
+                            <div class="col-12">
+                                <input type="text" class="form-control form-control-sm rounded-2"
+                                       id="VerifyCode" name="VerifyCode"
+                                       placeholder="رمز تصدیق" required />
+                            </div>
+                        </div>
+                        <small class="text-@(string.IsNullOrEmpty(formModel?.Step2Message) || formModel.Step2Message.Contains("معتبر") ? "success" : "danger") d-block mt-2">
+                            @formModel?.Step2Message
+                        </small>
+                    </div>
+
+                    <!-- دکمه‌ها -->
+                    <div class="d-flex gap-2 justify-content-end mt-4 pt-2">
+                        <button type="button" class="btn btn-sm btn-light px-4 rounded-2" data-bs-dismiss="modal">انصراف</button>
+                        <button type="submit" id="btnVerify" class="btn btn-sm btn-primary px-4 rounded-2">ثبت درخواست</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+
+            // ==================== 1. ابزارهای کمکی ====================
+            $('[data-bs-toggle="tooltip"]').tooltip();
+
+            let pendingReject = null;
+
+            // ریست فرم مودال
+            $('#scrollingmodal').on('hidden.bs.modal', function () {
+                $('#needs-validation-form')[0].reset();
+            });
+
+            // ==================== 2. نمایش متن سند ====================
+            $(document).on('click', '.btn-view-doc', function () {
+                const requestId = $(this).data('request-id');
+
+                $('#documentModalLabel').text('متن سند درخواست ' + requestId);
+                $('#documentModalBody').html('<div class="d-flex justify-content-center my-5"><div class="spinner-border" role="status"></div><span class="ms-2">در حال بارگذاری...</span></div>');
+                $('#documentChecked').prop('checked', false);
+                $('#confirmDocument').data('request-id', requestId);
+                $('#documentModal').modal('show');
+
+                $.ajax({
+                    url: '/Cartable/GetDocumentText',
+                    type: 'GET',
+                    data: { requestId: requestId },
+                    dataType: 'json',
+                    success: function (res) {
+                        if (res && res.success && res.documentText && res.documentText.trim() !== "") {
+                            let text = res.documentText;
+                            let safe = $('<div/>').text(text).html();
+
+                            safe = safe.replace(
+                                /(مهلت اعتبار این وکالتنامه تا تاریخ\s*\d{4}\/\d{2}\/\d{2}\s*می باشد)/g,
+                                '<strong style="color:#d9534f; font-weight:bold;">$1</strong>'
+                            );
+
+                            $('#documentModalBody').html('<pre style="white-space: pre-wrap; line-height:1.8; font-size:0.95rem; background: #f8f9fa; padding: 15px; border-radius: 8px; color: #212529;" class="document-content">' + safe + '</pre>');
+                            $('#documentChecked').prop('checked', res.isRead === true);
+                            $('#documentChecked').prop('disabled', false);
+                            $('#confirmDocument').prop('disabled', false);
+                        } else {
+                            $('#documentModalBody').html('<p class="text-danger fw-bold text-center my-4">⚠️ رمز تصدیق یا شماره سند درست وارد نشده است.<br><small class="text-muted">جهت مشاهده متن سند، لطفاً اطلاعات صحیح را وارد کنید.</small></p>');
+                            $('#documentChecked').prop('checked', false);
+                            $('#documentChecked').prop('disabled', true);
+                            $('#confirmDocument').prop('disabled', true);
+                            toastr.error(res.message || 'رمز تصدیق یا شماره سند درست وارد نشده است.');
+                        }
+                    },
+                    error: function (xhr) {
+                        const msg = xhr.responseJSON?.message || 'خطا در دریافت اطلاعات سند.';
+                        $('#documentModalBody').html('<p class="text-danger text-center my-4">❌ ' + msg + '</p>');
+                        $('#documentChecked').prop('checked', false);
+                        $('#documentChecked').prop('disabled', true);
+                        $('#confirmDocument').prop('disabled', true);
+                        toastr.error(msg);
+                    }
+                });
+            });
+
+            // ==================== 3. تیک "سند مشاهده شد" ====================
+            $('#confirmDocument').click(function () {
+                if (!$('#documentChecked').is(':checked')) {
+                    toastr.warning('لطفاً ابتدا گزینه «متن سند بررسی شد» را تیک بزنید.');
+                    return;
+                }
+
+                const requestId = $(this).data('request-id');
+                const token = $('input[name="__RequestVerificationToken"]').val();
+
+                $.ajax({
+                    url: '/Cartable/MarkDocumentAsRead',
+                    type: 'POST',
+                    data: { requestId: requestId },
+                    headers: { 'X-CSRF-TOKEN': token },
+                    dataType: 'json',
+                    success: function (res) {
+                        if (res.success) {
+                            toastr.success('سند با موفقیت به عنوان خوانده شده علامت‌گذاری شد ✓');
+                            $('#documentModal').modal('hide');
+                        } else {
+                            toastr.error(res.message || 'خطا در ثبت خواندن سند.');
+                        }
+                    },
+                    error: function () {
+                        toastr.error('خطا در ارتباط با سرور.');
+                    }
+                });
+            });
+
+            // ==================== 4. دکمه‌های تایید و رد (جدید) ====================
+
+            // کلیک روی دکمه تایید
+            $(document).on('click', '.approve-btn', function () { 
+                const requestId = $(this).data('request-id');
+                submitValidation(requestId, true, null);
+            });
+
+            // کلیک روی دکمه رد
+            $(document).on('click', '.reject-btn', function () {
+                const requestId = $(this).data('request-id');
+                pendingReject = { requestId };
+                $('#rejectRequestId').val(requestId);
+                $('#predefinedReason').val('');
+                $('#customDescription').val('');
+                $('#rejectModal').modal('show');
+            });
+
+            // نمایش دلیل عدم تایید با کلیک روی متن دلیل
+            $(document).on('click', '.reject-reason-text', function () {
+                const reason = $(this).data('reason');
+                $('#rejectReasonText').text(reason || 'دلیلی ثبت نشده است.');
+                $('#rejectReasonModal').modal('show');
+            });
+
+            // ==================== 5. تایید رد در مودال ====================
+            $('#confirmReject').click(function () {
+                if (!pendingReject) return;
+
+                let description = '';
+                const reason = $('#predefinedReason option:selected').text().trim();
+                const custom = $('#customDescription').val()?.trim();
+
+                if (reason && reason !== "---") description += reason;
+                if (custom) {
+                    if (description) description += " - ";
+                    description += custom;
+                }
+
+                submitValidation(pendingReject.requestId, false, description || null);
+                $('#rejectModal').modal('hide');
+                pendingReject = null;
+            });
+
+            // ==================== 6. تابع اصلی ارسال وضعیت ====================
+            function submitValidation(requestId, validateByExpert, description) {
+                const row = $(`tr[data-request-id="${requestId}"]`);
+                const token = $('input[name="__RequestVerificationToken"]').val();
+
+                fetch('/Cartable/UpdateValidationStatus', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
+                    body: JSON.stringify({
+                        RequestId: requestId,
+                        ValidateByExpert: validateByExpert,
+                        Description: description
+                    })
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.json().then(err => { throw err; });
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        toastr.success(data.message || "وضعیت با موفقیت به‌روز شد");
+
+                        // آپدیت UI بعد از موفقیت
+                        if (validateByExpert === true) {
+                            row.find('.approve-btn').addClass('active btn-success').removeClass('btn-outline-success');
+                            row.find('.reject-btn').removeClass('active btn-danger').addClass('btn-outline-danger');
+                        } else if (validateByExpert === false) {
+                            row.find('.reject-btn').addClass('active btn-danger').removeClass('btn-outline-danger');
+                            row.find('.approve-btn').removeClass('active btn-success').addClass('btn-outline-success');
+                        }
+                    } else {
+                        toastr.error(data.message || "خطا در به‌روزرسانی وضعیت");
+                    }
+                })
+                .catch(err => {
+                    toastr.error(err.message || "خطا در ارتباط با سرور");
+                });
+            }
+
+            // ==================== 7. فرم ارسال درخواست جدید ====================
+            $('#needs-validation-form').on('submit', function (e) {
+                e.preventDefault();
+                const form = $(this);
+                const btn = $('#btnVerify');
+
+                if (!this.checkValidity()) {
+                    e.stopPropagation();
+                    form.addClass('was-validated');
+                    toastr.error('لطفاً فیلدهای الزامی را پر کنید.');
+                    return;
+                }
+
+                btn.prop('disabled', true)
+                   .html('<span class="spinner-border spinner-border-sm me-2"></span>در حال ارسال...');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    type: 'POST',
+                    data: form.serialize(),
+                    success: function () {
+                        toastr.success('درخواست با موفقیت ارسال شد');
+                        $('#scrollingmodal').modal('hide');
+                        location.reload(); // یا load فقط بخش جدول
+                    },
+                    error: function () {
+                        toastr.error('خطا در ارسال درخواست');
+                    },
+                    complete: function () {
+                        btn.prop('disabled', false).html('بررسی و ارسال');
+                    }
+                });
+            });
+
+            // بستن مودال رد
+            $('#rejectModal').on('hidden.bs.modal', function () {
+                pendingReject = null;
+            });
+
+        });
+    </script>
+}
+  <script src="~/assets/plugins/bootstrap5-typehead/autocomplete.js"></script>
+    <script src="~/assets/js/typehead.js"></script>

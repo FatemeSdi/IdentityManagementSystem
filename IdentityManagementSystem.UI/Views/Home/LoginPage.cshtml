@@ -1,0 +1,324 @@
+﻿@model IdentityManagementSystem.UI.ViewModels.LoginViewModel
+@using DNTCaptcha.Core
+@{
+    ViewData["Title"] = "ورود به سامانه";
+    Layout = "~/Views/Shared/_LayoutAuth.cshtml";
+}
+
+<style>
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    .login-card {
+        display: flex;
+        width: 900px;
+        max-width: 100%;
+        background: rgba(255,255,255,.25);
+        backdrop-filter: blur(12px);
+        border-radius: 22px;
+        overflow: hidden;
+        box-shadow: 0 10px 35px rgba(31,38,135,.18);
+        border: 1px solid rgba(255,255,255,.3);
+        transition: .3s;
+    }
+
+        .login-card:hover {
+            transform: translateY(-6px);
+        }
+
+    /* فرم ورود */
+
+    .login-right {
+        flex: 1;
+        padding: 45px;
+    }
+
+    /* بخش لوگو */
+
+    .login-left {
+        width: 360px;
+        background: linear-gradient(135deg,#f8fbff,#edf4ff);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+        border-left: 1px solid rgba(0,0,0,.08);
+    }
+
+        .login-left img {
+            max-width: 220px;
+            width: 100%;
+            height: auto;
+            margin-bottom: 30px;
+            transition: .3s;
+        }
+
+            .login-left img:hover {
+                transform: scale(1.05);
+            }
+
+    .login-title {
+        font-size: 26px;
+        font-weight: 700;
+        color: #244b8b;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    .login-subtitle {
+        font-size: 16px;
+        color: #666;
+        text-align: center;
+        line-height: 30px;
+    }
+
+    h3 {
+        font-weight: 700;
+        margin-bottom: 30px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    .input-group {
+        width: 100%;
+    }
+
+    .form-control {
+        height: 45px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+        width: 100%;
+    }
+
+        .form-control:focus {
+            border-color: #86b7fe;
+            outline: 0;
+            box-shadow: 0 0 0 .2rem rgba(13,110,253,.15);
+        }
+
+    .input-group-text {
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+    }
+
+    .btn-primary {
+        width: 100%;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        color: #fff;
+    }
+
+    .captchaInput {
+        height: 45px !important;
+        border-radius: 8px !important;
+        border: 1px solid #ccc !important;
+        width: 100% !important;
+        text-align: right !important;
+        direction: rtl !important;
+    }
+
+    .captcha-validation-message {
+        display: block;
+        margin-top: 5px;
+        font-size: 13px;
+    }
+
+    .captcha-container img {
+        margin-left: 10px !important;
+    }
+
+    .captcha-refresh-btn {
+        margin-left: 10px !important;
+    }
+
+    .captcha-group {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    .wrap-input100 {
+        margin-bottom: 5px;
+    }
+
+    .login-right form > div {
+        margin-bottom: 20px;
+    }
+
+    @@media (max-width: 991px) {
+
+        .login-card {
+            flex-direction: column;
+            width: 450px;
+        }
+
+        .login-left {
+            width: 100%;
+            border-left: none;
+            border-bottom: 1px solid rgba(0,0,0,.08);
+            padding: 30px;
+        }
+
+            .login-left img {
+                max-width: 160px;
+                margin-bottom: 20px;
+            }
+
+        .login-right {
+            padding: 30px;
+        }
+    }
+</style>
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-right">
+            <h3 class="text-center pb-3">خوش آمدید</h3>
+            <form id="loginForm" asp-action="LoginPage" method="post" autocomplete="off">
+                <!-- Username Input -->
+                <div class="form-group mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted">
+                            <i class="zmdi zmdi-account text-muted" aria-hidden="true"></i>
+                        </span>
+                        <input asp-for="Username"
+                               class="form-control"
+                               placeholder="نام کاربری"
+                               autocomplete="username"
+                               required />
+                    </div>
+                    <span asp-validation-for="Username" class="text-danger d-block mt-1"></span>
+                </div>
+
+                <!-- Password Input -->
+                <div class="form-group mb-3">
+                    <div class="input-group" id="Password-toggle">
+                        <span class="input-group-text bg-white text-muted">
+                            <i class="zmdi zmdi-eye" aria-hidden="true"></i>
+                        </span>
+                        <input asp-for="Password"
+                               type="password"
+                               class="form-control"
+                               placeholder="رمز عبور"
+                               autocomplete="current-password"
+                               required />
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger d-block mt-1"></span>
+                </div>
+
+                <!-- Captcha Section -->
+                <div id="securitySection" class="form-group text-start mt-2" style="direction: rtl;">
+                    <dnt-captcha asp-captcha-generator-max="9999"
+                                 asp-captcha-generator-min="1000"
+                                 asp-captcha-generator-language="English"
+                                 asp-captcha-generator-display-mode="ShowDigits"
+                                 asp-use-relative-urls="true"
+                                 asp-placeholder="کد امنیتی را وارد کنید"
+                                 asp-validation-error-message="کد امنیتی اشتباه است. لطفاً کد جدید را وارد کنید."
+                                 asp-too-many-requests-error-message="درخواست‌های زیاد! لطفاً یک دقیقه صبر کنید!"
+                                 asp-font-name="Tahoma"
+                                 asp-font-size="30"
+                                 asp-fore-color="#333333"
+                                 asp-back-color="#FCF6F5FF"
+                                 asp-text-box-class="form-control captchaInput"
+                                 asp-text-box-template="<div class='form-group'>{0}</div>"
+                                 asp-validation-message-class="text-danger captcha-validation-message"
+                                 asp-refresh-button-class="btn fe fe-refresh-cw"
+                                 asp-show-refresh-button="true" />
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-group mt-3">
+                    <button type="submit" class="btn btn-primary mb-1">ورود</button>
+                </div>
+            </form>
+        </div>
+        <div class="login-left">
+            <img src="~/assets/images/brand/logo-pmo.png"
+                 alt="Logo" />
+
+            <div class="login-title">
+                اداره بندر شهید رجایی
+            </div>
+
+            <div class="login-subtitle">
+                سامانه استعلام سند
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        @if (TempData["SuccessLogoutMessage"] != null)
+        {
+                    @:toastr.options = {
+                    @:"closeButton": true,
+                    @:"progressBar": true,
+                    @:"positionClass": "toast-top-left",
+                    @:"timeOut": "3000",
+                    @:"rtl": true
+                    @:};
+                    @:toastr.success('@TempData["SuccessLogoutMessage"]');
+        }
+
+        const jwtToken = '@ViewBag.JwtToken';
+        if (jwtToken) {
+            localStorage.setItem('jwtToken', jwtToken);
+            window.location.href = '/Cartable/Index';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            toastr.options = {
+                "closeButton": true,
+                "progressBar": true,
+                "positionClass": "toast-top-left",
+                "timeOut": "5000",
+                "rtl": true
+            };
+
+            const validationErrors = document.querySelectorAll('.field-validation-error, .text-danger');
+            validationErrors.forEach(err => {
+                const text = err.textContent.trim();
+                if (text !== '' && text.length > 5) {
+                    toastr.error(text);
+                }
+            });
+
+            if ('@(!string.IsNullOrEmpty(ViewBag.ErrorMessage) ? ViewBag.ErrorMessage : "")' !== '') {
+                toastr.error('@(!string.IsNullOrEmpty(ViewBag.ErrorMessage) ? ViewBag.ErrorMessage : "")');
+            }
+
+            const toggle = document.getElementById('Password-toggle');
+            const icon = toggle.querySelector('i');
+            const input = toggle.querySelector('input');
+
+            toggle.addEventListener('click', function (e) {
+                if (e.target.closest('span.input-group-text')) {
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.classList.remove('zmdi-eye');
+                        icon.classList.add('zmdi-eye-off');
+                    } else {
+                        input.type = 'password';
+                        icon.classList.remove('zmdi-eye-off');
+                        icon.classList.add('zmdi-eye');
+                    }
+                }
+            });
+        });
+    </script>
+}

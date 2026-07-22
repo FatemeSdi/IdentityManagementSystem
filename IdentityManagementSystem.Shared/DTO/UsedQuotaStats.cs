@@ -1,0 +1,22 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
+
+namespace IdentityManagementSystem.Shared.DTO
+{
+    public class UsedQuotaStats
+    {
+        [JsonPropertyName("hourlyUsed")]
+        public int HourlyUsed { get; set; }
+
+        [JsonPropertyName("dailyUsed")]
+        public int DailyUsed { get; set; }
+
+        [JsonPropertyName("monthlyUsed")]
+        public int MonthlyUsed { get; set; }
+    }
+
+}

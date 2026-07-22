@@ -1,0 +1,195 @@
+﻿@{
+    ViewData["Title"] = "گزارش‌گیری سامانه";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<!-- Chart.js محلی (بدون اینترنت) -->
+<script src="~/js/chart.min.js"></script>
+
+<style>
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+        transition: all 0.3s;
+    }
+
+    .doc-search {
+        max-width: 400px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <h1 class="text-primary mb-4">
+        <i class="fa fa-chart-bar"></i> گزارش‌گیری زنده
+    </h1>
+
+    <!-- جستجوی سند -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form asp-action="Index" method="get" class="row g-3">
+                <div class="col-md-8">
+                    <input type="text" name="docNumber" class="form-control doc-search"
+                           placeholder="شناسه سند را وارد کنید (مثال: 140232155760000666)"
+                           value="@Model.SearchedDocNumber" />
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fa fa-search"></i> جستجو
+                    </button>
+                </div>
+            </form>
+
+            @if (!string.IsNullOrEmpty(Model.SearchedDocNumber))
+            {
+                <div class="alert alert-info mt-3">
+                    <strong>سند @Model.SearchedDocNumber:</strong>
+                    <span class="badge bg-success fs-5">@Model.DocRequestCount درخواست</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary card-hover">
+                <div class="card-body">
+                    <h5>کل درخواست‌ها</h5>
+                    <h2>@Model.Stats.Total</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success card-hover">
+                <div class="card-body">
+                    <h5>تایید شده</h5>
+                    <h2>@Model.Stats.Approved</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger card-hover">
+                <div class="card-body">
+                    <h5>رد شده</h5>
+                    <h2>@Model.Stats.Rejected</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning card-hover">
+                <div class="card-body">
+                    <h5>در انتظار</h5>
+                    <h2>@Model.Stats.Pending</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4 g-4">
+        <div class="col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h5>وضعیت درخواست‌ها</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white">
+                    <h5>کارمند برتر</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="p-3 border rounded">
+                                <small class="text-muted">هفته</small>
+                                <h5 class="text-primary">@Model.TopUserWeek.Username</h5>
+                                <span class="badge bg-primary fs-6">@Model.TopUserWeek.RequestCount</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 border rounded">
+                                <small class="text-muted">ماه</small>
+                                <h5 class="text-success">@Model.TopUserMonth.Username</h5>
+                                <span class="badge bg-success fs-6">@Model.TopUserMonth.RequestCount</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 border rounded">
+                                <small class="text-muted">سال</small>
+                                <h5 class="text-danger">@Model.TopUserYear.Username</h5>
+                                <span class="badge bg-danger fs-6">@Model.TopUserYear.RequestCount</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow mt-4">
+        <div class="card-header bg-secondary text-white">
+            <h5>10 سند پر درخواست</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>شناسه سند</th>
+                            <th class="text-center">تعداد درخواست</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var doc in Model.TopDocuments)
+                        {
+                            <tr>
+                                <td><code>@doc.DocumentNumber</code></td>
+                                <td class="text-center">
+                                    <span class="badge bg-@(doc.RequestCount > 5 ? "danger" : "warning")">
+                                        @doc.RequestCount
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // کاملاً آفلاین کار می‌کنه!
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['تایید شده', 'رد شده', 'در انتظار'],
+                datasets: [{
+                    data: [@Model.Stats.Approved, @Model.Stats.Rejected, @Model.Stats.Pending],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return `${ctx.label}: ${ctx.raw} درخواست`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+}
