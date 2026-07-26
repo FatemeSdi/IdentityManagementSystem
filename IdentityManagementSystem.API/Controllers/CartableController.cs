@@ -52,9 +52,8 @@ namespace IdentityManagementSystem.API.Controllers
                     AssignedAt = ci.AssignedAt,
                     ViewedAt = ci.ViewedAt,
                     Status = ci.Status,
-                    Description = ci.Description,
-                    ValidateByExpert = ci.ValidateByExpert
-
+                    Description = ci.Description, // NotMapped - will be null unless populated
+                    ValidateByExpert = ci.ValidateByExpert // NotMapped
                 })
                 .ToListAsync();
 
@@ -78,15 +77,16 @@ namespace IdentityManagementSystem.API.Controllers
             await _context.SaveChangesAsync();
 
             // 🟢 اضافه کردن رکورد تاریخچه برای عملیات Assign
+            // ExpertId در DB از نوع nvarchar است
             _context.RequestHistory.Add(new RequestHistory
             {
                 RequestId = cartableItem.RequestId,
-                ExpertId = viewModel.AssignedTo, // کاربری که وظیفه به او اختصاص داده شده
+                ExpertId = viewModel.AssignedTo.ToString(), // string مطابق اسکیما
                 StatusId = 1,
                 ActionDescription = $"آیتم کارتابل به کاربر {viewModel.AssignedTo} تخصیص یافت",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedStatus = "Assigned",
-                UpdatedStatusBy = User?.Identity?.Name, // یا Id کاربر جاری
+                UpdatedStatusBy = User?.Identity?.Name,
                 UpdatedStatusDate = DateTime.UtcNow
             });
 
@@ -95,24 +95,23 @@ namespace IdentityManagementSystem.API.Controllers
             return NoContent();
         }
 
-            // متد کمکی برای ایجاد آیتم کارتابل برای Request جدید
-            [HttpPost("create-for-request")]
-            public async Task<CartableItem> CreateCartableItemForRequest(long requestId, long cartableId, long? assignedToUserId = null)
+        // متد کمکی برای ایجاد آیتم کارتابل برای Request جدید
+        [HttpPost("create-for-request")]
+        public async Task<ActionResult<CartableItem>> CreateCartableItemForRequest(long requestId, long cartableId, long? assignedToUserId = null)
+        {
+            var cartableItem = new CartableItem
             {
-                var cartableItem = new CartableItem
-                {
-                    RequestId = requestId,
-                    CartableId = cartableId,
-                    AssignedTo = assignedToUserId,
-                    AssignedAt = (DateTime)(assignedToUserId.HasValue ? DateTime.UtcNow : (DateTime?)null),
-                    Status = "New"
-                };
+                RequestId = requestId,
+                CartableId = cartableId,
+                AssignedTo = assignedToUserId,
+                AssignedAt = assignedToUserId.HasValue ? DateTime.UtcNow : null,
+                Status = "New"
+            };
 
-                _context.CartableItems.Add(cartableItem);
-                await _context.SaveChangesAsync();
+            _context.CartableItems.Add(cartableItem);
+            await _context.SaveChangesAsync();
 
-                return cartableItem;
-            }
+            return Ok(cartableItem);
         }
-    } 
-
+    }
+}

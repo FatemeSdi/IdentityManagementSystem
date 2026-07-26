@@ -1,68 +1,104 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Data;
 
 namespace IdentityManagementSystem.API.Models
 {
+    [Table("Users", Schema = "Sec")]
     public class User
     {
         [Key]
         public long UserId { get; set; }
 
-        // فیلدهای رمزنگاری شده جدید
-        
-        public string NationalId { get; set; } = string.Empty;   // برای جستجو
+        [Required]
+        [StringLength(10)]
+        public string NationalId { get; set; } = string.Empty;
 
+        [Required]
+        [StringLength(50)]
         public string Username { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(255)]
         public string PasswordHash { get; set; } = string.Empty;
 
+        [Required]
+        [StringLength(75)]
         public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(85)]
         public string LastName { get; set; } = string.Empty;
 
-        public int RoleId { get; set; }
-        public Role Role { get; set; } = null!;
-
-        public string? MobileNumber { get; set; }
-
-        public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLogin { get; set; }
         public bool IsActive { get; set; } = true;
 
-        
+        [StringLength(11)]
+        public string? MobileNumber { get; set; }
+
+        // Navigation for many-to-many roles via UserRoles
+        public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+
+        // Convenience for single role (common in this app) - not mapped to DB
+        [NotMapped]
+        public Role? Role { get; set; }
+
+        [NotMapped]
+        public int RoleId { get; set; }
     }
 
-    public class RoleViewModel
-        {
-            public int RoleId { get; set; }
-            public string RoleName { get; set; } = string.Empty;
-        }
+    [Table("Roles", Schema = "Sec")]
+    public class Role
+    {
+        [Key]
+        public int RoleId { get; set; }
 
+        [Required]
+        [StringLength(100)]
+        public string RoleName { get; set; } = string.Empty;
 
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
+    }
+
+    [Table("UserRoles", Schema = "Sec")]
+    public class UserRole
+    {
+        [Key]
+        public long UserRoleId { get; set; }
+
+        public long UserId { get; set; }
+        public User? User { get; set; }
+
+        public int RoleId { get; set; }
+        public Role? Role { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public string? CreatedBy { get; set; }
+    }
+
+    [Table("Request", Schema = "Define")]
     public class Request
     {
         [Key]
         public long RequestId { get; set; }
 
-        [StringLength(10)]
-        public string? NationalIdEnc { get; set; }
-
-        public string? NationalIdHash { get; set; }        // برای جستجوی سریع
+        [Required]
+        [StringLength(50)]
+        public string RequestCode { get; set; } = string.Empty;
 
         [StringLength(20)]
-        public string? MobileNumberEnc { get; set; }
+        public string? NationalId { get; set; }
 
-        public string? MobileNumberHash { get; set; }
-
-        [StringLength(50)]
-        public string? DocumentNumberEnc { get; set; }
+        [StringLength(20)]
+        public string? MobileNumber { get; set; }
 
         [StringLength(50)]
-        public string? VerificationCodeEnc { get; set; }
+        public string? DocumentNumber { get; set; }
 
-        public string? RequestCode { get; set; } = string.Empty;   // این را هم می‌توانی encrypt کنی اگر حساس باشد
-
-        public bool? ValidateByExpert { get; set; }
-        public string? Description { get; set; }
+        [StringLength(50)]
+        public string? VerificationCode { get; set; }
 
         public bool? IsMatch { get; set; }
         public bool? IsExist { get; set; }
@@ -76,60 +112,54 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(100)]
         public string? UpdatedBy { get; set; }
 
-        // فیلدهای قدیمی (برای مهاجرت)
-        [Obsolete("Use NationalIdEnc instead")]
-        public string? NationalId { get; set; }
-
-        [Obsolete("Use MobileNumberEnc instead")]
-        public string? MobileNumber { get; set; }
-
-        [Obsolete("Use DocumentNumberEnc instead")]
-        public string? DocumentNumber { get; set; }
-
-        [Obsolete("Use VerificationCodeEnc instead")]
-        public string? VerificationCode { get; set; }
+        public bool? ValidateByExpert { get; set; }
+        [StringLength(500)]
+        public string? Description { get; set; }
     }
 
+    [Table("Cartable", Schema = "WF")]
     public class Cartable
     {
         [Key]
         public long CartableId { get; set; }
 
-        [ForeignKey("User")]
         public long UserId { get; set; }
-
         public User? User { get; set; }
+
+        [StringLength(200)]
         public string? CartableName { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    [Table("CartableItems", Schema = "WF")]
     public class CartableItem
     {
         [Key]
         public long ItemId { get; set; }
 
-        [ForeignKey("Cartable")]
         public long CartableId { get; set; }
-
         public Cartable? Cartable { get; set; }
 
-        [ForeignKey("Request")]
         public long RequestId { get; set; }
-
         public Request? Request { get; set; }
 
-        [ForeignKey("User")]
         public long? AssignedTo { get; set; }
-        public bool? ValidateByExpert { get; set; } // اضافه شده
-        public string? Description { get; set; }
         public User? AssignedToUser { get; set; }
 
-        public DateTime AssignedAt { get; set; } = DateTime.UtcNow;
-
+        public DateTime? AssignedAt { get; set; }
         public DateTime? ViewedAt { get; set; }
 
         [StringLength(20)]
-        public string Status { get; set; } = "New";
+        public string? Status { get; set; } = "New";
+
+        // These are used in code but not present in current DB schema.
+        // Kept as NotMapped to avoid EF errors. Add columns to DB if needed.
+        [NotMapped]
+        public bool? ValidateByExpert { get; set; }
+
+        [NotMapped]
+        public string? Description { get; set; }
     }
 
     [Table("UserLog", Schema = "Log")]
@@ -139,52 +169,48 @@ namespace IdentityManagementSystem.API.Models
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public long LogId { get; set; }
 
-        public long? UserId { get; set; }
+        public long UserId { get; set; }  // NOT NULL in DB
 
         [MaxLength(255)]
         public string? Action { get; set; }
 
-        public DateTime ActionTime { get; set; } = DateTime.UtcNow;
+        public DateTime? ActionTime { get; set; } = DateTime.UtcNow;
 
-        [MaxLength(50)]
+        [MaxLength(45)]
         public string? IpAddress { get; set; }
 
-        [MaxLength(512)]
+        [MaxLength(255)]
         public string? UserAgent { get; set; }
-        public string ActionResult { get; internal set; }
-        public string LogLevel { get; internal set; }
+
+        [MaxLength(500)]
+        public string? ActionResult { get; set; }
+
+        [MaxLength(20)]
+        public string? LogLevel { get; set; }
     }
 
-
-    [Table("RequestHistory", Schema = "sec")]
+    [Table("RequestHistory", Schema = "Sec")]
     public class RequestHistory
     {
         [Key]
         public long LogId { get; set; }
 
-        // ارتباط با جدول Request
-        [ForeignKey(nameof(Request))]
         public long RequestId { get; set; }
         public Request? Request { get; set; }
 
-        // وضعیت درخواست
-   
-         public int StatusId { get; set; }
-        public RequestStatus Status { get; set; } = null!;
+        public int StatusId { get; set; }
+        public RequestStatus? Status { get; set; }
 
-        // کارشناس انجام‌دهنده یا دریافت‌کننده
-        [ForeignKey(nameof(Expert))]
-        public long? ExpertId { get; set; }
-        public User? Expert { get; set; }
+        // In DB: nvarchar(50) NOT NULL. Store as string (e.g. UserId.ToString() or Username)
+        [Required]
+        [StringLength(50)]
+        public string ExpertId { get; set; } = string.Empty;
 
-        // توضیح عملکرد
-        [StringLength(250)]
+        [StringLength(500)]
         public string? ActionDescription { get; set; }
 
-        // زمان ایجاد لاگ
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // 🟢 فیلدهای مربوط به وضعیت به‌روزرسانی
         [StringLength(100)]
         public string? UpdatedStatus { get; set; }
 
@@ -204,29 +230,26 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(50)]
         public string StatusName { get; set; } = string.Empty;
 
+        [StringLength(200)]
         public string? Description { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
-    // مدل جدید UserAccess
+
+    [Table("UserAccess", Schema = "Sec")]
     public class UserAccess
     {
         [Key]
         [Column("AccessId")]
         public long Id { get; set; }
 
-        [ForeignKey("User")]
-        [Column("UserId")]
         public long UserId { get; set; }
-
         public User? User { get; set; }
 
         [Required]
         [StringLength(50)]
-        [Column("Permission")]
-        public string? Permission { get; set; }
+        public string Permission { get; set; } = string.Empty;
 
-        [Column("CreatedAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
@@ -248,18 +271,14 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(30)]
         public string RequestCode { get; set; } = string.Empty;
 
-        [Required]
         public bool IsMatch { get; set; }
 
         public string? ResponseText { get; set; }
 
-        [Required]
         public long ExpertId { get; set; }
 
-      
-        public long RequestId { get; set; }
+        public long? RequestId { get; set; }
 
-        [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
@@ -269,25 +288,28 @@ namespace IdentityManagementSystem.API.Models
         [Key]
         public int VerifyDocLogId { get; set; }
 
-        // لاگ اصلی: کل JSON پاسخ سرویس
         [Required]
         public string ResponseText { get; set; } = null!;
 
-        // مقادیر ورودی که بعدا برای تطابق کارتابل استفاده میشن
         [Required]
-        public string DocumentNumber { get; set; } = null!;  // NationalRegisterNo
+        [StringLength(50)]
+        public string DocumentNumber { get; set; } = null!;
 
-        public long RequestId { get; set; }
+        public long? RequestId { get; set; }
+
         [Required]
-        public string VerificationCode { get; set; } = null!; // SecretNo
+        [StringLength(10)]
+        public string VerificationCode { get; set; } = null!;
 
-        // تاریخ و کاربر ایجاد کننده
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
         [Required]
+        [StringLength(100)]
         public string CreatedBy { get; set; } = null!;
-        public bool? IsExist { get;  set; }
-        public bool? IsRead { get; set; } = false; 
-        public string? ReadBy { get; set; } 
+
+        public bool? IsExist { get; set; }
+        public bool? IsRead { get; set; } = false;
+        public string? ReadBy { get; set; }
         public DateTime? ReadDate { get; set; }
     }
 
@@ -297,29 +319,26 @@ namespace IdentityManagementSystem.API.Models
         [Key]
         public long Id { get; set; }
 
-        [Required]
         public long UserId { get; set; }
 
         [Required]
         [StringLength(255)]
         public string Token { get; set; } = string.Empty;
 
-        [Required]
         public DateTime ExpiryDate { get; set; }
 
         public bool IsRevoked { get; set; }
 
-        [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         [ForeignKey("UserId")]
         public User? User { get; set; }
     }
-    public class Role
+
+    // ViewModels kept for compatibility (moved from controllers where possible)
+    public class RoleViewModel
     {
         public int RoleId { get; set; }
         public string RoleName { get; set; } = string.Empty;
-        public bool IsActive { get; set; }
     }
-
 }

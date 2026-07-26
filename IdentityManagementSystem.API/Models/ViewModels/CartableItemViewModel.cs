@@ -18,7 +18,7 @@ namespace IdentityManagementSystem.API.Models.ViewModels
         public string? RequestStatus { get; set; }
         public long? AssignedTo { get; set; }
         public string? AssignedToName { get; set; }
-        public DateTime AssignedAt { get; set; }
+        public DateTime? AssignedAt { get; set; }
         public DateTime? ViewedAt { get; set; }
         public string? Status { get; set; }
         public bool? IsMatch { get; internal set; }

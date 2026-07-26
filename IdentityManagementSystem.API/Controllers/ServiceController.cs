@@ -58,6 +58,7 @@ namespace IdentityManagementSystem.API.Controllers
                             retryCount, timeSpan.TotalSeconds, result.Exception?.Message ?? $"StatusCode: {result.Result?.StatusCode}");
                     });
         }
+
         [HttpPost("ProcessCombinedRequest")]
         [Authorize(Policy = "CanAccessShahkar")]
         public async Task<IActionResult> ProcessCombinedRequest([FromBody] CombinedRequestViewModel model)
@@ -89,12 +90,13 @@ namespace IdentityManagementSystem.API.Controllers
 
             _context.Request.Add(request);
             await _context.SaveChangesAsync();
+
             // === ثبت تاریخچه درخواست (RequestHistory) ===
             var history = new RequestHistory
             {
                 RequestId = request.RequestId,
                 StatusId = 1,                                          // 1 = در انتظار بررسی
-                ExpertId = userId,                                     // کاربر جاری
+                ExpertId = userId.ToString(),                          // string مطابق اسکیمای DB (nvarchar)
                 ActionDescription = "درخواست جدید از فرم کارتابل ایجاد شد.",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedStatus = "در انتظار بررسی",
@@ -103,7 +105,7 @@ namespace IdentityManagementSystem.API.Controllers
             };
 
             _context.RequestHistory.Add(history);
-            await _context.SaveChangesAsync();   // حتماً دوباره Save کن!
+            await _context.SaveChangesAsync();
 
             long expertId = userId;
 
@@ -142,8 +144,6 @@ namespace IdentityManagementSystem.API.Controllers
                 _context.Request.Update(request);
                 await _context.SaveChangesAsync();
 
-
-
                 var combinedResult = new
                 {
                     Shahkar = shahkarResult,
@@ -159,6 +159,7 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = $"خطا در پردازش درخواست: {ex.Message}" });
             }
         }
+
         private async Task<ShahkarResponse> CheckMobileNationalCode_Internal(
             string nationalId, string mobile, string requestCode, long requestId, long expertId)
         {
@@ -331,9 +332,9 @@ namespace IdentityManagementSystem.API.Controllers
                 credential = new { code = _options.Credential.Code, password = _options.Credential.Password },
                 parameters = new object[]
                 {
-            new { parameterName = "NationalRegisterNo", parameterValue = documentNumber },
-            new { parameterName = "SecretNo", parameterValue = verificationCode },
-            new { parameterName = "requestId", parameterValue = requestCode }
+                    new { parameterName = "NationalRegisterNo", parameterValue = documentNumber },
+                    new { parameterName = "SecretNo", parameterValue = verificationCode },
+                    new { parameterName = "requestId", parameterValue = requestCode }
                 },
                 service = "gsb-Approval2-GetData"
             };
@@ -358,7 +359,7 @@ namespace IdentityManagementSystem.API.Controllers
             VerifyDocResponse result = new VerifyDocResponse
             {
                 IsSuccessful = false,
-                ResponseText = responseString, // نگه داشتن JSON خام
+                ResponseText = responseString,
                 PersonsInQuery = new List<PersonInQuery>(),
                 ExistDoc = false,
                 IsNationalIdInLawyers = false,
@@ -446,7 +447,7 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 DocumentNumber = documentNumber,
                 VerificationCode = verificationCode,
-                ResponseText = responseString, // ذخیره JSON خام
+                ResponseText = responseString,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = User.Identity?.Name ?? userId.ToString(),
                 IsExist = isExist,
@@ -460,7 +461,6 @@ namespace IdentityManagementSystem.API.Controllers
 
             return result;
         }
-
         private string GetDocumentText(string responseString)
         {
             try
@@ -672,8 +672,6 @@ namespace IdentityManagementSystem.API.Controllers
             }
         }
 
-
-
         private string GenerateRequestId()
         {
             var now = DateTime.Now;
@@ -698,7 +696,6 @@ namespace IdentityManagementSystem.API.Controllers
                    b.Trim().Replace("ي", "ی").Replace("ك", "ک");
         }
 
-
         private bool IsValidIranianNationalId(string nationalId)
         {
             if (nationalId.Length != 10 || !nationalId.All(char.IsDigit)) return false;
@@ -719,9 +716,10 @@ namespace IdentityManagementSystem.API.Controllers
         public bool Success { get; set; }
         public string? DocumentText { get; set; }
         public bool IsRead { get; set; }
-        public bool ExistDoc { get; set; } // اضافه شده برای هماهنگی با VerifyDocResponse
+        public bool ExistDoc { get; set; }
         public string? Message { get; set; }
     }
+
     public class CombinedRequestViewModel
     {
         public string NationalId { get; set; } = string.Empty;
@@ -729,6 +727,7 @@ namespace IdentityManagementSystem.API.Controllers
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
     }
+
     public class InternalShahkarResponse
     {
         public ResultWrapper? Result { get; set; }
@@ -739,6 +738,7 @@ namespace IdentityManagementSystem.API.Controllers
         public DataWrapper? Data { get; set; }
         public StatusWrapper? Status { get; set; }
     }
+
     public class VerifyDocResponse
     {
         public bool IsSuccessful { get; set; }
@@ -747,8 +747,8 @@ namespace IdentityManagementSystem.API.Controllers
         public bool ExistDoc { get; set; }
         public bool IsNationalIdInLawyers { get; set; }
         public bool IsNationalIdInResponse { get; set; }
-
     }
+
     public class DataWrapper
     {
         public string? Result { get; set; }

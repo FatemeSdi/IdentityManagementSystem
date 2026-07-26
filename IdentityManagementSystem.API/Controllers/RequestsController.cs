@@ -15,21 +15,21 @@ namespace IdentityManagementSystem.API.Controllers
     [Authorize]
     public class RequestController : ControllerBase
     {
-            private readonly IdentityManagementSystemContext _context;
-            private readonly ILogger<RequestController> _logger;
-            private readonly UserActionLogger _actionLogger;
-            private readonly EncryptionHelper _encryptionHelper;
+        private readonly IdentityManagementSystemContext _context;
+        private readonly ILogger<RequestController> _logger;
+        private readonly UserActionLogger _actionLogger;
+        private readonly EncryptionHelper _encryptionHelper;
 
         public RequestController(
-                IdentityManagementSystemContext context,
-                ILogger<RequestController> logger,
-                UserActionLogger actionLogger,
-                EncryptionHelper encryptionHelper)
-            {
-                _context = context;
-                _logger = logger;
-                _actionLogger = actionLogger;
-                _encryptionHelper = encryptionHelper;
+            IdentityManagementSystemContext context,
+            ILogger<RequestController> logger,
+            UserActionLogger actionLogger,
+            EncryptionHelper encryptionHelper)
+        {
+            _context = context;
+            _logger = logger;
+            _actionLogger = actionLogger;
+            _encryptionHelper = encryptionHelper;
         }
 
         [HttpGet]
@@ -45,6 +45,7 @@ namespace IdentityManagementSystem.API.Controllers
                 return Unauthorized();
 
             var currentUser = await _context.Users
+                .Include(u => u.UserRoles)
                 .FirstOrDefaultAsync(u => u.Username == username);
 
             if (currentUser == null)
@@ -52,8 +53,10 @@ namespace IdentityManagementSystem.API.Controllers
 
             var query = _context.Request.AsQueryable();
 
-            // اگر ادمین نیست، فقط Requestهای خودش
-            if (currentUser.RoleId != 3)
+            // اگر ادمین نیست (RoleId == 3 یا RoleName ادمین)، فقط Requestهای خودش
+            // چون RoleId در User نیست، از UserRoles چک می‌کنیم
+            bool isAdmin = currentUser.UserRoles.Any(ur => ur.RoleId == 3);
+            if (!isAdmin)
             {
                 query = query.Where(r =>
                     r.CreatedBy == username ||
@@ -63,11 +66,11 @@ namespace IdentityManagementSystem.API.Controllers
             if (!string.IsNullOrWhiteSpace(search))
             {
                 query = query.Where(r =>
-                    r.NationalId.Contains(search) ||
-                    r.MobileNumber.Contains(search) ||
-                    r.DocumentNumber.Contains(search) ||
-                    r.VerificationCode.Contains(search) ||
-                    r.RequestCode.Contains(search) ||
+                    (r.NationalId != null && r.NationalId.Contains(search)) ||
+                    (r.MobileNumber != null && r.MobileNumber.Contains(search)) ||
+                    (r.DocumentNumber != null && r.DocumentNumber.Contains(search)) ||
+                    (r.VerificationCode != null && r.VerificationCode.Contains(search)) ||
+                    (r.RequestCode != null && r.RequestCode.Contains(search)) ||
                     r.RequestId.ToString().Contains(search));
             }
 
@@ -101,7 +104,8 @@ namespace IdentityManagementSystem.API.Controllers
                     NationalId = r.NationalId,
                     MobileNumber = r.MobileNumber,
                     DocumentNumber = r.DocumentNumber,
-                    VerificationCode = _encryptionHelper.Decrypt(r.VerificationCode),
+                    // اگر encrypted ذخیره شده باشد decrypt، در غیر این صورت همان مقدار
+                    VerificationCode = r.VerificationCode != null ? TryDecrypt(r.VerificationCode) : null,
                     IsMatch = r.IsMatch ?? false,
                     IsExist = r.IsExist ?? false,
                     IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,
@@ -124,7 +128,18 @@ namespace IdentityManagementSystem.API.Controllers
             });
         }
 
-
+        private string? TryDecrypt(string value)
+        {
+            try
+            {
+                return _encryptionHelper.Decrypt(value);
+            }
+            catch
+            {
+                // اگر plain text باشد همان را برگردان
+                return value;
+            }
+        }
 
         [HttpPost("CreateNewRequest")]
         [Authorize]
@@ -143,10 +158,11 @@ namespace IdentityManagementSystem.API.Controllers
                     NationalId = model.NationalId,
                     MobileNumber = model.MobileNumber,
                     DocumentNumber = model.DocumentNumber,
-                    VerificationCode = _encryptionHelper.Encrypt(model.VerificationCode),
+                    VerificationCode = _encryptionHelper.Encrypt(model.VerificationCode), // ذخیره encrypted
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = User.Identity?.Name ?? "Unknown",
-                    ValidateByExpert = null
+                    ValidateByExpert = null,
+                    RequestCode = GenerateTempRequestCode() // اگر لازم باشد
                 };
 
                 _context.Request.Add(newRequest);
@@ -159,14 +175,15 @@ namespace IdentityManagementSystem.API.Controllers
                     RequestCode = newRequest.RequestCode,
                     ExpertId = userId,
                     RequestId = newRequest.RequestId,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    IsMatch = false
                 };
                 _context.ShahkarLog.Add(shahkarLog);
 
                 var verifyLog = new VerifyDocLog
                 {
                     DocumentNumber = model.DocumentNumber,
-                    VerificationCode = _encryptionHelper.Encrypt(model.VerificationCode),
+                    VerificationCode = model.VerificationCode.Length > 10 ? model.VerificationCode.Substring(0, 10) : model.VerificationCode, // DB limit 10
                     ResponseText = "",
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = userId.ToString(),
@@ -178,7 +195,7 @@ namespace IdentityManagementSystem.API.Controllers
                 {
                     RequestId = newRequest.RequestId,
                     StatusId = 1,
-                    ExpertId = null,
+                    ExpertId = userId.ToString(), // string مطابق اسکیما
                     ActionDescription = "درخواست جدید ایجاد شد و در انتظار بررسی قرار گرفت.",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedStatus = "در انتظار بررسی",
@@ -205,6 +222,11 @@ namespace IdentityManagementSystem.API.Controllers
                 await _actionLogger.Error(userId, "Create_Request", $"Exception: {ex.Message}");
                 return StatusCode(500, new { success = false, message = "خطا در ایجاد درخواست." });
             }
+        }
+
+        private string GenerateTempRequestCode()
+        {
+            return "TMP" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
         }
 
         [HttpPost("ValidateRequest")]
@@ -245,7 +267,7 @@ namespace IdentityManagementSystem.API.Controllers
                 var history = new RequestHistory
                 {
                     RequestId = request.RequestId,
-                    ExpertId = userId,
+                    ExpertId = userId.ToString(),
                     StatusId = newStatusId,
                     ActionDescription = model.ValidateByExpert
                         ? $"درخواست تأیید شد. توضیحات: {model.Description}"
@@ -350,7 +372,7 @@ namespace IdentityManagementSystem.API.Controllers
                 {
                     RequestId = requestId,
                     StatusId = statusId,
-                    ExpertId = userId,
+                    ExpertId = userId.ToString(),
                     ActionDescription = validateByExpert
                         ? "درخواست توسط کارشناس تأیید شد"
                         : $"درخواست رد شد: {description}",

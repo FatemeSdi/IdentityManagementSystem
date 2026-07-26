@@ -30,16 +30,22 @@ namespace IdentityManagementSystem.API.Controllers
                 return BadRequest(ModelState);
 
             var user = await _context.Users
-                .Include(u => u.Role) // join جدول Roles
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.Username == loginViewModel.Username);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(loginViewModel.Password, user.PasswordHash))
                 return Unauthorized("نام کاربری یا رمز عبور اشتباه است.");
 
+            // Set convenience properties from first role (if any)
+            var firstRole = user.UserRoles?.FirstOrDefault()?.Role;
+            user.Role = firstRole;
+            user.RoleId = firstRole?.RoleId ?? 0;
+
             // بروزرسانی آخرین ورود 
             user.LastLogin = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-               
+
             // تولید توکن‌ها
             var tokens = await _tokenService.GenerateTokensAsync(user);
 
@@ -50,12 +56,12 @@ namespace IdentityManagementSystem.API.Controllers
                 user.Username,
                 user.Name,
                 user.LastName,
-                Role = new
+                Role = firstRole != null ? new
                 {
-                    user.Role.RoleId,
-                    user.Role.RoleName
-                },
-                Tokens = tokens // اضافه کردن توکن‌ها
+                    firstRole.RoleId,
+                    firstRole.RoleName
+                } : null,
+                Tokens = tokens
             });
         }
 
@@ -67,11 +73,19 @@ namespace IdentityManagementSystem.API.Controllers
             if (refreshToken == null)
                 return Unauthorized("Refresh Token نامعتبر یا منقضی شده است.");
 
-            var user = await _context.Users.FindAsync(refreshToken.UserId);
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.UserId == refreshToken.UserId);
             if (user == null)
                 return Unauthorized("کاربر یافت نشد.");
 
-            object value = await _tokenService.RevokeRefreshTokenAsync(model.RefreshToken);
+            // Set convenience
+            var firstRole = user.UserRoles?.FirstOrDefault()?.Role;
+            user.Role = firstRole;
+            user.RoleId = firstRole?.RoleId ?? 0;
+
+            await _tokenService.RevokeRefreshTokenAsync(model.RefreshToken);
             var newTokens = await _tokenService.GenerateTokensAsync(user);
 
             await LogAction(user.UserId, "Refresh_Success", user.Username, "Token refreshed");
@@ -106,21 +120,37 @@ namespace IdentityManagementSystem.API.Controllers
                 Name = viewModel.Name,
                 LastName = viewModel.LastName,
                 MobileNumber = viewModel.MobileNumber,
-                RoleId = viewModel.RoleId,
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync(); // کاربر ثبت می‌شود
 
-            // بارگذاری نقش با Include تا از NullReferenceException جلوگیری شود
+            // ثبت نقش از طریق UserRoles (مطابق اسکیمای DB)
+            if (viewModel.RoleId > 0)
+            {
+                var userRole = new UserRole
+                {
+                    UserId = user.UserId,
+                    RoleId = viewModel.RoleId,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "System"
+                };
+                _context.UserRoles.Add(userRole);
+                await _context.SaveChangesAsync();
+            }
+
+            // بارگذاری نقش
             user = await _context.Users
-                .Include(u => u.Role)
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.UserId == user.UserId);
 
             if (user == null)
                 return StatusCode(500, "خطا در ثبت کاربر.");
+
+            var roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "بدون نقش";
 
             // ثبت لاگ
             await LogAction(user.UserId, "Register_Success", user.Username, "User registered");
@@ -133,7 +163,7 @@ namespace IdentityManagementSystem.API.Controllers
                 Username = user.Username,
                 Name = user.Name,
                 LastName = user.LastName,
-                Role = user.Role?.RoleName ?? "بدون نقش", // RoleName مستقیم از DB
+                Role = roleName,
                 CreatedAt = user.CreatedAt,
                 LastLogin = user.LastLogin,
                 IsActive = user.IsActive,
@@ -146,15 +176,15 @@ namespace IdentityManagementSystem.API.Controllers
         private bool IsAdmin()
         {
             var roleIdClaim = User.FindFirst("RoleId")?.Value;
-            
-            if(int.TryParse(roleIdClaim, out var roleId)&& roleId==3) return true;
+
+            if (int.TryParse(roleIdClaim, out var roleId) && roleId == 3) return true;
             var roleName = User.FindFirst(ClaimTypes.Role)?.Value;
             return roleName == "ادمین";
         }
 
 
         [HttpGet("GetUsers")]
-        [AllowAnonymous]
+        [Authorize] // تغییر از AllowAnonymous به Authorize چون IsAdmin نیاز به Claims دارد
         public async Task<ActionResult<IEnumerable<UserViewModel>>> GetUsers()
         {
             if (!IsAdmin())
@@ -162,7 +192,8 @@ namespace IdentityManagementSystem.API.Controllers
                 return Forbid();
             }
             var users = await _context.Users
-                .Include(u => u.Role) //  برای جلوگیری از NullReference در Role
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
                 .Select(u => new UserViewModel
                 {
                     UserId = u.UserId,
@@ -170,19 +201,20 @@ namespace IdentityManagementSystem.API.Controllers
                     Username = u.Username,
                     Name = u.Name,
                     LastName = u.LastName,
-                    Role = u.Role != null ? u.Role.RoleName : "بدون نقش",
+                    Role = u.UserRoles.Select(ur => ur.Role != null ? ur.Role.RoleName : null).FirstOrDefault() ?? "بدون نقش",
                     CreatedAt = u.CreatedAt,
                     LastLogin = u.LastLogin,
-                    IsActive = u.IsActive,          //  اضافه شد تا وضعیت فعال/غیرفعال هم برگرده
-                    MobileNumber = u.MobileNumber   //  اضافه شد برای نمایش شماره موبایل
+                    IsActive = u.IsActive,
+                    MobileNumber = u.MobileNumber
                 })
-                .OrderByDescending(u => u.CreatedAt) //  اختیاری: کاربران جدیدتر اول بیایند
+                .OrderByDescending(u => u.CreatedAt)
                 .ToListAsync();
 
             return Ok(users);
         }
 
         [HttpPut("UpdateUser/{id}")]
+        [Authorize]
         public async Task<IActionResult> UpdateUser(long id, [FromBody] UpdateUserRequest model)
         {
             var user = await _context.Users.FindAsync(id);
@@ -205,8 +237,20 @@ namespace IdentityManagementSystem.API.Controllers
             if (!string.IsNullOrEmpty(model.MobileNumber))
                 user.MobileNumber = model.MobileNumber;
 
+            // RoleId از طریق UserRoles مدیریت شود
             if (model.RoleId.HasValue && model.RoleId.Value > 0)
-                user.RoleId = model.RoleId.Value;
+            {
+                // حذف نقش‌های قبلی و اضافه کردن جدید (ساده)
+                var existingRoles = await _context.UserRoles.Where(ur => ur.UserId == id).ToListAsync();
+                _context.UserRoles.RemoveRange(existingRoles);
+
+                _context.UserRoles.Add(new UserRole
+                {
+                    UserId = id,
+                    RoleId = model.RoleId.Value,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             // اگر رمز جدید فرستاده شده بود، بروزرسانی کن
             if (!string.IsNullOrEmpty(model.Password))
@@ -220,6 +264,7 @@ namespace IdentityManagementSystem.API.Controllers
 
         // 🔴 Soft Delete (غیرفعال کردن کاربر)
         [HttpDelete("SoftDeleteUser/{id}")]
+        [Authorize]
         public async Task<IActionResult> SoftDeleteUser(long id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -238,6 +283,7 @@ namespace IdentityManagementSystem.API.Controllers
 
         // 🟢 فعال‌سازی مجدد کاربر
         [HttpPost("RestoreUser/{id}")]
+        [Authorize]
         public async Task<IActionResult> RestoreUser(long id)
         {
             var user = await _context.Users.FindAsync(id);
@@ -256,16 +302,21 @@ namespace IdentityManagementSystem.API.Controllers
 
         // ⚫ حذف واقعی از دیتابیس (اختیاری)
         [HttpDelete("HardDeleteUser/{id}")]
+        [Authorize]
         public async Task<IActionResult> HardDeleteUser(long id)
         {
             var user = await _context.Users.FindAsync(id);
             if (user == null)
                 return NotFound("کاربر یافت نشد.");
 
+            // حذف نقش‌ها ابتدا
+            var roles = await _context.UserRoles.Where(ur => ur.UserId == id).ToListAsync();
+            _context.UserRoles.RemoveRange(roles);
+
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
-            await LogAction(user.UserId, "HardDeleteUser", user.Username, "User permanently deleted");
+            await LogAction(id, "HardDeleteUser", user.Username, "User permanently deleted");
 
             return Ok("کاربر به صورت دائم حذف شد.");
         }
@@ -296,7 +347,7 @@ namespace IdentityManagementSystem.API.Controllers
 
             var userAccess = new UserAccess
             {
-                UserId = (int)model.UserId,
+                UserId = model.UserId,
                 Permission = model.Permission
             };
             _context.UserAccesses.Add(userAccess);
@@ -397,7 +448,8 @@ namespace IdentityManagementSystem.API.Controllers
                 }
 
                 var user = await _context.Users
-                    .Include(u => u.Role)
+                    .Include(u => u.UserRoles)
+                        .ThenInclude(ur => ur.Role)
                     .FirstOrDefaultAsync(u => u.UserId == userId);
 
                 if (user == null)
@@ -405,13 +457,15 @@ namespace IdentityManagementSystem.API.Controllers
                     return NotFound("کاربر یافت نشد.");
                 }
 
+                var roleName = user.UserRoles?.FirstOrDefault()?.Role?.RoleName ?? "بدون نقش";
+
                 var userInfo = new
                 {
                     user.UserId,
                     user.Username,
                     user.Name,
                     user.LastName,
-                    Role = user.Role?.RoleName ?? "بدون نقش"
+                    Role = roleName
                 };
 
                 return Ok(userInfo);
@@ -424,6 +478,7 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         [HttpGet("GetRoles")]
+        [Authorize]
         public async Task<IActionResult> GetRoles()
         {
             try
@@ -448,13 +503,18 @@ namespace IdentityManagementSystem.API.Controllers
         {
             try
             {
+                // UserId در DB NOT NULL است، اگر 0 باشد ممکن است مشکل ایجاد کند
+                if (userId <= 0) userId = 1; // fallback موقت
+
                 _context.UserLogs.Add(new UserLog
                 {
-                    UserId = (int?)userId,
+                    UserId = userId,
                     Action = $"{action}: Username={username}, Result={result}",
                     ActionTime = DateTime.UtcNow,
                     IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                    UserAgent = Request.Headers["User-Agent"].ToString()
+                    UserAgent = Request.Headers["User-Agent"].ToString(),
+                    ActionResult = result,
+                    LogLevel = "Info"
                 });
                 await _context.SaveChangesAsync();
             }
