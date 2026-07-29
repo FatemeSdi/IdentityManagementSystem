@@ -455,13 +455,24 @@ namespace IdentityManagementSystem.UI.Controllers
 
             try
             {
-                var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken;
+                var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken as string;
+
+                _logger.LogWarning($"TOKEN is null? {string.IsNullOrEmpty(token)}");
+                _logger.LogWarning($"Request URL = {url}");
+
                 if (!string.IsNullOrEmpty(token))
                 {
                     _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 }
 
                 var response = await _client.GetAsync(url);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                _logger.LogWarning("API StatusCode = {StatusCode}", response.StatusCode);
+                _logger.LogWarning("API Response = {Response}", responseContent);
+
+
                 if (response.IsSuccessStatusCode)
                 {
                     var data = await response.Content.ReadFromJsonAsync<PaginatedResponse<CartableItemViewModel>>();

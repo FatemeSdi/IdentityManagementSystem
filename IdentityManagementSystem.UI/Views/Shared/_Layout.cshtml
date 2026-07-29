@@ -5,55 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - ServiceUIPMO</title>
 
-    <!-- BOOTSTRAP RTL CSS -->
-    <link href="~/assets/plugins/bootstrap/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <!-- Favicon -->
+    <link rel="icon" href="~/assets/images/brand-logos/favicon.ico" type="image/x-icon" />
 
-    <!-- STYLE CSS -->
-    <link href="~/assets/css/style.css" rel="stylesheet" />@* 
-    <link href="~/assets/css/dark-style.css" rel="stylesheet" />
-    <link href="~/assets/css/transparent-style.css" rel="stylesheet" />
-    <link href="~/assets/css/skin-modes.css" rel="stylesheet" /> *@
+    <!-- Bootstrap RTL -->
+    <link href="~/assets/libs/bootstrap/css/bootstrap.rtl.min.css" rel="stylesheet" />
 
-    <!-- FONT-ICONS CSS -->
+    <!-- Main Styles -->
+    <link href="~/assets/css/styles.css" rel="stylesheet" />
+
+    <!-- Icons -->
     <link href="~/assets/css/icons.css" rel="stylesheet" />
-    <link href="~/assets/iconfonts/bootstrapicons/bootstrap-icons.css" rel="stylesheet" />
-    <link href="~/assets/iconfonts/font-awesome/css/font-awesome.min.css" rel="stylesheet" />
-    <link href="~/assets/iconfonts/ionicons/ionicons.css" rel="stylesheet" />
-    <link rel="preload" href="~/assets/iconfonts/feather/fonts/feather-webfont.woff" as="font" type="font/woff" crossorigin>
-    <link rel="preload" href="~/assets/iconfonts/font-awesome/fonts/fontawesome-webfont.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="~/assets/iconfonts/materialdesignicons/fonts/Material-Design-Iconic-Font.woff2" as="font" type="font/woff2" crossorigin>
-    
-    <!-- COLOR SKIN CSS -->
-    <link id="theme" rel="stylesheet" type="text/css" media="all" href="~/assets/colors/color1.css" />
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/toastr.min.css" />
-    <!-- SITE CUSTOM CSS -->
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
+    <!-- Toastr -->
+    <link href="~/lib/bootstrap/dist/css/toastr.min.css" rel="stylesheet" />
+
+    <!-- Site Custom CSS -->
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
     @RenderSection("Styles", required: false)
 </head>
 
 <body class="app sidebar-mini rtl">
-    <!-- GLOBAL-LOADER -->
+
+    <!-- GLOBAL LOADER -->
     <div id="global-loader">
-        <img src="~/assets/images/loader.svg" class="loader-img" alt="Loader">
+        <img src="~/assets/images/loader.svg" class="loader-img" alt="Loader" onerror="this.parentElement.style.display='none'">
     </div>
 
     <!-- PAGE -->
     <div class="page">
         <div class="page-main">
+
+            <!-- HEADER -->
             <header class="app-header">
-                <div class="header-container">
+                <div class="header-container d-flex align-items-center justify-content-between px-3 py-2">
                     <div class="header-left">
-                        <a class="logo-horizontal" asp-controller="Cartable" asp-action="Index" id="main-logo">
-                            <img src="~/assets/images/brand/logo-7.png" id="logo-image" alt="Logo" />
+                        <a class="logo-horizontal" asp-controller="Cartable" asp-action="Index">
+                            <img src="~/assets/images/brand-logos/desktop-logo.png" alt="Logo" style="height: 40px;"
+                                 onerror="this.src='~/assets/images/brand-logos/desktop-logo.png'">
                         </a>
                     </div>
 
-                    <div class="header-center"></div>
-
-                    <div class="header-right">
-                        <!-- دکمه مدیریت کاربران -->
+                    <div class="header-right d-flex align-items-center gap-3">
                         @{
                             var userRole = Context.Session.GetString("UserRole");
                             var userRoleId = Context.Session.GetString("UserRoleId");
@@ -62,201 +56,123 @@
                         @if (isAdmin)
                         {
                             <a class="btn btn-outline-primary btn-sm" asp-controller="Home" asp-action="Users">
-                                <i class="fe fe-users"></i>
-                                <span>مدیریت کاربران</span>
+                                <i class="ri-team-line"></i>
+                                <span class="d-none d-md-inline">مدیریت کاربران</span>
                             </a>
                         }
-                        <a class="full-screen-link" href="javascript:void(0)" id="fullScreenBtn">
-                            <i class="fe fe-maximize" id="fullScreenIcon"></i>
+
+                        <a href="javascript:void(0)" id="fullScreenBtn" class="text-dark fs-18" title="تمام صفحه">
+                            <i class="ri-fullscreen-line" id="fullScreenIcon"></i>
                         </a>
-                        <div class="profile-dropdown" id="profileDropdown">
-                            <a href="javascript:void(0)" class="profile-trigger" id="profileTrigger">
-                                <img src="~/assets/images/users/22.jfif" alt="profile-user" class="profile-avatar" id="profileAvatar">
+
+                        <div class="dropdown">
+                            <a href="javascript:void(0)" class="d-flex align-items-center" data-bs-toggle="dropdown">
+                                <img src="~/assets/images/faces/9.jpg" alt="profile" class="rounded-circle"
+                                     style="width:36px;height:36px;object-fit:cover;"
+                                     onerror="this.src='https://via.placeholder.com/36'">
                             </a>
-                            <div class="dropdown-menu-custom">
-                                <a class="dropdown-item-custom" asp-controller="Home" asp-action="EditProfile">
-                                    پروفایل
-                                    <i class="fe fe-user"></i>
-                                </a>
-                                <div class="dropdown-divider"></div>
-                                <form id="logout-form" asp-controller="Home" asp-action="Logout" method="post" style="display: none;">
-                                    @Html.AntiForgeryToken()
-                                </form>
-                                <a class="dropdown-item-custom" href="javascript:void(0);" onclick="document.getElementById('logout-form').submit();">
-                                    خروج
-                                    <i class="fe fe-log-out"></i>
-                                </a>
-                            </div>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Home" asp-action="EditProfile">
+                                        <i class="ri-user-line me-2"></i> پروفایل
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form id="logout-form" asp-controller="Home" asp-action="Logout" method="post" class="d-none">
+                                        @Html.AntiForgeryToken()
+                                    </form>
+                                    <a class="dropdown-item" href="javascript:void(0);" onclick="document.getElementById('logout-form').submit();">
+                                        <i class="ri-logout-box-r-line me-2"></i> خروج
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <!-- محتوای اصلی -->
-            <div class="main-content mt-5 hor-content">
-                <div class="side-app">
-                    <!-- CONTAINER -->
-                    <div class="main-container container">
-                        @RenderBody()
-                    </div>
+            <!-- MAIN CONTENT -->
+            <div class="main-content app-content">
+                <div class="container-fluid py-3">
+                    @RenderBody()
                 </div>
             </div>
 
-            <!-- فوتر -->
-            <footer class="footer">
-                <div class="container">
-                    <div class="row align-items-center flex-row-reverse">
-                        <div class="col-md-12 text-center small text-muted">
-                            © <span id="year">۱۴۰۴</span>
-                            <a href="javascript:void(0)" class="text-dark fw-semibold">اداره کل بنادر و دریانوردی هرمزگان</a> —
-                            طراحی و توسعه توسط
-                            <a href="javascript:void(0)" class="text-primary fw-semibold">تیم فناوری اطلاعات</a>
-                        </div>
+            <!-- FOOTER -->
+            <footer class="footer mt-auto py-3 border-top">
+                <div class="container-fluid">
+                    <div class="text-center small text-muted">
+                        © <span id="year"></span>
+                        <span class="fw-semibold">اداره کل بنادر و دریانوردی هرمزگان</span> —
+                        طراحی و توسعه توسط
+                        <span class="text-primary fw-semibold">تیم فناوری اطلاعات</span>
                     </div>
                 </div>
             </footer>
+
         </div>
     </div>
 
-    <!-- BACK-TO-TOP -->
-    <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
-
-    <!-- SCRIPTS -->
+    <!-- ==================== SCRIPTS ==================== -->
+    <!-- jQuery اول از همه -->
     <script src="~/assets/js/jquery.min.js"></script>
-    <script src="~/assets/plugins/bootstrap/js/popper.min.js"></script>
-    <script src="~/assets/plugins/bootstrap/js/bootstrap.min.js"></script>
-    <script src="~/assets/js/jquery.sparkline.min.js"></script>
-    <script src="~/assets/js/sticky.js"></script>
-    @* <script src="~/assets/plugins/sidebar/sidebar.js"></script>
-    <script src="~/assets/plugins/p-scroll/perfect-scrollbar.js"></script>
-    <script src="~/assets/plugins/p-scroll/pscroll.js"></script>
-    <script src="~/assets/plugins/p-scroll/pscroll-1.js"></script> *@
-    <script src="~/assets/plugins/select2/select2.full.min.js"></script>
-    <script src="~/assets/plugins/datatable/js/jquery.dataTables.min.js"></script>
-    <script src="~/assets/plugins/datatable/js/dataTables.bootstrap5.js"></script>
-    <script src="~/assets/plugins/datatable/dataTables.responsive.min.js"></script>
-    @* <script src="~/assets/plugins/flot/jquery.flot.js"></script>
-    <script src="~/assets/plugins/flot/jquery.flot.fillbetween.js"></script>
-    <script src="~/assets/plugins/flot/chart.flot.sampledata.js"></script>
-    <script src="~/assets/plugins/flot/dashboard.sampledata.js"></script> *@
-    @* <script src="~/assets/plugins/jvectormap/jquery-jvectormap-2.0.2.min.js"></script>
-    <script src="~/assets/plugins/jvectormap/jquery-jvectormap-world-mill-en.js"></script> *@
-@*  <script src="~/assets/plugins/sidemenu/sidemenu.js"></script>*@    
-@*  <script src="~/assets/js/index1.js"></script>*@    
-    <script src="~/assets/js/themeColors.js"></script>
-    <script src="~/assets/js/custom.js"></script>
-    <script src="~/assets/js/show-password.min.js"></script>
-    <script src="~/assets/js/generate-otp.js"></script>
-    <script src="~/assets/plugins/input-mask/jquery.mask.min.js"></script>
-    @* <script src="~/assets/plugins/formwizard/jquery.smartWizard.js"></script>
-    <script src="~/assets/plugins/formwizard/fromwizard.js"></script>
-    <script src="~/assets/plugins/accordion-Wizard-Form/jquery.accordion-wizard.min.js"></script>
-    <script src="~/assets/js/form-wizard.js"></script> *@
-    <script src="~/assets/plugins/datatable/js/dataTables.buttons.min.js"></script>
-    <script src="~/assets/plugins/datatable/js/buttons.bootstrap5.min.js"></script>
-    @* <script src="~/assets/plugins/datatable/js/jszip.min.js"></script>
-    <script src="~/assets/plugins/datatable/pdfmake/pdfmake.min.js"></script>
-    <script src="~/assets/plugins/datatable/pdfmake/vfs_fonts.js"></script> *@
-    <script src="~/assets/plugins/datatable/js/buttons.html5.min.js"></script>
-    <script src="~/assets/plugins/datatable/js/buttons.print.min.js"></script>
-    <script src="~/assets/plugins/datatable/js/buttons.colVis.min.js"></script>
-    <script src="~/assets/plugins/datatable/dataTables.responsive.min.js"></script>
-    <script src="~/assets/plugins/datatable/responsive.bootstrap5.min.js"></script>
-    <script src="~/assets/js/table-data.js"></script>
+
+    <!-- Bootstrap -->
+    <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Toastr (باید قبل از کدهای خودمون لود بشه) -->
     <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
-    <script src="~/assets/plugins/edit-table/bst-edittable.js"></script>
-    <script src="~/assets/plugins/edit-table/edit-table.js"></script>
+
+    <!-- اگر flatpickr لازم داری (برای جلوگیری از خطای custom.js) -->
+    <!-- <script src="~/assets/libs/flatpickr/flatpickr.min.js"></script> -->
 
     <script>
-        $(document).ready(function () {
-             if ('@User.Identity.IsAuthenticated' === 'True') {
-                 $.get('/Home/GetUserProfile')
-                     .done(function (data) {
-                         if (data && data.success !== false) {
-                             $('#user-name').text(data.name + ' ' + data.lastName);
-                             $('#user-role').text(data.role);
-                             $('#userNameDisplay').text(data.name || 'کاربر');
-                         }
-                     })
-                     .fail(function (xhr) {
-                         if (xhr.status === 401) {
-                             console.warn('Unauthorized - User may not be logged in.');
-                         }
-                     });
-             }
-            // پیکربندی Toastr
-            toastr.options = {
-                "closeButton": true,
-                "progressBar": true,
-                "positionClass": "toast-top-left",
-                "showDuration": "300",
-                "hideDuration": "1000",
-                "timeOut": "5000",
-                "extendedTimeOut": "1000",
-                "showEasing": "swing",
-                "hideEasing": "linear",
-                "showMethod": "fadeIn",
-                "hideMethod": "fadeOut"
-            };
-        });
-
-        const fullScreenBtn = document.getElementById('fullScreenBtn');
-        const fullScreenIcon = document.getElementById('fullScreenIcon');
-
-        if (fullScreenBtn) {
-            fullScreenBtn.addEventListener('click', function () {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().then(() => {
-                        updateFullScreenIcon(true);
-                    }).catch(err => {
-                        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-                    });
-                } else {
-                    document.exitFullscreen().then(() => {
-                        updateFullScreenIcon(false);
-                    }).catch(err => {
-                        console.error(`Error attempting to exit full-screen mode: ${err.message}`);
-                    });
-                }
-            });
-
-            document.addEventListener('fullscreenchange', function () {
-                updateFullScreenIcon(!!document.fullscreenElement);
-            });
-        }
-
-        function updateFullScreenIcon(isFullScreen) {
-            if (fullScreenIcon) {
-                if (isFullScreen) {
-                    fullScreenIcon.className = 'fe fe-minimize';
-                } else {
-                    fullScreenIcon.className = 'fe fe-maximize';
-                }
+        // مخفی کردن لودر به محض آماده شدن صفحه
+        (function () {
+            const loader = document.getElementById('global-loader');
+            if (loader) {
+                loader.style.display = 'none';
             }
-        }
+        })();
 
-        const profileTrigger = document.getElementById('profileTrigger');
-        const profileDropdown = document.getElementById('profileDropdown');
+        $(document).ready(function () {
+            // سال شمسی
+            const yearEl = document.getElementById("year");
+            if (yearEl) {
+                yearEl.textContent = new Date().toLocaleDateString("fa-IR", { year: "numeric" });
+            }
 
-        if (profileTrigger && profileDropdown) {
-            profileTrigger.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                profileDropdown.classList.toggle('open');
-            });
+            // تنظیمات Toastr
+            if (typeof toastr !== 'undefined') {
+                toastr.options = {
+                    closeButton: true,
+                    progressBar: true,
+                    positionClass: "toast-top-left",
+                    timeOut: 5000,
+                    rtl: true
+                };
+            }
 
-            document.addEventListener('click', function (e) {
-                if (!profileDropdown.contains(e.target)) {
-                    profileDropdown.classList.remove('open');
-                }
-            });
-        }
-
-        // بروزرسانی سال شمسی
-        document.getElementById("year").textContent = new Date().toLocaleDateString("fa-IR", { year: "numeric" });
+            // Fullscreen
+            const fullScreenBtn = document.getElementById('fullScreenBtn');
+            const fullScreenIcon = document.getElementById('fullScreenIcon');
+            if (fullScreenBtn && fullScreenIcon) {
+                fullScreenBtn.addEventListener('click', function () {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen()
+                            .then(() => fullScreenIcon.className = 'ri-fullscreen-exit-line')
+                            .catch(console.error);
+                    } else {
+                        document.exitFullscreen()
+                            .then(() => fullScreenIcon.className = 'ri-fullscreen-line');
+                    }
+                });
+            }
+        });
     </script>
 
+    @* اسکریپت‌های صفحه *@
     @await RenderSectionAsync("Scripts", required: false)
 </body>
-
 </html>

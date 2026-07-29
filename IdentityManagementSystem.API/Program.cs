@@ -19,6 +19,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TokenService, TokenService>();
 builder.Services.Configure<ShahkarServiceOptions>(builder.Configuration.GetSection("Shahkar"));
+builder.Services.AddScoped<IdentityManagementSystem.API.Helpers.EncryptionHelper>();
 
 // --- Authentication & Authorization ---
 var jwtSettings = builder.Configuration.GetSection("Jwt");

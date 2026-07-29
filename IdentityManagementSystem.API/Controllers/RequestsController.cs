@@ -105,7 +105,7 @@ namespace IdentityManagementSystem.API.Controllers
                     MobileNumber = r.MobileNumber,
                     DocumentNumber = r.DocumentNumber,
                     // اگر encrypted ذخیره شده باشد decrypt، در غیر این صورت همان مقدار
-                    VerificationCode = r.VerificationCode != null ? TryDecrypt(r.VerificationCode) : null,
+                    VerificationCode = r.VerificationCode,
                     IsMatch = r.IsMatch ?? false,
                     IsExist = r.IsExist ?? false,
                     IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using IdentityManagementSystem.API.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace IdentityManagementSystem.API.Models
@@ -45,6 +46,8 @@ namespace IdentityManagementSystem.API.Models
 
         [NotMapped]
         public int RoleId { get; set; }
+        public string? NationalIdEnc { get; set; }
+        public string? NationalIdHash { get; set; }
     }
 
     [Table("Roles", Schema = "Sec")]
@@ -279,8 +282,15 @@ namespace IdentityManagementSystem.API.Models
 
         public long? RequestId { get; set; }
 
+
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public string? NationalIdEnc { get; set; }
+        public string? NationalIdHash { get; set; }
+        public string? MobileNumberEnc { get; set; }
+        public string? MobileNumberHash { get; set; }
     }
+}
 
     [Table("VerifyDocLog", Schema = "Log")]
     public class VerifyDocLog
@@ -307,7 +317,12 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(100)]
         public string CreatedBy { get; set; } = null!;
 
-        public bool? IsExist { get; set; }
+        public string? DocumentNumberEnc { get; set; }
+        public string? DocumentNumberHash { get; set; }
+        public string? VerificationCodeEnc { get; set; }
+        public string? VerificationCodeHash { get; set; }
+
+    public bool? IsExist { get; set; }
         public bool? IsRead { get; set; } = false;
         public string? ReadBy { get; set; }
         public DateTime? ReadDate { get; set; }
@@ -341,4 +356,3 @@ namespace IdentityManagementSystem.API.Models
         public int RoleId { get; set; }
         public string RoleName { get; set; } = string.Empty;
     }
-}

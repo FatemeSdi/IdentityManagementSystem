@@ -7,14 +7,18 @@ namespace IdentityManagementSystem.API.Helpers
     public class EncryptionHelper
     {
         private readonly byte[] _key;
+        private readonly byte[] _hmacKey;
         private const string DefaultSalt = "Shamel2026_PM0_!@#";
 
         public EncryptionHelper(IConfiguration configuration)
         {
             var keyBase64 = configuration["Encryption:Key"]
                 ?? throw new InvalidOperationException("کلید رمزنگاری در appsettings.json تنظیم نشده است.");
-
             _key = Convert.FromBase64String(keyBase64);
+
+            var hmacKeyBase64 = configuration["Encryption:HmacKey"]
+                ?? throw new InvalidOperationException("کلید HMAC (برای جستجوی داده‌های رمزنگاری‌شده) در appsettings.json تنظیم نشده است.");
+            _hmacKey = Convert.FromBase64String(hmacKeyBase64);
         }
 
         // ---------------- ENCRYPT ----------------
@@ -41,13 +45,12 @@ namespace IdentityManagementSystem.API.Helpers
             return Convert.ToBase64String(result);
         }
 
-        // ---------------- DECRYPT (FIXED) ----------------
+        // ---------------- DECRYPT ----------------
         public string Decrypt(string? cipherText)
         {
             if (string.IsNullOrWhiteSpace(cipherText))
                 return string.Empty;
 
-            // ✅ مهم: جلوگیری از crash روی داده‌های قدیمی (plaintext)
             if (!IsBase64(cipherText))
                 return cipherText;
 
@@ -59,11 +62,10 @@ namespace IdentityManagementSystem.API.Helpers
             }
             catch
             {
-                // اگر Base64 خراب بود، همون متن رو برگردون
                 return cipherText;
             }
 
-            if (combined.Length < 17) // IV + data حداقل
+            if (combined.Length < 17)
                 return cipherText;
 
             using var aes = Aes.Create();
@@ -85,9 +87,35 @@ namespace IdentityManagementSystem.API.Helpers
             }
             catch
             {
-                // اگر decrypt شکست خورد، fallback به مقدار اصلی
                 return cipherText;
             }
+        }
+
+        // ---------------- SEARCH HASH (Blind Index) ----------------
+        // برای جستجو و uniqueness check روی داده‌های encrypted استفاده می‌شود.
+        // برخلاف Encrypt، این تابع deterministic است (بدون IV تصادفی)
+        // پس فقط برای مقادیر شناسه‌ای/جستجوپذیر استفاده شود، نه برای داده‌ای که محرمانگی معنایی بالا نیاز دارد.
+        public string ComputeSearchHash(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var normalized = Normalize(value);
+
+            using var hmac = new HMACSHA256(_hmacKey);
+            byte[] bytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(normalized));
+            return Convert.ToHexString(bytes).ToLower();
+        }
+
+        // نرمال‌سازی قبل از هش کردن: بدون این کار، تفاوت‌های جزئی (space، نویسه عربی/فارسی)
+        // باعث می‌شود همان مقدار دو hash متفاوت تولید کند و تشخیص تکراری از کار بیفتد.
+        private string Normalize(string value)
+        {
+            return value
+                .Trim()
+                .Replace("ي", "ی")
+                .Replace("ك", "ک")
+                .Replace(" ", ""); // برای کد ملی/شماره سند که نباید فاصله معنادار داشته باشند
         }
 
         // ---------------- SAFE CHECK ----------------
@@ -97,7 +125,7 @@ namespace IdentityManagementSystem.API.Helpers
             return Convert.TryFromBase64String(input, buffer, out _);
         }
 
-        // ---------------- HASH ----------------
+        // ---------------- HASH (legacy - غیرمرتبط با blind index) ----------------
         public string Hash(string? value, string? customSalt = null)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -112,7 +140,7 @@ namespace IdentityManagementSystem.API.Helpers
             return Convert.ToHexString(hashBytes).ToLower();
         }
 
-        // ---------------- KEY GENERATOR ----------------
+        // ---------------- KEY GENERATORS ----------------
         public static string GenerateNewKey()
         {
             using var aes = Aes.Create();
@@ -120,6 +148,12 @@ namespace IdentityManagementSystem.API.Helpers
             aes.GenerateKey();
 
             return Convert.ToBase64String(aes.Key);
+        }
+
+        public static string GenerateNewHmacKey()
+        {
+            using var hmac = new HMACSHA256();
+            return Convert.ToBase64String(hmac.Key);
         }
     }
 }
