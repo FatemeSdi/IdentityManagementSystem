@@ -8,6 +8,14 @@ var builder = WebApplication.CreateBuilder(args);
 // ================= MVC =================
 builder.Services.AddControllersWithViews();
 
+// ================= Antiforgery =================
+// اجازه می‌ده توکن CSRF از طریق هدر هم (نه فقط فیلد فرم) ارسال بشه —
+// چون چندجا تو پروژه (fetch/$.ajax با JSON body) توکن رو تو هدر می‌فرستن.
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "RequestVerificationToken";
+});
+
 // ================= Cookie Auth =================
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

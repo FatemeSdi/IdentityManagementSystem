@@ -1,4 +1,5 @@
 ﻿using DNTCaptcha.Core;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Newtonsoft.Json;
@@ -9,6 +10,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using IdentityManagementSystem.UI.Enums;
+
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
@@ -39,11 +41,28 @@ namespace IdentityManagementSystem.UI.Controllers
         [HttpGet]
         public async Task<IActionResult> Index(int page = 1, string search = "", string filterStatus = "")
         {
+            // ========== چک نقش ==========
+            int roleId = 0;
+
+            var roleIdClaim = User.FindFirst("RoleId")?.Value;
+            if (!string.IsNullOrEmpty(roleIdClaim))
+            {
+                int.TryParse(roleIdClaim, out roleId);
+            }
+            else if (HttpContext.Session.GetInt32("RoleId").HasValue)
+            {
+                roleId = HttpContext.Session.GetInt32("RoleId").Value;
+            }
+
+            // اگر متقاضی بود → بفرست به ClientIndex
+            if (roleId == 2)
+            {
+                return RedirectToAction("ClientIndex", new { page, search });
+            }
+            // ============================
+
             // گرفتن داده‌ها از API
-            var model = await GetCartableData(
-            page,
-            search,
-            filterStatus);
+            var model = await GetCartableData(page, search, filterStatus);
 
             // بررسی خوانده شدن سندها
             foreach (var item in model.Items)
@@ -73,113 +92,196 @@ namespace IdentityManagementSystem.UI.Controllers
 
             ViewBag.FormModel = new CartableFormViewModel();
             ViewBag.FilterStatus = filterStatus;
-
             ViewBag.RejectReasons = EnumHelper.ToSelectList<RejectReason>();
 
             return View(model);
+        }
+
+
+        [HttpPost]
+        public IActionResult SendOtp(string nationalCode, string mobileNumber)
+        {
+            if (string.IsNullOrWhiteSpace(nationalCode) || nationalCode.Length != 10)
+                return Json(new { success = false, message = "کد ملی نامعتبر است" });
+
+            if (string.IsNullOrWhiteSpace(mobileNumber) || mobileNumber.Length != 11 || !mobileNumber.StartsWith("09"))
+                return Json(new { success = false, message = "شماره موبایل نامعتبر است" });
+
+            var otp = new Random().Next(100000, 999999).ToString();
+
+            HttpContext.Session.SetString($"OTP_{mobileNumber}", otp);
+            HttpContext.Session.SetString($"OTP_Time_{mobileNumber}", DateTime.UtcNow.ToString("O"));
+
+            _logger.LogWarning("===== OTP برای تست: {Otp} | موبایل: {Mobile} =====", otp, mobileNumber);
+
+            return Json(new
+            {
+                success = true,
+                message = "کد تایید ارسال شد",
+                debugOtp = otp   // فقط برای تست
+            });
+        }
+
+        [HttpPost]
+        public IActionResult VerifyOtp(string mobileNumber, string otpCode)
+        {
+            if (string.IsNullOrWhiteSpace(mobileNumber) || string.IsNullOrWhiteSpace(otpCode))
+                return Json(new { success = false, message = "اطلاعات ناقص است" });
+
+            var savedOtp = HttpContext.Session.GetString($"OTP_{mobileNumber}");
+            var timeStr = HttpContext.Session.GetString($"OTP_Time_{mobileNumber}");
+
+            if (string.IsNullOrEmpty(savedOtp))
+                return Json(new { success = false, message = "کدی ارسال نشده یا منقضی شده است" });
+
+            if (DateTime.TryParse(timeStr, out var sentTime))
+            {
+                if ((DateTime.UtcNow - sentTime).TotalMinutes > 2)
+                {
+                    HttpContext.Session.Remove($"OTP_{mobileNumber}");
+                    HttpContext.Session.Remove($"OTP_Time_{mobileNumber}");
+                    return Json(new { success = false, message = "کد منقضی شده است. دوباره ارسال کنید" });
+                }
+            }
+
+            if (savedOtp != otpCode)
+                return Json(new { success = false, message = "کد تایید اشتباه است" });
+
+            HttpContext.Session.Remove($"OTP_{mobileNumber}");
+            HttpContext.Session.Remove($"OTP_Time_{mobileNumber}");
+            HttpContext.Session.SetString($"OTP_Verified_{mobileNumber}", "true");
+
+            return Json(new { success = true, message = "شماره موبایل با موفقیت تایید شد" });
+        }
+
+        /// <summary>
+        /// داشبورد مخصوص متقاضی (RoleId = 2)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ClientIndex(int page = 1, string search = "")
+        {
+            int roleId = 0;
+
+            var roleIdClaim = User.FindFirst("RoleId")?.Value;
+            if (!string.IsNullOrEmpty(roleIdClaim))
+            {
+                int.TryParse(roleIdClaim, out roleId);
+            }
+            else if (HttpContext.Session.GetInt32("RoleId").HasValue)
+            {
+                roleId = HttpContext.Session.GetInt32("RoleId").Value;
+            }
+
+            // فقط RoleId = 2 اجازه داره
+            if (roleId != 2)
+            {
+                return RedirectToAction("Index");
+            }
+
+            var model = await GetCartableData(page, search, filterStatus: "");
+
+            ViewBag.FormModel = new CartableFormViewModel();
+
+            return View("ClientIndex", model);   // ویوی ClientIndex.cshtml
+        }
+
+        /// <summary>
+        /// داشبورد مخصوص متقاضی (RoleId = 2)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ApplicantIndex(int page = 1, string search = "")
+        {
+            var roleId = HttpContext.Session.GetInt32("RoleId") ?? 0;
+            if (roleId != 2)
+            {
+                // اگر کارشناس یا ادمین اومد اینجا، بفرستش به کارتابل اصلی
+                return RedirectToAction(nameof(Index));
+            }
+
+            // فعلاً از همون متد GetCartableData استفاده می‌کنیم
+            // (بعداً می‌تونی فیلتر بر اساس کاربر لاگین‌شده اضافه کنی)
+            var model = await GetCartableData(page, search, filterStatus: "");
+
+            ViewBag.FormModel = new CartableFormViewModel();
+
+            return View("ApplicantIndex", model);   // ویوی متقاضی که قبلاً ساختم
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ValidateSteps(CartableFormViewModel model)
         {
-            // ریست کردن پیام‌ها
-            model.Step1Message = model.Step2Message = model.Step3Message = "";
+            // اعتبارسنجی فرمت پایه — این فقط یه گیت جلوی داده‌ی واضحاً غلط هست،
+            // نه احراز هویت واقعی. تصمیم نهایی (تایید/رد) رو سرویس‌ها و متصدی می‌گیرن.
+            var formatErrors = new List<string>();
+            if (string.IsNullOrEmpty(model.NationalCode) || !Regex.IsMatch(model.NationalCode, @"^\d{10}$"))
+                formatErrors.Add("کد ملی نامعتبر است.");
+            if (string.IsNullOrEmpty(model.MobileNumber) || !Regex.IsMatch(model.MobileNumber, @"^09\d{9}$"))
+                formatErrors.Add("شماره موبایل نامعتبر است.");
+            if (string.IsNullOrEmpty(model.DocumentNumber) || !Regex.IsMatch(model.DocumentNumber, @"^\d{18}$"))
+                formatErrors.Add("شناسه سند نامعتبر است.");
+            if (string.IsNullOrEmpty(model.VerifyCode) || !Regex.IsMatch(model.VerifyCode, @"^\d{6}$"))
+                formatErrors.Add("رمز تصدیق نامعتبر است.");
 
-            bool step1Valid = true, step2Valid = true, step3Valid = true;
-
-            // 🟢 گام 1: احراز هویت با سرویس شاهکار
-            if (string.IsNullOrEmpty(model.NationalCode) || model.NationalCode.Length != 10 || !Regex.IsMatch(model.NationalCode, @"^\d{10}$"))
+            if (formatErrors.Count > 0)
             {
-                model.Step1Message = "کد ملی نامعتبر است.";
-                step1Valid = false;
+                return Json(new { success = false, message = string.Join(" ", formatErrors) });
             }
-            if (string.IsNullOrEmpty(model.MobileNumber) || model.MobileNumber.Length != 11 || !Regex.IsMatch(model.MobileNumber, @"^09\d{9}$"))
+
+            var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken;
+            if (string.IsNullOrEmpty(token))
             {
-                model.Step1Message += " شماره موبایل نامعتبر است.";
-                step1Valid = false;
+                return Json(new { success = false, message = "لطفاً ابتدا وارد سیستم شوید." });
             }
 
-            if (step1Valid)
+            try
             {
-                try
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _client.PostAsJsonAsync("Service/ProcessCombinedRequest", new CombinedRequestViewModel
                 {
-                    var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken;
-                    if (string.IsNullOrEmpty(token))
-                    {
-                        model.Step1Message = "لطفاً ابتدا وارد سیستم شوید.";
-                        step1Valid = false;
-                    }
-                    else
-                    {
-                        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    NationalId = model.NationalCode,
+                    MobileNumber = model.MobileNumber,
+                    DocumentNumber = model.DocumentNumber,
+                    VerificationCode = model.VerifyCode
+                });
 
-                        var response = await _client.PostAsJsonAsync("Service/ProcessCombinedRequest", new CombinedRequestViewModel
-                        {
-                            NationalId = model.NationalCode,
-                            MobileNumber = model.MobileNumber,
-                            DocumentNumber = model.DocumentNumber,
-                            VerificationCode = model.VerifyCode
-                        });
+                var content = await response.Content.ReadAsStringAsync();
 
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var content = await response.Content.ReadAsStringAsync();
-                            dynamic result = JsonConvert.DeserializeObject<dynamic>(content);
-                            bool isMatch = result?.data?.Shahkar?.IsSuccessful == true;
-
-                            model.Step1Message = isMatch ? "احراز هویت معتبر است." : "کد ملی و شماره موبایل تطابق ندارند.";
-                            step1Valid = isMatch;
-                        }
-                        else
-                        {
-                            model.Step1Message = "خطا در ارتباط با سرویس احراز هویت.";
-                            step1Valid = false;
-                        }
-                    }
-                }
-                catch (Exception ex)
+                if (!response.IsSuccessStatusCode)
                 {
-                    model.Step1Message = $"خطا در ارتباط با سرویس احراز هویت: {ex.Message}";
-                    step1Valid = false;
+                    _logger.LogWarning("ProcessCombinedRequest returned {StatusCode}: {Content}", response.StatusCode, content);
+                    return Json(new { success = false, message = "خطا در ارتباط با سرویس. لطفاً دوباره تلاش کنید." });
                 }
-            }
 
-            // 🟢 گام 2: احراز سند (مستقل از گام 1)
-            if (string.IsNullOrEmpty(model.VerifyCode) || model.VerifyCode.Length != 6 || !Regex.IsMatch(model.VerifyCode, @"^\d{6}$"))
-            {
-                model.Step2Message = "رمز تصدیق نامعتبر است.";
-                step2Valid = false;
-            }
-            if (string.IsNullOrEmpty(model.DocumentNumber) || model.DocumentNumber.Length != 18 || !Regex.IsMatch(model.DocumentNumber, @"^\d{18}$"))
-            {
-                model.Step2Message += " شناسه سند نامعتبر است.";
-                step2Valid = false;
-            }
-            if (step2Valid && string.IsNullOrEmpty(model.Step2Message))
-            {
-                model.Step2Message = "احراز سند معتبر است.";
-            }
+                dynamic result = JsonConvert.DeserializeObject<dynamic>(content);
+                bool apiSuccess = result?.success == true;
 
-            // 🟢 گام 3: تطابق کد ملی موکل (مستقل از گام‌های دیگر)
-            if (string.IsNullOrEmpty(model.ClientNationalCode) || model.ClientNationalCode.Length != 10 || !Regex.IsMatch(model.ClientNationalCode, @"^\d{10}$"))
-            {
-                model.Step3Message = "کد ملی موکل نامعتبر است.";
-                step3Valid = false;
-            }
-            else
-            {
-                model.Step3Message = "تطابق کد ملی معتبر است.";
-            }
+                if (!apiSuccess)
+                {
+                    string apiMessage = (string?)result?.message ?? "درخواست ثبت نشد.";
+                    return Json(new { success = false, message = apiMessage });
+                }
 
-            // پیام نهایی
-            if (step1Valid && step2Valid && step3Valid)
-            {
-                ViewBag.SuccessMessage = "همه گام‌ها معتبر هستند.";
-            }
+                // درخواست تو دیتابیس ثبت شده — صرف‌نظر از نتیجه‌ی تطابق. جزئیات وضعیت رو
+                // متقاضی/متصدی از ستون «وضعیت» تو جدول کارتابل می‌بینن، نه از این پیام.
+                bool? isMatch = null;
+                if (result?.data?.Shahkar != null)
+                {
+                    isMatch = (bool)(result.data.Shahkar.IsSuccessful == true);
+                }
 
-            ViewBag.FormModel = model;
-            return View("Index", await GetCartableData(1, "", ""));
+                string message = isMatch == false
+                    ? "درخواست شما ثبت شد. وضعیت آن را از جدول درخواست‌ها دنبال کنید."
+                    : "درخواست شما با موفقیت ثبت شد.";
+
+                return Json(new { success = true, message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در ثبت درخواست جدید برای کد ملی {NationalCode}", model.NationalCode);
+                return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
+            }
         }
 
 

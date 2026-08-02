@@ -3,6 +3,7 @@ using IdentityManagementSystem.API.Helpers;
 using IdentityManagementSystem.API.Models;
 using IdentityManagementSystem.API.Models.ViewModels;
 using IdentityManagementSystem.API.Services.Logging;
+using IdentityManagementSystem.API.Services.Sms;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,17 +20,20 @@ namespace IdentityManagementSystem.API.Controllers
         private readonly ILogger<RequestController> _logger;
         private readonly UserActionLogger _actionLogger;
         private readonly EncryptionHelper _encryptionHelper;
+        private readonly ISmsService _smsService;
 
         public RequestController(
             IdentityManagementSystemContext context,
             ILogger<RequestController> logger,
             UserActionLogger actionLogger,
-            EncryptionHelper encryptionHelper)
+            EncryptionHelper encryptionHelper,
+            ISmsService smsService)
         {
             _context = context;
             _logger = logger;
             _actionLogger = actionLogger;
             _encryptionHelper = encryptionHelper;
+            _smsService = smsService;
         }
 
         [HttpGet]
@@ -53,10 +57,11 @@ namespace IdentityManagementSystem.API.Controllers
 
             var query = _context.Request.AsQueryable();
 
-            // اگر ادمین نیست (RoleId == 3 یا RoleName ادمین)، فقط Requestهای خودش
-            // چون RoleId در User نیست، از UserRoles چک می‌کنیم
-            bool isAdmin = currentUser.UserRoles.Any(ur => ur.RoleId == 3);
-            if (!isAdmin)
+            // فقط متقاضی (RoleId == 2) به درخواست‌های خودش محدود می‌شه.
+            // کارشناس حراست (RoleId == 1) و ادمین (RoleId == 3) باید همه‌ی درخواست‌ها رو
+            // برای بررسی/تایید/رد ببینن — نه فقط چیزی که خودشون ثبت کردن.
+            bool isApplicant = currentUser.UserRoles.Any(ur => ur.RoleId == 2);
+            if (isApplicant)
             {
                 query = query.Where(r =>
                     r.CreatedBy == username ||
@@ -389,6 +394,56 @@ namespace IdentityManagementSystem.API.Controllers
                 // 8. لاگ
                 await _actionLogger.Info(userId, "UpdateValidationStatus",
                     $"{statusName} درخواست #{requestId} توسط کارشناس");
+
+                // 9. اطلاع‌رسانی پیامکی به متقاضی — عدم موفقیت پیامک نباید ثبت وضعیت رو خراب کنه
+                if (!string.IsNullOrWhiteSpace(request.MobileNumber))
+                {
+                    var smsText = validateByExpert
+                        ? $"کاربر گرامی، درخواست شما با کد پیگیری {request.RequestCode} تایید شد."
+                        : $"کاربر گرامی، درخواست شما با کد پیگیری {request.RequestCode} رد شد.{(string.IsNullOrWhiteSpace(description) ? "" : $" دلیل: {description}")}";
+
+                    var smsLog = new SmsLog
+                    {
+                        UserId = userId,
+                        RequestId = requestId,
+                        MobileNumberEnc = _encryptionHelper.Encrypt(request.MobileNumber),
+                        MobileNumberHash = _encryptionHelper.ComputeSearchHash(request.MobileNumber),
+                        // مقادیر مجاز طبق CK_Sms_Purpose: General/RequestRejected/RequestApproved/RequestStageUpdate/Otp
+                        Purpose = validateByExpert ? "RequestApproved" : "RequestRejected",
+                        MessageText = smsText,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    try
+                    {
+                        var smsResult = await _smsService.SendAsync(request.MobileNumber, smsText);
+                        smsLog.Status = smsResult.IsSuccess ? "Sent" : "Failed";
+                        smsLog.ErrorMessage = smsResult.IsSuccess ? null : (smsResult.ErrorMessage ?? smsResult.RawResponse);
+                        smsLog.SentAt = smsResult.IsSuccess ? DateTime.UtcNow : null;
+
+                        if (!smsResult.IsSuccess)
+                        {
+                            _logger.LogWarning("پیامک اطلاع‌رسانی وضعیت برای درخواست {RequestId} ارسال نشد: {Error}",
+                                requestId, smsLog.ErrorMessage);
+                        }
+                    }
+                    catch (Exception smsEx)
+                    {
+                        smsLog.Status = "Failed";
+                        smsLog.ErrorMessage = smsEx.Message;
+                        _logger.LogError(smsEx, "خطا در ارسال پیامک اطلاع‌رسانی برای درخواست {RequestId}", requestId);
+                    }
+
+                    try
+                    {
+                        _context.SmsLogs.Add(smsLog);
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (Exception logEx)
+                    {
+                        _logger.LogError(logEx, "ثبت لاگ پیامک برای درخواست {RequestId} در دیتابیس ناموفق بود", requestId);
+                    }
+                }
 
                 return Ok(new
                 {

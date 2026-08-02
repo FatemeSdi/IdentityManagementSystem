@@ -123,27 +123,38 @@ namespace IdentityManagementSystem.API.Services
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var permissions = await _context.UserAccesses
+            // پرمیشن‌های مستقیم (اختصاص داده‌شده به خود کاربر)
+            var directPermissions = await _context.UserAccesses
                 .Where(ua => ua.UserId == user.UserId)
                 .Select(ua => ua.Permission)
                 .ToListAsync();
 
+            // پرمیشن‌های نقش‌محور (از طریق نقش‌های کاربر)
+            var rolePermissions = await _context.UserRoles
+                .Where(ur => ur.UserId == user.UserId)
+                .Join(_context.RolePermissions, ur => ur.RoleId, rp => rp.RoleId, (ur, rp) => rp)
+                .Join(_context.Permissions.Where(p => p.IsActive), rp => rp.PermissionId, p => p.PermissionId, (rp, p) => p.PermissionCode)
+                .ToListAsync();
+
+            var permissions = directPermissions
+                .Concat(rolePermissions)
+                .Distinct()
+                .ToList();
+
             var claims = new List<Claim>
-{
-    new Claim("UserId", user.UserId.ToString()),
-    new Claim("Username", user.Username),
+    {
+        new Claim("UserId", user.UserId.ToString()),
+        new Claim("Username", user.Username),
+        new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+        new Claim(ClaimTypes.Name, user.Username),
+        new Claim("FullName", user.Name ?? ""),
+        new Claim(ClaimTypes.Surname, user.LastName ?? ""),
+        new Claim(ClaimTypes.Role, user.Role?.RoleName ?? "User"),
 
-    new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+        // 🔥 این خط رو اضافه کن
+        new Claim("RoleId", (user.RoleId).ToString())
+    };
 
-    // این مهمه
-    new Claim(ClaimTypes.Name, user.Username),
-
-    new Claim("FullName", user.Name ?? ""),
-
-    new Claim(ClaimTypes.Surname, user.LastName ?? ""),
-
-    new Claim(ClaimTypes.Role, user.Role?.RoleName ?? "User")
-};
             // اضافه کردن پرمیشن‌ها
             claims.AddRange(permissions.Select(p => new Claim("Permission", p)));
 

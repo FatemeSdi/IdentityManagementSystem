@@ -62,6 +62,7 @@ namespace IdentityManagementSystem.UI.Controllers
                         HttpContext.Session.SetString("UserLastName", loginResponse.LastName ?? "");
                         HttpContext.Session.SetString("UserId", loginResponse.UserId.ToString());
                         HttpContext.Session.SetString("Username", loginResponse.Username ?? "");
+                        HttpContext.Session.SetInt32("RoleId", loginResponse.Role?.RoleId ?? 0);
 
                         return RedirectToAction("Index", "Cartable");
                     }

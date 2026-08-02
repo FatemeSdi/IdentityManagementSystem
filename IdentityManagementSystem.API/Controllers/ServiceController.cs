@@ -60,7 +60,7 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         [HttpPost("ProcessCombinedRequest")]
-        [Authorize(Policy = "CanAccessShahkar")]
+        [Authorize(Policy = "CanAccessServices")]
         public async Task<IActionResult> ProcessCombinedRequest([FromBody] CombinedRequestViewModel model)
         {
             if (!ModelState.IsValid)
@@ -109,54 +109,105 @@ namespace IdentityManagementSystem.API.Controllers
 
             long expertId = userId;
 
+            // === گام ۱: احراز هویت (شاهکار) — تا این تایید نشه سراغ گام بعد نمی‌ریم ===
+            ShahkarResponse shahkarResult;
             try
             {
-                var shahkarTask = CheckMobileNationalCode_Internal(
+                shahkarResult = await CheckMobileNationalCode_Internal(
                     model.NationalId, model.MobileNumber, request.RequestCode, request.RequestId, expertId);
-                var verifyDocTask = VerifyDocument_Internal(
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Shahkar check failed for {RequestId}", request.RequestId);
+                await FinalizeRequestAsync(request, isMatch: false, description: $"خطا در احراز هویت: {ex.Message}");
+                return new JsonResult(new
+                {
+                    success = true,
+                    data = new { Shahkar = (ShahkarResponse?)null, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId },
+                    message = "درخواست ثبت شد؛ اما احراز هویت با خطا مواجه شد."
+                });
+            }
+
+            bool isMatch = false;
+            try
+            {
+                var internalShahkarResponse = JsonSerializer.Deserialize<InternalShahkarResponse>(
+                    shahkarResult.ResponseText,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                isMatch = internalShahkarResponse?.Result?.Data?.Response == 200;
+                _logger.LogInformation("Shahkar IsMatch for {RequestId}: {IsMatch}", request.RequestId, isMatch);
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                _logger.LogError(ex, "Failed to parse internal Shahkar response: {ResponseText}", shahkarResult.ResponseText);
+            }
+
+            if (!isMatch)
+            {
+                // احراز هویت رد شد → درخواست همینجا ثبت و متوقف می‌شه، سراغ بررسی سند نمی‌ریم
+                await FinalizeRequestAsync(request, isMatch: false, description: null);
+                return new JsonResult(new
+                {
+                    success = true,
+                    data = new { Shahkar = shahkarResult, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId }
+                });
+            }
+
+            // === گام ۲: بررسی سند (وجود سند، تطابق کدملی، وکالت) — فقط اگه گام ۱ تایید شده باشه ===
+            VerifyDocResponse verifyDocResult;
+            try
+            {
+                verifyDocResult = await VerifyDocument_Internal(
                     model.DocumentNumber, model.VerificationCode, request.RequestCode, request.RequestId, userId, model.NationalId);
-
-                await Task.WhenAll(shahkarTask, verifyDocTask);
-
-                var shahkarResult = await shahkarTask;
-                var verifyDocResult = await verifyDocTask;
-
-                bool isMatch = false;
-                try
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VerifyDocument failed for {RequestId}", request.RequestId);
+                await FinalizeRequestAsync(request, isMatch: true, description: $"احراز هویت موفق بود؛ خطا در بررسی سند: {ex.Message}");
+                return new JsonResult(new
                 {
-                    var internalShahkarResponse = JsonSerializer.Deserialize<InternalShahkarResponse>(
-                        shahkarResult.ResponseText,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    isMatch = internalShahkarResponse?.Result?.Data?.Response == 200;
-                    _logger.LogInformation("Shahkar IsMatch for {RequestId}: {IsMatch}", request.RequestId, isMatch);
-                }
-                catch (System.Text.Json.JsonException ex)
-                {
-                    _logger.LogError(ex, "Failed to parse internal Shahkar response: {ResponseText}", shahkarResult.ResponseText);
-                }
+                    success = true,
+                    data = new { Shahkar = shahkarResult, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId },
+                    message = "احراز هویت موفق بود؛ اما بررسی سند با خطا مواجه شد."
+                });
+            }
 
+            request.IsExist = verifyDocResult.ExistDoc;
+            request.IsNationalIdInResponse = verifyDocResult.IsNationalIdInResponse;
+            request.IsNationalIdInLawyers = verifyDocResult.IsNationalIdInLawyers;
+            await FinalizeRequestAsync(request, isMatch: true, description: null);
+
+            var combinedResult = new
+            {
+                Shahkar = shahkarResult,
+                VerifyDoc = verifyDocResult,
+                RequestId = request.RequestId
+            };
+
+            return new JsonResult(new { success = true, data = combinedResult });
+        }
+
+        /// <summary>
+        /// درخواست رو با نتیجه‌ی نهایی (هر مرحله‌ای که تا اینجا رسیده) در دیتابیس finalize می‌کنه.
+        /// طوری طراحی شده که هیچوقت throw نکنه تا رکورد درخواست یتیم/بدون به‌روزرسانی نمونه.
+        /// </summary>
+        private async Task FinalizeRequestAsync(Request request, bool isMatch, string? description)
+        {
+            try
+            {
                 request.IsMatch = isMatch;
-                request.IsExist = verifyDocResult.ExistDoc;
-                request.IsNationalIdInResponse = verifyDocResult.IsNationalIdInResponse;
-                request.IsNationalIdInLawyers = verifyDocResult.IsNationalIdInLawyers;
+                if (description != null)
+                {
+                    request.Description = description;
+                }
                 request.UpdatedAt = DateTime.UtcNow;
                 request.UpdatedBy = User.Identity?.Name ?? "Unknown";
                 _context.Request.Update(request);
                 await _context.SaveChangesAsync();
-
-                var combinedResult = new
-                {
-                    Shahkar = shahkarResult,
-                    VerifyDoc = verifyDocResult,
-                    RequestId = request.RequestId
-                };
-
-                return new JsonResult(new { success = true, data = combinedResult });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing combined request for {RequestId}", request.RequestId);
-                return new JsonResult(new { success = false, message = $"خطا در پردازش درخواست: {ex.Message}" });
+                _logger.LogError(ex, "Failed to finalize request {RequestId}", request.RequestId);
             }
         }
 
@@ -630,7 +681,7 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         [HttpPost("MarkDocumentAsRead/{requestId}")]
-        [Authorize(Policy = "CanAccessShahkar")]
+        [Authorize(Policy = "CanAccessServices")]
         public async Task<IActionResult> MarkDocumentAsRead(long requestId)
         {
             try

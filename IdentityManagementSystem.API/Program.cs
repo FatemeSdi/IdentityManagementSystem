@@ -20,6 +20,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TokenService, TokenService>();
 builder.Services.Configure<ShahkarServiceOptions>(builder.Configuration.GetSection("Shahkar"));
 builder.Services.AddScoped<IdentityManagementSystem.API.Helpers.EncryptionHelper>();
+builder.Services.AddHttpClient<IdentityManagementSystem.API.Services.Sms.ISmsService, IdentityManagementSystem.API.Services.Sms.SmsService>();
 
 // --- Authentication & Authorization ---
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -46,8 +47,8 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("CanAccessShahkar", policy =>
-        policy.RequireClaim("Permission", "CanAccessShahkar"));
+    options.AddPolicy("CanAccessServices", policy =>
+        policy.RequireClaim("Permission", "CanAccessServices"));
 
 
     options.AddPolicy("CanValidateRequest", policy =>

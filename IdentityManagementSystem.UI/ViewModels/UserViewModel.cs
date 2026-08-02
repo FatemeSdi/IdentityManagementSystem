@@ -65,6 +65,9 @@ namespace IdentityManagementSystem.UI.ViewModels
         [Required(ErrorMessage = "فیلد {0} الزامی است")]
         [Display(Name = "رمز عبور")]
         public string? Password { get; set; }
+
+        //public string? MobileNumber { get; set; }
+        //public string OtpCodeHash { get; set; } = string.Empty;
     }
 
     public class GrantAccessViewModel

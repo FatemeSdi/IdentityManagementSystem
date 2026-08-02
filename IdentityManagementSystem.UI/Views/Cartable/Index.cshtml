@@ -289,42 +289,107 @@
 </div>
 
 <!-- مودال ایجاد درخواست جدید -->
-<div class="modal fade" id="scrollingmodal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+<div class="modal fade" id="scrollingmodal" tabindex="-1" aria-labelledby="scrollingmodalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title">ایجاد درخواست جدید</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title fw-semibold" id="scrollingmodalLabel">ایجاد درخواست جدید</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
             </div>
-            <div class="modal-body">
-                <form asp-action="ValidateSteps" method="post" id="needs-validation-form">
+
+            <div class="modal-body p-4">
+                <form asp-action="ValidateSteps" method="post" id="needs-validation-form" autocomplete="off">
                     @Html.AntiForgeryToken()
 
-                    <div class="mb-3">
-                        <label class="form-label">اطلاعات متقاضی</label>
-                        <input type="text" class="form-control mb-2" id="NationalCode" name="NationalCode" placeholder="کد ملی" required />
-                        <input type="text" class="form-control" id="MobileNumber" name="MobileNumber" placeholder="شماره موبایل" required />
-                        <small class="text-@(string.IsNullOrEmpty(formModel?.Step1Message) || formModel.Step1Message.Contains("معتبر") ? "success" : "danger")">
-                            @formModel?.Step1Message
-                        </small>
+                    <!-- بخش اطلاعات متقاضی -->
+                    <div class="mb-4">
+                        <p class="fw-semibold mb-3 text-primary">
+                            <i class="ri-user-line me-1"></i>
+                            اطلاعات متقاضی
+                        </p>
+
+                        <div class="row gy-3">
+                            <div class="col-md-6">
+                                <label for="NationalCode" class="form-label text-default">کد ملی</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="NationalCode"
+                                       name="NationalCode"
+                                       placeholder="کد ملی ۱۰ رقمی"
+                                       maxlength="10"
+                                       inputmode="numeric"
+                                       required />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="MobileNumber" class="form-label text-default">شماره موبایل</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="MobileNumber"
+                                       name="MobileNumber"
+                                       placeholder="مثلاً 09123456789"
+                                       maxlength="11"
+                                       inputmode="numeric"
+                                       required />
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(formModel?.Step1Message))
+                        {
+                            <div class="mt-2">
+                                <small class="text-@(formModel.Step1Message.Contains("معتبر") ? "success" : "danger")">
+                                    @formModel.Step1Message
+                                </small>
+                            </div>
+                        }
                     </div>
 
-                    <hr />
+                    <hr class="my-4" />
 
-                    <div class="mb-3">
-                        <label class="form-label">اطلاعات سند</label>
-                        <input type="text" class="form-control mb-2" id="DocumentNumber" name="DocumentNumber" placeholder="شناسه سند" required />
-                        <input type="text" class="form-control" id="VerifyCode" name="VerifyCode" placeholder="رمز تصدیق" required />
-                        <small class="text-@(string.IsNullOrEmpty(formModel?.Step2Message) || formModel.Step2Message.Contains("معتبر") ? "success" : "danger")">
-                            @formModel?.Step2Message
-                        </small>
-                    </div>
+                    <!-- بخش اطلاعات سند -->
+                    <div class="mb-2">
+                        <p class="fw-semibold mb-3 text-primary">
+                            <i class="ri-file-text-line me-1"></i>
+                            اطلاعات سند
+                        </p>
 
-                    <div class="d-flex gap-2 justify-content-end">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
-                        <button type="submit" id="btnVerify" class="btn btn-primary">ثبت درخواست</button>
+                        <div class="row gy-3">
+                            <div class="col-md-6">
+                                <label for="DocumentNumber" class="form-label text-default">شناسه سند</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="DocumentNumber"
+                                       name="DocumentNumber"
+                                       placeholder="شناسه سند را وارد کنید"
+                                       required />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="VerifyCode" class="form-label text-default">رمز تصدیق</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="VerifyCode"
+                                       name="VerifyCode"
+                                       placeholder="رمز تصدیق را وارد کنید"
+                                       required />
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(formModel?.Step2Message))
+                        {
+                            <div class="mt-2">
+                                <small class="text-@(formModel.Step2Message.Contains("معتبر") ? "success" : "danger")">
+                                    @formModel.Step2Message
+                                </small>
+                            </div>
+                        }
                     </div>
                 </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
+                <button type="submit" form="needs-validation-form" id="btnVerify" class="btn btn-primary">
+                    ثبت درخواست
+                </button>
             </div>
         </div>
     </div>
@@ -431,9 +496,13 @@
 
             function submitValidation(requestId, validateByExpert, description) {
                 const row = $(`tr[data-request-id="${requestId}"]`);
+                const token = $('input[name="__RequestVerificationToken"]').val();
                 fetch('/Cartable/UpdateValidationStatus', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': token
+                    },
                     body: JSON.stringify({
                         RequestId: requestId,
                         ValidateByExpert: validateByExpert,
@@ -467,14 +536,27 @@
                     return;
                 }
                 btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> در حال ارسال...');
-                $.post($(this).attr('action'), $(this).serialize())
-                    .done(() => {
-                        toastr.success('درخواست با موفقیت ثبت شد');
-                        $('#scrollingmodal').modal('hide');
-                        location.reload();
+                $.ajax({
+                    url: $(this).attr('action'),
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    dataType: 'json'
+                })
+                    .done((data) => {
+                        if (data && data.success) {
+                            toastr.success(data.message || 'درخواست با موفقیت ثبت شد');
+                            $('#scrollingmodal').modal('hide');
+                            // اجازه می‌دیم توست قبل از رفرش صفحه دیده بشه
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            toastr.error((data && data.message) || 'اطلاعات وارد شده معتبر نیست.');
+                            btn.prop('disabled', false).html('ثبت درخواست');
+                        }
                     })
-                    .fail(() => toastr.error('خطا در ارسال درخواست'))
-                    .always(() => btn.prop('disabled', false).html('ثبت درخواست'));
+                    .fail((xhr) => {
+                        toastr.error(xhr.responseJSON?.message || 'خطا در ارسال درخواست');
+                        btn.prop('disabled', false).html('ثبت درخواست');
+                    });
             });
 
             $('#rejectModal').on('hidden.bs.modal', () => pendingReject = null);

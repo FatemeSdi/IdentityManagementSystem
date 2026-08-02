@@ -18,9 +18,11 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(50)]
         public string Username { get; set; } = string.Empty;
 
-        [Required]
+        // دیگه Required نیست: کاربران Applicant پسورد ندارن (فقط OTP).
+        // برای Staff همیشه باید پر باشه؛ این الزام توی CK_Users_PasswordRequiredForStaff
+        // سطح DB و توی منطق ثبت‌نام Staff سمت سرویس چک می‌شه.
         [StringLength(255)]
-        public string PasswordHash { get; set; } = string.Empty;
+        public string? PasswordHash { get; set; }
 
         [Required]
         [StringLength(75)]
@@ -29,6 +31,11 @@ namespace IdentityManagementSystem.API.Models
         [Required]
         [StringLength(85)]
         public string LastName { get; set; } = string.Empty;
+
+        // 'Staff' (یوزرنیم+پسورد+OTP) یا 'Applicant' (فقط موبایل+OTP، بدون پسورد)
+        //[Required]
+        //[StringLength(20)]
+        //public string UserType { get; set; } = "Staff";
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLogin { get; set; }
@@ -256,6 +263,45 @@ namespace IdentityManagementSystem.API.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    [Table("Permissions", Schema = "Sec")]
+    public class Permission
+    {
+        [Key]
+        public int PermissionId { get; set; }
+
+        [Required]
+        [StringLength(200)]
+        public string PermissionName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100)]
+        public string PermissionCode { get; set; } = string.Empty;
+
+        public int? CategoryId { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    [Table("RolePermissions", Schema = "Sec")]
+    public class RolePermission
+    {
+        [Key]
+        public long RolePermissionId { get; set; }
+
+        public int RoleId { get; set; }
+        public Role? Role { get; set; }
+
+        public int PermissionId { get; set; }
+        public Permission? Permission { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public string? CreatedBy { get; set; }
+    }
+
     [Table("ShahkarLog", Schema = "Log")]
     public class ShahkarLog
     {
@@ -282,15 +328,12 @@ namespace IdentityManagementSystem.API.Models
 
         public long? RequestId { get; set; }
 
-
-
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public string? NationalIdEnc { get; set; }
         public string? NationalIdHash { get; set; }
         public string? MobileNumberEnc { get; set; }
         public string? MobileNumberHash { get; set; }
     }
-}
 
     [Table("VerifyDocLog", Schema = "Log")]
     public class VerifyDocLog
@@ -322,10 +365,53 @@ namespace IdentityManagementSystem.API.Models
         public string? VerificationCodeEnc { get; set; }
         public string? VerificationCodeHash { get; set; }
 
-    public bool? IsExist { get; set; }
+        public bool? IsExist { get; set; }
         public bool? IsRead { get; set; } = false;
         public string? ReadBy { get; set; }
         public DateTime? ReadDate { get; set; }
+    }
+
+    [Table("Sms", Schema = "Log")]
+    public class SmsLog
+    {
+        [Key]
+        public long SmsId { get; set; }
+
+        public long? UserId { get; set; }
+        public long? RequestId { get; set; }
+        public long? OtpId { get; set; }
+
+        [Required]
+        [StringLength(256)]
+        public string MobileNumberEnc { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(64)]
+        public string MobileNumberHash { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(30)]
+        public string Purpose { get; set; } = string.Empty;
+
+        [StringLength(50)]
+        public string? MessageTemplate { get; set; }
+
+        [Required]
+        [StringLength(500)]
+        public string MessageText { get; set; } = string.Empty;
+
+        [StringLength(100)]
+        public string? ProviderMessageId { get; set; }
+
+        [Required]
+        [StringLength(20)]
+        public string Status { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string? ErrorMessage { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? SentAt { get; set; }
     }
 
     [Table("RefreshTokens", Schema = "Sec")]
@@ -350,9 +436,103 @@ namespace IdentityManagementSystem.API.Models
         public User? User { get; set; }
     }
 
+    // ---------------------------------------------------------------------
+    // OTP (لاگین Staff با پسورد+OTP، ثبت‌نام/لاگین Applicant فقط با OTP)
+    // ---------------------------------------------------------------------
+    [Table("LoginOtp", Schema = "Sec")]
+    public class LoginOtp
+    {
+        [Key]
+        public long OtpId { get; set; }
+
+        public long UserId { get; set; }
+        public User? User { get; set; }
+
+        // فقط هش کد نگه‌داری می‌شه، هرگز خود کد (با ComputeSearchHash از EncryptionHelper)
+        [Required]
+        [StringLength(64)]
+        public string OtpCodeHash { get; set; } = string.Empty;
+
+        // 'Registration' | 'Login' | 'StaffLogin2FA'
+        [Required]
+        [StringLength(20)]
+        public string Purpose { get; set; } = string.Empty;
+
+        public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime ExpiresAt { get; set; }
+
+        public int AttemptCount { get; set; } = 0;
+
+        public int MaxAttempts { get; set; } = 5;
+
+        public bool IsVerified { get; set; } = false;
+
+        public DateTime? VerifiedAt { get; set; }
+
+        public bool IsUsed { get; set; } = false;
+
+        [StringLength(45)]
+        public string? IpAddress { get; set; }
+    }
+
+    // ---------------------------------------------------------------------
+    // لاگ پیامک‌های ارسالی (OTP و اطلاع‌رسانی مراحل درخواست)
+    // ---------------------------------------------------------------------
+    [Table("Sms", Schema = "Log")]
+    public class Sms
+    {
+        [Key]
+        public long SmsId { get; set; }
+
+        public long? UserId { get; set; }
+        public User? User { get; set; }
+
+        public long? RequestId { get; set; }
+        public Request? Request { get; set; }
+
+        public long? OtpId { get; set; }
+        public LoginOtp? LoginOtp { get; set; }
+
+        [Required]
+        [StringLength(256)]
+        public string MobileNumberEnc { get; set; } = string.Empty;
+
+        [StringLength(64)]
+        public string? MobileNumberHash { get; set; }
+
+        // 'Otp' | 'RequestStageUpdate' | 'RequestApproved' | 'RequestRejected' | 'General'
+        [Required]
+        [StringLength(30)]
+        public string Purpose { get; set; } = string.Empty;
+
+        [StringLength(50)]
+        public string? MessageTemplate { get; set; }
+
+        // متن باید همیشه mask‌شده ذخیره بشه (کد OTP هرگز plaintext وارد دیتابیس نشه)
+        [Required]
+        [StringLength(500)]
+        public string MessageText { get; set; } = string.Empty;
+
+        [StringLength(100)]
+        public string? ProviderMessageId { get; set; }
+
+        // 'Queued' | 'Sent' | 'Failed' | 'DeliveryUnknown'
+        [StringLength(20)]
+        public string Status { get; set; } = "Queued";
+
+        [StringLength(500)]
+        public string? ErrorMessage { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? SentAt { get; set; }
+    }
+
     // ViewModels kept for compatibility (moved from controllers where possible)
     public class RoleViewModel
     {
         public int RoleId { get; set; }
         public string RoleName { get; set; } = string.Empty;
     }
+}

@@ -19,8 +19,11 @@ namespace IdentityManagementSystem.API.Data
         public DbSet<RequestHistory> RequestHistory { get; set; }
         public DbSet<RequestStatus> RequestStatus { get; set; }
         public DbSet<UserAccess> UserAccesses { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
         public DbSet<ShahkarLog> ShahkarLog { get; set; }
         public DbSet<VerifyDocLog> VerifyDocLog { get; set; }
+        public DbSet<SmsLog> SmsLogs { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -36,8 +39,11 @@ namespace IdentityManagementSystem.API.Data
             modelBuilder.Entity<UserLog>().ToTable("UserLog", "Log");          // توجه: در DB اسم جدول UserLog است (نه UserLogs)
             modelBuilder.Entity<RequestHistory>().ToTable("RequestHistory", "Sec");
             modelBuilder.Entity<UserAccess>().ToTable("UserAccess", "Sec");
+            modelBuilder.Entity<Permission>().ToTable("Permissions", "Sec");
+            modelBuilder.Entity<RolePermission>().ToTable("RolePermissions", "Sec");
             modelBuilder.Entity<ShahkarLog>().ToTable("ShahkarLog", "Log");
             modelBuilder.Entity<VerifyDocLog>().ToTable("VerifyDocLog", "Log");
+            modelBuilder.Entity<SmsLog>().ToTable("Sms", "Log");
             modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens", "Sec");
 
             // ========== User ==========
