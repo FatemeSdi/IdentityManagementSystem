@@ -22,6 +22,7 @@ namespace IdentityManagementSystem.API.Controllers
         private readonly HttpClient _httpClient;
         private readonly IdentityManagementSystemContext _context;
         private readonly ShahkarServiceOptions _options;
+        private readonly BsrServiceOptions _bsrOptions;
         private readonly IMemoryCache _cache;
         private readonly ILogger<ServiceController> _logger;
         private readonly string _providerCode = "0785";
@@ -31,12 +32,14 @@ namespace IdentityManagementSystem.API.Controllers
             HttpClient httpClient,
             IdentityManagementSystemContext context,
             IOptions<ShahkarServiceOptions> options,
+            IOptions<BsrServiceOptions> bsrOptions,
             IMemoryCache cache,
             ILogger<ServiceController> logger)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+            _bsrOptions = bsrOptions?.Value ?? new BsrServiceOptions();
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -46,6 +49,13 @@ namespace IdentityManagementSystem.API.Controllers
                 _logger.LogError("Shahkar service configuration is incomplete: BaseUrl={BaseUrl}, Code={Code}, Password={Password}",
                     _options.BaseUrl, _options.Credential?.Code, _options.Credential?.Password);
                 throw new InvalidOperationException("تنظیمات سرویس شاهکار ناقص است.");
+            }
+
+            if (string.IsNullOrEmpty(_bsrOptions.Username) || string.IsNullOrEmpty(_bsrOptions.Password))
+            {
+                // بر خلاف شاهکار، نبود تنظیمات Bsr نباید کل کنترلر رو از کار بندازه —
+                // فقط گام قبض انبار (که اختیاریه) موقع فراخوانی با خطای واضح fail می‌شه.
+                _logger.LogWarning("Bsr service configuration is incomplete (Username/Password). Warehouse receipt lookups will fail until configured.");
             }
 
             _retryPolicy = Policy
@@ -84,6 +94,7 @@ namespace IdentityManagementSystem.API.Controllers
                 MobileNumber = model.MobileNumber,
                 DocumentNumber = model.DocumentNumber,
                 VerificationCode = model.VerificationCode,
+                WarehouseReceiptNumber = model.WarehouseReceiptNumber,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = User.Identity?.Name ?? "Unknown"
             };
@@ -108,6 +119,14 @@ namespace IdentityManagementSystem.API.Controllers
             await _context.SaveChangesAsync();
 
             long expertId = userId;
+
+            // === قبض انبار — مستقل از گام‌های احراز هویت/سند، فقط اگه شماره‌ش وارد شده باشه.
+            // عمداً همینجا (قبل از Shahkar/VerifyDoc) قرار گرفته که به هیچ‌کدوم از return‌های
+            // early اون دو گام وابسته نباشه و همیشه دقیقاً یک‌بار اجرا بشه.
+            if (!string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
+            {
+                await ProcessWarehouseReceipt_Internal(model.WarehouseReceiptNumber, request.RequestId, userId);
+            }
 
             // === گام ۱: احراز هویت (شاهکار) — تا این تایید نشه سراغ گام بعد نمی‌ریم ===
             ShahkarResponse shahkarResult;
@@ -512,6 +531,347 @@ namespace IdentityManagementSystem.API.Controllers
 
             return result;
         }
+
+        /// <summary>
+        /// دریافت قبض انبار (bsr-GetPortIncomeInvoice) و ثبت جزئیات استخراج‌شده در Define.WarehouseReceipt
+        /// + متن خام پاسخ در Log.WarehouseReceiptLog. طوری نوشته شده که هیچوقت throw نکنه — شکست این گام
+        /// (که مستقل و اختیاریه) نباید مانع ادامه‌ی پردازش Shahkar/VerifyDoc بشه.
+        /// </summary>
+        private async Task ProcessWarehouseReceipt_Internal(string receiptNumber, long requestId, long userId)
+        {
+            var createdBy = User.Identity?.Name ?? userId.ToString();
+            var receiptParams = new[] { ("WarehouseReceiptNumber", receiptNumber) };
+
+            // === فاکتور درآمد بندری — همونی که Define.WarehouseReceipt رو پر می‌کنه ===
+            var portIncomeResult = await CallBsrServiceAsync("bsr-GetPortIncomeInvoice", receiptParams);
+            await LogWarehouseReceiptCallAsync(requestId, receiptNumber, "PortIncomeInvoice", portIncomeResult, createdBy);
+
+            var items = new List<PortIncomeInvoiceItem>();
+            if (!string.IsNullOrWhiteSpace(portIncomeResult.InnerResponseText))
+            {
+                try
+                {
+                    items = JsonSerializer.Deserialize<List<PortIncomeInvoiceItem>>(portIncomeResult.InnerResponseText, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<PortIncomeInvoiceItem>();
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "خطا در پردازش پاسخ GetPortIncomeInvoice برای درخواست {RequestId}", requestId);
+                }
+            }
+
+            try
+            {
+                if (items.Count > 0)
+                {
+                    // یک ردیف به‌ازای هر قلم فاکتور (چون یک قبض انبار می‌تونه چند فاکتور/تخلیه داشته باشه)
+                    foreach (var item in items)
+                    {
+                        _context.WarehouseReceipts.Add(new WarehouseReceipt
+                        {
+                            RequestId = requestId,
+                            ReceiptNumber = string.IsNullOrWhiteSpace(item.ReceiptNumber) ? receiptNumber : item.ReceiptNumber,
+                            SerialNumber = item.InvoiceNumber,
+                            OwnerNationalId = item.GoodsOwnerNationalID,
+                            Quantity = item.Weight,
+                            Unit = item.Weight.HasValue ? "kg" : null,
+                            IssueDate = ParsePersianDateSafe(item.DischargeDate) ?? ParsePersianDateSafe(item.InvoiceDate),
+                            IsVerified = portIncomeResult.IsSuccessful,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = createdBy
+                        });
+                    }
+                }
+                else
+                {
+                    // حتی اگه هیچ فاکتوری برنگشت، یه ردیف با نتیجه‌ی «تایید نشده» ثبت می‌کنیم
+                    // تا مشخص باشه این شماره قبض بررسی شده ولی چیزی پیدا نشده.
+                    _context.WarehouseReceipts.Add(new WarehouseReceipt
+                    {
+                        RequestId = requestId,
+                        ReceiptNumber = receiptNumber,
+                        IsVerified = false,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = createdBy
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception logEx)
+            {
+                _logger.LogError(logEx, "ثبت اطلاعات قبض انبار برای درخواست {RequestId} در دیتابیس ناموفق بود", requestId);
+            }
+
+            // === هزینه خدمات / بیمه / پارکینگ — فقط لاگ خام ثبت می‌شه.
+            // چون نمونه‌ی واقعی پاسخ این سه سرویس در دسترس نبود، استخراج فیلد به فیلد (مثل PortIncomeInvoice)
+            // فعلاً انجام نمی‌شه تا از حدس اشتباه پرهیز بشه؛ متن خام برای استفاده‌ی بعدی ذخیره‌ست. ===
+            var serviceCostResult = await CallBsrServiceAsync("bsr-GetServiceCostInvoic", receiptParams);
+            await LogWarehouseReceiptCallAsync(requestId, receiptNumber, "ServiceCostInvoice", serviceCostResult, createdBy);
+
+            var insuranceResult = await CallBsrServiceAsync("bsr-GetInsuranceInvoice", receiptParams);
+            await LogWarehouseReceiptCallAsync(requestId, receiptNumber, "InsuranceInvoice", insuranceResult, createdBy);
+
+            var parkingCostResult = await CallBsrServiceAsync("bsr-GetParkingCostInvoic", receiptParams);
+            await LogWarehouseReceiptCallAsync(requestId, receiptNumber, "ParkingCostInvoice", parkingCostResult, createdBy);
+        }
+
+        private async Task LogWarehouseReceiptCallAsync(long requestId, string receiptNumber, string serviceType, BsrServiceCallResult result, string createdBy)
+        {
+            try
+            {
+                _context.WarehouseReceiptLogs.Add(new WarehouseReceiptLog
+                {
+                    RequestId = requestId,
+                    ReceiptNumber = receiptNumber,
+                    ServiceType = serviceType,
+                    ResponseText = result.RawResponseText,
+                    IsSuccessful = result.IsSuccessful,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = createdBy
+                });
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ثبت لاگ سرویس {ServiceType} برای درخواست {RequestId} ناموفق بود", serviceType, requestId);
+            }
+        }
+
+        /// <summary>
+        /// متد عمومی برای فراخوانی هر سرویس bsr-* (توکن‌دار). گرفتن توکن، ست کردن هدر Authorization
+        /// فقط روی همین یک درخواست (نه _httpClient.DefaultRequestHeaders — که تماس‌های Shahkar/VerifyDoc
+        /// دست‌نخورده بمونن)، retry، و لاگ کردن پاسخ خام رو یکجا انجام می‌ده. هیچوقت throw نمی‌کنه؛
+        /// خطا در IsSuccessful=false و ErrorMessage نتیجه منعکس می‌شه.
+        /// </summary>
+        private async Task<BsrServiceCallResult> CallBsrServiceAsync(string service, IEnumerable<(string Name, string Value)> parameters)
+        {
+            var result = new BsrServiceCallResult();
+            try
+            {
+                var token = await GetBsrAuthTokenAsync();
+
+                var requestBody = new
+                {
+                    credential = new { code = _options.Credential.Code, password = _options.Credential.Password },
+                    parameters = parameters.Select(p => new { parameterName = p.Name, parameterValue = p.Value }).ToArray(),
+                    service
+                };
+
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.BaseUrl)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
+                };
+                httpRequest.Headers.TryAddWithoutValidation("Authorization", token);
+
+                var response = await _retryPolicy.ExecuteAsync(() => _httpClient.SendAsync(httpRequest));
+                result.RawResponseText = await response.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("Received response from {Service}: StatusCode={StatusCode}, Content={ResponseContent}",
+                    service, response.StatusCode, result.RawResponseText);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException($"خطای سرویس {service}: کد {(int)response.StatusCode}");
+                }
+
+                using var doc = JsonDocument.Parse(result.RawResponseText);
+                var root = doc.RootElement;
+                result.IsSuccessful = root.TryGetProperty("isSuccessful", out var isSuccessfulEl) &&
+                                       isSuccessfulEl.ValueKind == JsonValueKind.True;
+
+                if (root.TryGetProperty("responseText", out var responseTextEl) && responseTextEl.ValueKind == JsonValueKind.String)
+                {
+                    result.InnerResponseText = responseTextEl.GetString();
+                }
+
+                if (!result.IsSuccessful && root.TryGetProperty("errorDescription", out var errDescEl) && errDescEl.ValueKind == JsonValueKind.String)
+                {
+                    result.ErrorMessage = errDescEl.GetString();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در فراخوانی سرویس {Service}", service);
+                result.ErrorMessage ??= ex.Message;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// bsr-GetPortIncomeByDate — گزارش درآمد بندری در یک بازه‌ی تاریخی (نه مرتبط با یک درخواست خاص).
+        /// فعلاً به هیچ endpoint/UI‌یی وصل نیست؛ آماده‌ست تا هروقت محل نمایشش (مثلاً صفحه‌ی گزارش‌ها) مشخص شد استفاده بشه.
+        /// </summary>
+        private async Task<BsrServiceCallResult> GetPortIncomeByDate(string startDate, string endDate, long lastReceivedInvoiceId = 0, int countRowsPerRequest = 50)
+        {
+            return await CallBsrServiceAsync("bsr-GetPortIncomeByDate", new[]
+            {
+                ("StartDate", startDate),
+                ("EndDate", endDate),
+                ("LastRecivedInvoiceID", lastReceivedInvoiceId.ToString()),
+                ("CountRowsPerRequest", countRowsPerRequest.ToString())
+            });
+        }
+
+        /// <summary>
+        /// bsr-GetExitGateByInvDate — گزارش خروج از دروازه بر اساس تاریخ فاکتور (نه مرتبط با یک درخواست خاص).
+        /// فعلاً به هیچ endpoint/UI‌یی وصل نیست؛ آماده‌ست تا هروقت محل نمایشش مشخص شد استفاده بشه.
+        /// </summary>
+        private async Task<BsrServiceCallResult> GetExitGateByInvDate(string startDate, string endDate, long lastReceivedInvoiceId = 0, int countRowsPerRequest = 50)
+        {
+            return await CallBsrServiceAsync("bsr-GetExitGateByInvDate", new[]
+            {
+                ("StartDate", startDate),
+                ("EndDate", endDate),
+                ("LastRecivedInvoiceID", lastReceivedInvoiceId.ToString()),
+                ("CountRowsPerRequest", countRowsPerRequest.ToString())
+            });
+        }
+
+        /// <summary>
+        /// گرفتن توکن Bearer سرویس‌های bsr-* از طریق bsr-login و کش کردنش —
+        /// طوری که هر تماس (تایید/رد/قبض انبار) نیازی به لاگین دوباره نداشته باشه.
+        /// </summary>
+        private async Task<string> GetBsrAuthTokenAsync()
+        {
+            const string cacheKey = "Bsr_AuthToken";
+            if (_cache.TryGetValue(cacheKey, out string? cachedToken) && !string.IsNullOrWhiteSpace(cachedToken))
+            {
+                return cachedToken;
+            }
+
+            if (string.IsNullOrEmpty(_bsrOptions.Username) || string.IsNullOrEmpty(_bsrOptions.Password))
+            {
+                throw new InvalidOperationException("تنظیمات ورود سرویس قبض انبار (Bsr:Username/Password) ناقص است.");
+            }
+
+            var loginBody = new
+            {
+                credential = new { code = _options.Credential.Code, password = _options.Credential.Password },
+                parameters = new[]
+                {
+                    new { parameterName = "Username", parameterValue = _bsrOptions.Username },
+                    new { parameterName = "Password", parameterValue = _bsrOptions.Password }
+                },
+                service = "bsr-login"
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(loginBody), Encoding.UTF8, "application/json");
+            var response = await _retryPolicy.ExecuteAsync(() => _httpClient.PostAsync(_options.BaseUrl, content));
+            var responseText = await response.Content.ReadAsStringAsync();
+
+            _logger.LogInformation("Received response from bsr-login: StatusCode={StatusCode}, Content={ResponseContent}",
+                response.StatusCode, responseText);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"خطای ورود به سرویس قبض انبار: کد {(int)response.StatusCode}");
+            }
+
+            var token = ExtractBsrToken(responseText);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                throw new Exception("توکن سرویس قبض انبار در پاسخ bsr-login یافت نشد.");
+            }
+
+            // مدت اعتبار واقعی توکن مشخص نیست؛ برای احتیاط کوتاه کش می‌کنیم و در صورت خطای بعدی دوباره لاگین می‌کنیم.
+            _cache.Set(cacheKey, token, TimeSpan.FromMinutes(10));
+            return token;
+        }
+
+        /// <summary>
+        /// استخراج توکن از پاسخ bsr-login. چون نمونه‌ی واقعی پاسخ این سرویس در دسترس نبود،
+        /// چند شکل محتمل رو امتحان می‌کنه و خام پاسخ رو (بالا، در GetBsrAuthTokenAsync) لاگ می‌کنه
+        /// تا در صورت اشتباه بودن، به‌راحتی از لاگ قابل تشخیص و اصلاح باشه.
+        /// </summary>
+        private string? ExtractBsrToken(string rawResponse)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(rawResponse);
+                var root = doc.RootElement;
+
+                string[] tokenFieldNames = { "token", "Token", "accessToken", "AccessToken", "authToken", "AuthToken" };
+
+                foreach (var name in tokenFieldNames)
+                {
+                    if (root.TryGetProperty(name, out var tokenEl) && tokenEl.ValueKind == JsonValueKind.String)
+                        return tokenEl.GetString();
+                }
+
+                if (root.TryGetProperty("responseText", out var rt) && rt.ValueKind == JsonValueKind.String)
+                {
+                    var text = rt.GetString();
+                    if (string.IsNullOrWhiteSpace(text))
+                        return null;
+
+                    if (text.TrimStart().StartsWith("{"))
+                    {
+                        using var inner = JsonDocument.Parse(text);
+                        var innerRoot = inner.RootElement;
+
+                        foreach (var name in tokenFieldNames)
+                        {
+                            if (innerRoot.TryGetProperty(name, out var tokenEl) && tokenEl.ValueKind == JsonValueKind.String)
+                                return tokenEl.GetString();
+                        }
+
+                        if (innerRoot.TryGetProperty("result", out var resultEl) &&
+                            resultEl.TryGetProperty("data", out var dataEl))
+                        {
+                            foreach (var name in tokenFieldNames)
+                            {
+                                if (dataEl.TryGetProperty(name, out var tokenEl) && tokenEl.ValueKind == JsonValueKind.String)
+                                    return tokenEl.GetString();
+                            }
+                        }
+
+                        return null;
+                    }
+
+                    // اگه JSON نبود، احتمالاً خود متن، توکن خامه
+                    return text;
+                }
+            }
+            catch (JsonException)
+            {
+                // اگه کل پاسخ اصلاً JSON نبود، شاید بدنه‌ی پاسخ مستقیماً همون توکنه
+                return string.IsNullOrWhiteSpace(rawResponse) ? null : rawResponse;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// تبدیل تاریخ شمسی به شکل "1401/01/07" به DateTime میلادی. اگه فرمت نامعتبر بود null برمی‌گردونه
+        /// (throw نمی‌کنه چون این فقط یه فیلد کمکیه، نباید کل ثبت قبض انبار رو خراب کنه).
+        /// </summary>
+        private DateTime? ParsePersianDateSafe(string? persianDate)
+        {
+            if (string.IsNullOrWhiteSpace(persianDate))
+                return null;
+
+            var parts = persianDate.Split('/');
+            if (parts.Length != 3)
+                return null;
+
+            try
+            {
+                var pc = new System.Globalization.PersianCalendar();
+                int year = int.Parse(parts[0]);
+                int month = int.Parse(parts[1]);
+                int day = int.Parse(parts[2]);
+                return pc.ToDateTime(year, month, day, 0, 0, 0, 0);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private string GetDocumentText(string responseString)
         {
             try
@@ -680,6 +1040,54 @@ namespace IdentityManagementSystem.API.Controllers
             }
         }
 
+        [HttpGet("GetWarehouseReceiptByRequestId/{requestId}")]
+        [Authorize(Policy = "CanAccessServices")]
+        public async Task<IActionResult> GetWarehouseReceiptByRequestId(long requestId)
+        {
+            try
+            {
+                var receipts = await _context.WarehouseReceipts
+                    .Where(w => w.RequestId == requestId)
+                    .OrderBy(w => w.WarehouseReceiptId)
+                    .ToListAsync();
+
+                if (receipts.Count == 0)
+                {
+                    return new JsonResult(new { success = false, message = "اطلاعاتی برای قبض انبار این درخواست یافت نشد." });
+                }
+
+                var receiptNumber = receipts.First().ReceiptNumber;
+                var isVerified = receipts.Any(r => r.IsVerified == true);
+
+                var lines = new List<string>();
+                int i = 1;
+                foreach (var r in receipts)
+                {
+                    lines.Add($"— قلم {i++} —");
+                    lines.Add($"شماره قبض انبار: {r.ReceiptNumber}");
+                    if (!string.IsNullOrWhiteSpace(r.SerialNumber)) lines.Add($"شماره فاکتور: {r.SerialNumber}");
+                    if (!string.IsNullOrWhiteSpace(r.OwnerNationalId)) lines.Add($"کد ملی/اقتصادی صاحب کالا: {r.OwnerNationalId}");
+                    if (r.Quantity.HasValue) lines.Add($"وزن: {r.Quantity} {r.Unit}");
+                    if (r.IssueDate.HasValue) lines.Add($"تاریخ تخلیه: {r.IssueDate:yyyy/MM/dd}");
+                    lines.Add($"وضعیت: {(r.IsVerified == true ? "تایید شده" : "تایید نشده")}");
+                    lines.Add("");
+                }
+
+                return new JsonResult(new
+                {
+                    success = true,
+                    receiptNumber,
+                    isVerified,
+                    text = string.Join("\n", lines)
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در دریافت قبض انبار برای درخواست {RequestId}", requestId);
+                return new JsonResult(new { success = false, message = $"خطا در دریافت اطلاعات قبض انبار: {ex.Message}" });
+            }
+        }
+
         [HttpPost("MarkDocumentAsRead/{requestId}")]
         [Authorize(Policy = "CanAccessServices")]
         public async Task<IActionResult> MarkDocumentAsRead(long requestId)
@@ -777,6 +1185,42 @@ namespace IdentityManagementSystem.API.Controllers
         public string MobileNumber { get; set; } = string.Empty;
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
+        public string? WarehouseReceiptNumber { get; set; }
+    }
+
+    public class BsrServiceOptions
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    /// <summary>نتیجه‌ی یک فراخوانی سرویس bsr-* — هیچوقت throw نمی‌شه، خطا این‌جا منعکس می‌شه.</summary>
+    public class BsrServiceCallResult
+    {
+        public bool IsSuccessful { get; set; }
+        public string RawResponseText { get; set; } = string.Empty;
+        public string? InnerResponseText { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
+    /// <summary>
+    /// یک قلم از آرایه‌ی پاسخ bsr-GetPortIncomeInvoice (responseText). فقط فیلدهایی که
+    /// در پروژه استفاده می‌شن تعریف شدن؛ بقیه‌ی فیلدهای واقعی پاسخ نادیده گرفته می‌شن.
+    /// </summary>
+    public class PortIncomeInvoiceItem
+    {
+        public string? TrafficType { get; set; }
+        public string? InvoiceNumber { get; set; }
+        public string? InvoiceDate { get; set; }
+        public string? ReceiptNumber { get; set; }
+        public string? Vessel { get; set; }
+        public string? BLNo { get; set; }
+        public decimal? Weight { get; set; }
+        public string? DischargeDate { get; set; }
+        public string? CustomsDecNumber { get; set; }
+        public string? GoodsOwnerName { get; set; }
+        public string? GoodsOwnerNationalID { get; set; }
+        public decimal? Total { get; set; }
     }
 
     public class InternalShahkarResponse

@@ -52,6 +52,7 @@
                         <th>شماره همراه</th>
                         <th>شناسه سند</th>
                         <th>رمز تصدیق</th>
+                        <th>شماره قبض انبار</th>
                         <th>نمایش سند</th>
                         <th>وضعیت</th>
                     </tr>
@@ -87,6 +88,7 @@
                             <td>@item.MobileNumber</td>
                             <td>@item.DocumentNumber</td>
                             <td>@item.VerificationCode</td>
+                            <td>@(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</td>
                             <td class="text-center">
                                 <button class="btn btn-sm btn-light btn-view-doc" data-request-id="@item.RequestId" title="مشاهده متن سند">
                                     <i class="ri-file-text-line @(item.IsRead ? "text-success" : "text-primary")"></i>
@@ -245,6 +247,26 @@
                                        name="VerifyCode"
                                        placeholder="رمز تصدیق را وارد کنید"
                                        required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" />
+
+                    <!-- بخش قبض انبار -->
+                    <div class="mb-2">
+                        <p class="fw-semibold mb-3 text-primary">
+                            <i class="ri-archive-line me-1"></i>
+                            قبض انبار
+                        </p>
+                        <div class="row gy-3">
+                            <div class="col-md-6">
+                                <label for="WarehouseReceiptNumber" class="form-label text-default">شماره قبض انبار</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="WarehouseReceiptNumber"
+                                       name="WarehouseReceiptNumber"
+                                       placeholder="شماره قبض انبار را وارد کنید" />
                             </div>
                         </div>
                     </div>

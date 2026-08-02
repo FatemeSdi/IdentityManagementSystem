@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "identity-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.API/IdentityManagementSystem.API.csproj", "--urls", "http://localhost:5066"],
+      "port": 5066
+    },
+    {
+      "name": "identity-ui",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.UI/IdentityManagementSystem.UI.csproj", "--urls", "http://localhost:5031"],
+      "port": 5031
+    }
+  ]
+}

@@ -243,7 +243,8 @@ namespace IdentityManagementSystem.UI.Controllers
                     NationalId = model.NationalCode,
                     MobileNumber = model.MobileNumber,
                     DocumentNumber = model.DocumentNumber,
-                    VerificationCode = model.VerifyCode
+                    VerificationCode = model.VerifyCode,
+                    WarehouseReceiptNumber = model.WarehouseReceiptNumber
                 });
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -320,7 +321,8 @@ namespace IdentityManagementSystem.UI.Controllers
                     NationalId = model.ClientNationalCode,
                     MobileNumber = model.MobileNumber,
                     DocumentNumber = model.DocumentNumber,
-                    VerificationCode = model.VerifyCode
+                    VerificationCode = model.VerifyCode,
+                    WarehouseReceiptNumber = model.WarehouseReceiptNumber
                 };
 
                 var response = await _client.PostAsJsonAsync("Service/ProcessCombinedRequest", requestData);
@@ -534,6 +536,37 @@ namespace IdentityManagementSystem.UI.Controllers
             catch (Exception ex)
             {
                 return Json(new { success = false, message = $"خطا در دریافت متن سند: {ex.Message}" });
+            }
+        }
+
+        // فقط برای متصدی — متن کامل قبض انبار رو نشون می‌ده. متقاضی فقط شماره‌ی قبض رو
+        // (که همراه بقیه‌ی اطلاعات درخواست تو جدول میاد) می‌بینه، نه این endpoint رو.
+        [HttpGet]
+        public async Task<IActionResult> GetWarehouseReceiptText(long requestId)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken;
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "توکن یافت نشد. لطفاً دوباره وارد سیستم شوید." });
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _client.GetAsync($"Service/GetWarehouseReceiptByRequestId/{requestId}");
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Json(new { success = false, message = $"خطا در دریافت قبض انبار: {content}" });
+                }
+
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"خطا در دریافت قبض انبار: {ex.Message}" });
             }
         }
 
@@ -759,6 +792,7 @@ namespace IdentityManagementSystem.UI.Controllers
         public string MobileNumber { get; set; } = string.Empty;
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
+        public string? WarehouseReceiptNumber { get; set; }
     }
 
     public class VerifyDocResponse
@@ -805,6 +839,7 @@ namespace IdentityManagementSystem.UI.Controllers
         public string VerifyCode { get; set; } = string.Empty;
         public string DocumentNumber { get; set; } = string.Empty;
         public string ClientNationalCode { get; set; } = string.Empty;
+        public string? WarehouseReceiptNumber { get; set; }
         public bool AgreeToTerms { get; set; }
         public string Step1Message { get; set; } = string.Empty;
         public string Step2Message { get; set; } = string.Empty;
@@ -819,6 +854,7 @@ namespace IdentityManagementSystem.UI.Controllers
         public string MobileNumber { get; set; } = string.Empty;
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
+        public string? WarehouseReceiptNumber { get; set; }
         public string ImpotrtantAnnexText { get; set; } = string.Empty;
         public bool? IsMatch { get; set; }
         public bool? IsExist { get; set; }

@@ -110,6 +110,9 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(50)]
         public string? VerificationCode { get; set; }
 
+        [StringLength(50)]
+        public string? WarehouseReceiptNumber { get; set; }
+
         public bool? IsMatch { get; set; }
         public bool? IsExist { get; set; }
         public bool? IsNationalIdInResponse { get; set; }
@@ -412,6 +415,79 @@ namespace IdentityManagementSystem.API.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? SentAt { get; set; }
+    }
+
+    [Table("WarehouseReceipt", Schema = "Define")]
+    public class WarehouseReceipt
+    {
+        [Key]
+        public long WarehouseReceiptId { get; set; }
+
+        public long RequestId { get; set; }
+
+        public int? CompanyId { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public string ReceiptNumber { get; set; } = string.Empty;
+
+        [StringLength(50)]
+        public string? SerialNumber { get; set; }
+
+        [StringLength(20)]
+        public string? OwnerNationalId { get; set; }
+
+        [StringLength(500)]
+        public string? GoodsDescription { get; set; }
+
+        public decimal? Quantity { get; set; }
+
+        [StringLength(20)]
+        public string? Unit { get; set; }
+
+        public DateTime? IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public int? StatusId { get; set; }
+        public bool? IsVerified { get; set; }
+
+        [StringLength(50)]
+        public string? VerificationCode { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [StringLength(100)]
+        public string? CreatedBy { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
+
+        [StringLength(100)]
+        public string? UpdatedBy { get; set; }
+    }
+
+    [Table("WarehouseReceiptLog", Schema = "Log")]
+    public class WarehouseReceiptLog
+    {
+        [Key]
+        public long WarehouseReceiptLogId { get; set; }
+
+        public long? RequestId { get; set; }
+
+        [Required]
+        [StringLength(50)]
+        public string ReceiptNumber { get; set; } = string.Empty;
+
+        // مشخص می‌کنه این لاگ مال کدوم سرویس bsr-* بوده (PortIncomeInvoice, ServiceCostInvoice, InsuranceInvoice, ParkingCostInvoice)
+        [StringLength(50)]
+        public string? ServiceType { get; set; }
+
+        public string? ResponseText { get; set; }
+
+        public bool IsSuccessful { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [StringLength(100)]
+        public string? CreatedBy { get; set; }
     }
 
     [Table("RefreshTokens", Schema = "Sec")]

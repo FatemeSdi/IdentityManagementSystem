@@ -19,6 +19,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TokenService, TokenService>();
 builder.Services.Configure<ShahkarServiceOptions>(builder.Configuration.GetSection("Shahkar"));
+builder.Services.Configure<IdentityManagementSystem.API.Controllers.BsrServiceOptions>(builder.Configuration.GetSection("Bsr"));
 builder.Services.AddScoped<IdentityManagementSystem.API.Helpers.EncryptionHelper>();
 builder.Services.AddHttpClient<IdentityManagementSystem.API.Services.Sms.ISmsService, IdentityManagementSystem.API.Services.Sms.SmsService>();
 
@@ -88,27 +89,21 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // --- CORS ---
+// آدرس‌های مجاز از appsettings.json خونده می‌شن (بخش Cors:AllowedOrigins) تا بعد از publish
+// روی هر سرور (UI متقاضی روی اینترنت، UI متصدی تو شبکه داخلی) بدون rebuild قابل تغییر باشن.
+var corsAllowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:7031", "https://localhost:7031" };
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowUI", builder =>
+    options.AddPolicy("AllowUI", policy =>
     {
-        builder.WithOrigins("http://localhost:7031", "https://localhost:7031")
-               .AllowAnyHeader()
-               .AllowAnyMethod()
-               .AllowCredentials();
-
+        policy.WithOrigins(corsAllowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
-//builder.Services.AddCors(options =>
-//{
-//    options.AddPolicy("AllowFrontend", policy =>
-//    {
-//        builder.WithOrigins("https://localhost:7031") 
-//               .AllowAnyMethod()
-//               .AllowAnyHeader()
-//               .AllowCredentials(); 
-//    });
-//});
 
 var app = builder.Build();
 

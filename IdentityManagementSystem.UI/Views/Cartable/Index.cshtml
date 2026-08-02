@@ -64,11 +64,13 @@
                         <th>شماره همراه</th>
                         <th>شناسه سند</th>
                         <th>رمز تصدیق</th>
+                        <th>شماره قبض انبار</th>
                         <th>احراز هویت متقاضی</th>
                         <th>احراز اصالت سند</th>
                         <th>ارتباط متقاضی با سند</th>
                         <th>احراز وکالت</th>
                         <th>نمایش سند</th>
+                        <th>قبض انبار</th>
                         <th>تایید درخواست</th>
                     </tr>
                 </thead>
@@ -85,6 +87,7 @@
                             <td>@item.MobileNumber</td>
                             <td>@item.DocumentNumber</td>
                             <td>@item.VerificationCode</td>
+                            <td>@(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</td>
 
                             <!-- احراز هویت متقاضی -->
                             <td class="text-center">
@@ -155,6 +158,20 @@
                                 <button class="btn btn-sm btn-light btn-view-doc" data-request-id="@item.RequestId" title="مشاهده متن سند">
                                     <i class="ri-file-text-line @(item.IsRead ? "text-success" : "text-primary")"></i>
                                 </button>
+                            </td>
+
+                            <!-- نمایش قبض انبار -->
+                            <td class="text-center">
+                                @if (!string.IsNullOrEmpty(item.WarehouseReceiptNumber))
+                                {
+                                    <button class="btn btn-sm btn-light btn-view-warehouse-receipt" data-request-id="@item.RequestId" title="مشاهده قبض انبار">
+                                        <i class="ri-archive-line text-primary"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
                             </td>
 
                             <!-- تایید / رد -->
@@ -252,6 +269,24 @@
                     <label class="form-check-label" for="documentChecked">متن سند بررسی شد</label>
                 </div>
                 <button type="button" class="btn btn-success" id="confirmDocument">تایید</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال نمایش قبض انبار -->
+<div class="modal fade" id="warehouseReceiptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="warehouseReceiptModalLabel">قبض انبار</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="warehouseReceiptModalBody">
+                <div class="text-center text-muted py-5">در حال بارگذاری...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
             </div>
         </div>
     </div>
@@ -382,6 +417,27 @@
                             </div>
                         }
                     </div>
+
+                    <hr class="my-4" />
+
+                    <!-- بخش قبض انبار -->
+                    <div class="mb-2">
+                        <p class="fw-semibold mb-3 text-primary">
+                            <i class="ri-archive-line me-1"></i>
+                            قبض انبار
+                        </p>
+
+                        <div class="row gy-3">
+                            <div class="col-md-6">
+                                <label for="WarehouseReceiptNumber" class="form-label text-default">شماره قبض انبار</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="WarehouseReceiptNumber"
+                                       name="WarehouseReceiptNumber"
+                                       placeholder="شماره قبض انبار را وارد کنید" />
+                            </div>
+                        </div>
+                    </div>
                 </form>
             </div>
 
@@ -438,6 +494,28 @@
                         $('#documentModalBody').html('<p class="text-danger text-center py-4">' + msg + '</p>');
                         $('#documentChecked, #confirmDocument').prop('disabled', true);
                         toastr.error(msg);
+                    });
+            });
+
+            // نمایش متن قبض انبار
+            $(document).on('click', '.btn-view-warehouse-receipt', function () {
+                const requestId = $(this).data('request-id');
+                $('#warehouseReceiptModalLabel').text('قبض انبار درخواست ' + requestId);
+                $('#warehouseReceiptModalBody').html('<div class="text-center py-5"><div class="spinner-border"></div><div class="mt-2">در حال بارگذاری...</div></div>');
+                $('#warehouseReceiptModal').modal('show');
+
+                $.get('/Cartable/GetWarehouseReceiptText', { requestId: requestId })
+                    .done(function (res) {
+                        if (res?.success && res.text?.trim()) {
+                            const safe = $('<div/>').text(res.text).html();
+                            $('#warehouseReceiptModalBody').html('<pre style="white-space:pre-wrap;line-height:1.8;background:#f8f9fa;padding:1rem;border-radius:8px;">' + safe + '</pre>');
+                        } else {
+                            $('#warehouseReceiptModalBody').html('<p class="text-danger text-center py-4">' + (res?.message || 'اطلاعاتی برای این قبض انبار یافت نشد.') + '</p>');
+                        }
+                    })
+                    .fail(function (xhr) {
+                        const msg = xhr.responseJSON?.message || 'خطا در دریافت قبض انبار';
+                        $('#warehouseReceiptModalBody').html('<p class="text-danger text-center py-4">' + msg + '</p>');
                     });
             });
 

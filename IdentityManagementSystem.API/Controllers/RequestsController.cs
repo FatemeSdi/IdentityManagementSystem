@@ -111,6 +111,7 @@ namespace IdentityManagementSystem.API.Controllers
                     DocumentNumber = r.DocumentNumber,
                     // اگر encrypted ذخیره شده باشد decrypt، در غیر این صورت همان مقدار
                     VerificationCode = r.VerificationCode,
+                    WarehouseReceiptNumber = r.WarehouseReceiptNumber,
                     IsMatch = r.IsMatch ?? false,
                     IsExist = r.IsExist ?? false,
                     IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,

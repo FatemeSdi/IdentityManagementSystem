@@ -24,6 +24,8 @@ namespace IdentityManagementSystem.API.Data
         public DbSet<ShahkarLog> ShahkarLog { get; set; }
         public DbSet<VerifyDocLog> VerifyDocLog { get; set; }
         public DbSet<SmsLog> SmsLogs { get; set; }
+        public DbSet<WarehouseReceipt> WarehouseReceipts { get; set; }
+        public DbSet<WarehouseReceiptLog> WarehouseReceiptLogs { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -44,6 +46,8 @@ namespace IdentityManagementSystem.API.Data
             modelBuilder.Entity<ShahkarLog>().ToTable("ShahkarLog", "Log");
             modelBuilder.Entity<VerifyDocLog>().ToTable("VerifyDocLog", "Log");
             modelBuilder.Entity<SmsLog>().ToTable("Sms", "Log");
+            modelBuilder.Entity<WarehouseReceipt>().ToTable("WarehouseReceipt", "Define");
+            modelBuilder.Entity<WarehouseReceiptLog>().ToTable("WarehouseReceiptLog", "Log");
             modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens", "Sec");
 
             // ========== User ==========
