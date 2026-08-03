@@ -1,103 +1,226 @@
-﻿@model IdentityManagementSystem.UI.ViewModels.LoginViewModel
+@model IdentityManagementSystem.UI.ViewModels.LoginViewModel
 @using DNTCaptcha.Core
 @{
     ViewData["Title"] = "ورود به سامانه";
     Layout = "~/Views/Shared/_LayoutAuth.cshtml";
 }
+<style>
+    .login-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 16px;
+        position: relative;
+        overflow: hidden;
+        background: radial-gradient(1100px 600px at 8% 0%, rgba(27,66,117,.10), transparent 60%), radial-gradient(900px 500px at 100% 100%, rgba(183,138,52,.08), transparent 55%), #eef1f5;
+    }
 
-<div class="container-lg">
-    <div class="snow-container"></div>
-    <div class="row justify-content-center align-items-center authentication authentication-basic h-100">
-        <div class="col-xl-11">
-            <div class="row justify-content-center">
-                <div class="col-xxl-5 col-xl-5 col-lg-5 col-md-6 col-sm-8 col-12">
+        .login-container::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(11,37,64,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(11,37,64,.035) 1px, transparent 1px);
+            background-size: 42px 42px;
+            pointer-events: none;
+        }
 
-                    <!-- لوگو -->
-                    <div class="my-5 d-flex justify-content-center">
-                        <a href="javascript:void(0);">
-                            <img src="~/assets/images/brand-logos/desktop-logo.png"
-                                 alt="Logo"
-                                 class="authentication-brand desktop-logo">
-                            <img src="~/assets/images/brand-logos/desktop-dark.png"
-                                 alt="Logo"
-                                 class="authentication-brand desktop-dark">
-                        </a>
+    .official-header {
+        width: 100%;
+        max-width: 860px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        z-index: 1;
+    }
+
+        .official-header .badge-line {
+            width: 46px;
+            height: 3px;
+            background: linear-gradient(90deg, #b78a34, #1b4275);
+            border-radius: 3px;
+        }
+
+        .official-header h6 {
+            margin: 0;
+            color: #0b2540;
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+    .login-card {
+        display: flex;
+        width: 960px;
+        min-height: 450px;
+        max-width: 100%;
+        background: #fff;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 12px 40px rgba(36, 75, 139, 0.12);
+        position: relative;
+        z-index: 1;
+    }
+
+    .login-right {
+        flex: 1;
+        padding: 40px 36px;
+    }
+
+    .login-left {
+        width: 320px;
+        background: linear-gradient(160deg, #244b8b, #3a6bb5);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 36px 28px;
+        color: #fff;
+        text-align: center;
+    }
+
+        .login-left img {
+            max-width: 160px;
+            margin-bottom: 24px;
+            filter: brightness(0) invert(1);
+        }
+
+    .login-title {
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.6;
+        margin-bottom: 20px;
+    }
+
+    .form-control, .captchaInput {
+        height: 46px !important;
+        border-radius: 10px !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #f8fafc !important;
+    }
+
+    .input-group .form-control {
+        border-radius: 10px 0 0 10px !important;
+    }
+
+        .form-control:focus {
+            border-color: #244b8b !important;
+            box-shadow: 0 0 0 3px rgba(36, 75, 139, 0.12) !important;
+            background: #fff !important;
+        }
+
+    .input-group-text {
+        border-radius: 0 10px 10px 0 !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #f8fafc !important;
+    }
+
+    .btn-primary {
+        height: 48px;
+        border: none !important;
+        border-radius: 10px;
+        font-weight: 600;
+        background: #244b8b !important;
+    }
+
+        .btn-primary:hover {
+            background: #1a3a6e !important;
+        }
+
+    .authentication-barrier p {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    @@media (max-width: 991px) {
+        .login-card {
+            flex-direction: column;
+            max-width: 420px;
+        }
+
+        .login-left {
+            width: 100%;
+            padding: 28px 20px;
+        }
+
+        .login-right {
+            padding: 28px 20px;
+        }
+    }
+</style>
+
+<div class="login-container">
+    <div class="official-header">
+        <span class="badge-line"></span>
+        <h6>سامانه مدیریت هویت</h6>
+        <span class="badge-line"></span>
+    </div>
+
+    <div class="login-card">
+        <div class="login-right">
+            @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
+            {
+                <div class="alert alert-danger py-2">@ViewBag.ErrorMessage</div>
+            }
+            <form id="loginForm" asp-action="LoginPage" method="post" autocomplete="off">
+                <div asp-validation-summary="ModelOnly" class="text-danger d-none"></div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label text-default" asp-for="Username"></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="ri-user-line text-muted"></i></span>
+                        <input asp-for="Username" class="form-control" placeholder="نام کاربری را وارد کنید" autocomplete="username" required />
                     </div>
-
-                    <!-- کارت لاگین -->
-                    <div class="card custom-card my-4">
-                        <div class="card-body p-5">
-                            <p class="h4 mb-2 fw-semibold">ورود به سامانه</p>
-                            <p class="mb-4 text-muted">لطفاً نام کاربری و رمز عبور خود را وارد کنید</p>
-
-                            <form id="loginForm" asp-action="LoginPage" method="post" autocomplete="off">
-                                <div class="row gy-3">
-
-                                    <!-- نام کاربری -->
-                                    <div class="col-xl-12">
-                                        <label class="form-label text-default" asp-for="Username">نام کاربری</label>
-                                        <input asp-for="Username"
-                                               class="form-control form-control-lg"
-                                               placeholder="نام کاربری را وارد کنید"
-                                               autocomplete="username" />
-                                        <span asp-validation-for="Username" class="text-danger d-block mt-1"></span>
-                                    </div>
-
-                                    <!-- رمز عبور -->
-                                    <div class="col-xl-12">
-                                        <label class="form-label text-default" asp-for="Password">رمز عبور</label>
-                                        <div class="position-relative">
-                                            <input asp-for="Password"
-                                                   type="password"
-                                                   class="form-control form-control-lg"
-                                                   id="login-password"
-                                                   placeholder="رمز عبور"
-                                                   autocomplete="current-password" />
-                                            <a href="javascript:void(0);"
-                                               class="show-password-button text-muted"
-                                               onclick="createpassword('login-password', this)">
-                                                <i class="ri-eye-off-line align-middle"></i>
-                                            </a>
-                                        </div>
-                                        <span asp-validation-for="Password" class="text-danger d-block mt-1"></span>
-                                    </div>
-
-                                    <!-- کپچا -->
-                                    <div class="col-xl-12">
-                                        <div id="securitySection" class="mt-2">
-                                            <dnt-captcha asp-captcha-generator-max="9999"
-                                                         asp-captcha-generator-min="1000"
-                                                         asp-captcha-generator-language="English"
-                                                         asp-captcha-generator-display-mode="ShowDigits"
-                                                         asp-use-relative-urls="true"
-                                                         asp-placeholder="کد امنیتی را وارد کنید"
-                                                         asp-validation-error-message="کد امنیتی اشتباه است. لطفاً کد جدید را وارد کنید."
-                                                         asp-too-many-requests-error-message="درخواست‌های زیاد! لطفاً یک دقیقه صبر کنید!"
-                                                         asp-font-name="Tahoma"
-                                                         asp-font-size="30"
-                                                         asp-fore-color="#333333"
-                                                         asp-back-color="#FCF6F5FF"
-                                                         asp-text-box-class="form-control form-control-lg"
-                                                         asp-text-box-template="<div class='form-group'>{0}</div>"
-                                                         asp-validation-message-class="text-danger"
-                                                         asp-refresh-button-class="btn btn-light"
-                                                         asp-show-refresh-button="true" />
-                                        </div>
-                                    </div>
-
-                                </div>
-
-                                <!-- دکمه ورود -->
-                                <div class="d-grid mt-4">
-                                    <button type="submit" class="btn btn-lg btn-primary">ورود</button>
-                                </div>
-                            </form>
-
-                        </div>
-                    </div>
-
+                    <span asp-validation-for="Username" class="text-danger d-block mt-1"></span>
                 </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label text-default" asp-for="Password"></label>
+                    <div class="input-group" id="Password-toggle">
+                        <span class="input-group-text"><i class="ri-lock-2-line text-muted"></i></span>
+                        <input asp-for="Password" type="password" id="login-password" class="form-control" placeholder="رمز عبور" autocomplete="current-password" required />
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger d-block mt-1"></span>
+                </div>
+
+                <div id="securitySection" class="form-group text-start mt-2" style="direction:rtl;">
+                    <dnt-captcha asp-captcha-generator-max="9999"
+                                 asp-captcha-generator-min="1000"
+                                 asp-captcha-generator-language="English"
+                                 asp-captcha-generator-display-mode="ShowDigits"
+                                 asp-use-relative-urls="true"
+                                 asp-placeholder="کد امنیتی را وارد کنید"
+                                 asp-text-box-class="form-control captchaInput text-start"
+                                 asp-validation-error-message="کد امنیتی اشتباه است. لطفاً کد جدید را وارد کنید."
+                                 asp-too-many-requests-error-message="درخواست‌های زیاد! لطفاً یک دقیقه صبر کنید!"
+                                 asp-font-name="Tahoma"
+                                 asp-font-size="28"
+                                 asp-fore-color="#333"
+                                 asp-back-color="#F8FAFC"
+                                 asp-text-box-template="<div class='form-group'>{0}</div>"
+                                 asp-validation-message-class="text-danger"
+                                 asp-show-refresh-button="true"
+                                 asp-refresh-button-class="ri-refresh-line btn captcha-refresh" />
+                </div>
+
+                <div class="form-group mt-3">
+                    <button type="submit" id="loginBtn" class="btn btn-primary w-100">
+                        <span id="loginText">ورود</span>
+                        <span id="loginSpinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="text-center mt-4 authentication-barrier">
+                <p class="mb-0"><i class="ri-shield-check-line me-1"></i>امنیت اطلاعات شما برای ما اهمیت دارد — تمامی فعالیت‌ها ثبت می‌شود</p>
             </div>
+        </div>
+
+        <div class="login-left">
+            <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" />
+            <div class="login-title">سامانه مدیریت هویت<br>ورود کاربران</div>
         </div>
     </div>
 </div>
@@ -108,14 +231,7 @@
     <script>
         @if (TempData["SuccessLogoutMessage"] != null)
         {
-                @:toastr.options = {
-                @:"closeButton": true,
-                @:"progressBar": true,
-                @:"positionClass": "toast-top-left",
-                @:"timeOut": "3000",
-                @:"rtl": true
-                @:};
-                @:toastr.success('@TempData["SuccessLogoutMessage"]');
+                @:showToast('@TempData["SuccessLogoutMessage"]', "success");
         }
 
         const jwtToken = '@ViewBag.JwtToken';
@@ -125,25 +241,26 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
-            toastr.options = {
-                "closeButton": true,
-                "progressBar": true,
-                "positionClass": "toast-top-left",
-                "timeOut": "5000",
-                "rtl": true
-            };
-
-            // نمایش خطاهای ولیدیشن با توستر
-            const validationErrors = document.querySelectorAll('.field-validation-error, .text-danger');
-            validationErrors.forEach(err => {
-                const text = err.textContent.trim();
-                if (text !== '' && text.length > 3) {
-                    toastr.error(text);
-                }
+            const shown = new Set();
+            document.querySelectorAll('.field-validation-error, .validation-summary-errors').forEach(el => {
+                const m = el.textContent.trim();
+                if (m && !shown.has(m)) { shown.add(m); showToast(m, "error"); }
             });
 
             if ('@(!string.IsNullOrEmpty(ViewBag.ErrorMessage) ? ViewBag.ErrorMessage : "")' !== '') {
-                toastr.error('@(!string.IsNullOrEmpty(ViewBag.ErrorMessage) ? ViewBag.ErrorMessage : "")');
+                showToast('@ViewBag.ErrorMessage', "error");
+            }
+
+            const toggle = document.getElementById('Password-toggle');
+            if (toggle) {
+                const icon = toggle.querySelector('i'), input = toggle.querySelector('input');
+                toggle.addEventListener('click', e => {
+                    if (e.target.closest('span.input-group-text')) {
+                        input.type = input.type === 'password' ? 'text' : 'password';
+                        icon.classList.toggle('ri-lock-2-line');
+                        icon.classList.toggle('ri-eye-line');
+                    }
+                });
             }
         });
     </script>

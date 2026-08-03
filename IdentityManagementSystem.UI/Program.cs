@@ -5,6 +5,12 @@ using IdentityManagementSystem.UI.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var portEnv = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(portEnv))
+{
+    builder.WebHost.UseUrls($"http://localhost:{portEnv}");
+}
+
 // ================= MVC =================
 builder.Services.AddControllersWithViews();
 
