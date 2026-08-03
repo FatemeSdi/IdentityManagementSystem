@@ -112,6 +112,7 @@ namespace IdentityManagementSystem.API.Controllers
                     // اگر encrypted ذخیره شده باشد decrypt، در غیر این صورت همان مقدار
                     VerificationCode = r.VerificationCode,
                     WarehouseReceiptNumber = r.WarehouseReceiptNumber,
+                    TrackingCode = r.TrackingCode,
                     IsMatch = r.IsMatch ?? false,
                     IsExist = r.IsExist ?? false,
                     IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,
@@ -131,6 +132,42 @@ namespace IdentityManagementSystem.API.Controllers
                 TotalCount = totalCount,
                 CurrentPage = page,
                 PageSize = pageSize
+            });
+        }
+
+        /// <summary>
+        /// پیگیری وضعیت یک درخواست با کد پیگیری + شماره موبایل — هر دو باید با هم مطابقت داشته باشن
+        /// (چون کد پیگیری از RequestId مشتق و قابل حدس زدنه، تنهایی برای شناسایی کافی نیست).
+        /// </summary>
+        [HttpGet("Track")]
+        public async Task<IActionResult> Track(string trackingCode, string mobileNumber)
+        {
+            if (string.IsNullOrWhiteSpace(trackingCode) || string.IsNullOrWhiteSpace(mobileNumber))
+            {
+                return BadRequest(new { success = false, message = "کد پیگیری و شماره موبایل الزامی است." });
+            }
+
+            var request = await _context.Request
+                .FirstOrDefaultAsync(r => r.TrackingCode == trackingCode.Trim() && r.MobileNumber == mobileNumber.Trim());
+
+            if (request == null)
+            {
+                return NotFound(new { success = false, message = "درخواستی با این مشخصات یافت نشد." });
+            }
+
+            string statusText = request.ValidateByExpert == true
+                ? "تایید شده"
+                : request.ValidateByExpert == false
+                    ? "رد شده"
+                    : "در انتظار بررسی";
+
+            return Ok(new
+            {
+                success = true,
+                trackingCode = request.TrackingCode,
+                createdAt = request.CreatedAt,
+                status = statusText,
+                description = request.ValidateByExpert == false ? request.Description : null
             });
         }
 
@@ -313,6 +350,13 @@ namespace IdentityManagementSystem.API.Controllers
             var validateByExpert = model.ValidateByExpert;
             var description = model.Description?.Trim();
 
+            // رد کردن دیگه یه اکشن دستی نیست — فقط سیستم (تو ProcessCombinedRequest) با شکست
+            // هر گام از زنجیره‌ی سرویس‌ها می‌تونه درخواست رو رد کنه. متصدی فقط می‌تونه تایید بزنه.
+            if (validateByExpert == false)
+            {
+                return BadRequest(new { success = false, message = "رد درخواست فقط به‌صورت سیستمی و خودکار انجام می‌شود؛ اکشن دستی رد وجود ندارد." });
+            }
+
             try
             {
                 // 1. شناسایی کاربر
@@ -400,8 +444,8 @@ namespace IdentityManagementSystem.API.Controllers
                 if (!string.IsNullOrWhiteSpace(request.MobileNumber))
                 {
                     var smsText = validateByExpert
-                        ? $"کاربر گرامی، درخواست شما با کد پیگیری {request.RequestCode} تایید شد."
-                        : $"کاربر گرامی، درخواست شما با کد پیگیری {request.RequestCode} رد شد.{(string.IsNullOrWhiteSpace(description) ? "" : $" دلیل: {description}")}";
+                        ? $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} تایید شد."
+                        : $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} رد شد.{(string.IsNullOrWhiteSpace(description) ? "" : $" دلیل: {description}")}";
 
                     var smsLog = new SmsLog
                     {

@@ -25,15 +25,76 @@ namespace IdentityManagementSystem.UI.Controllers
         private readonly HttpClient _client;
         private readonly IDNTCaptchaValidatorService _captchaValidatorService;
         private readonly ILogger<CartableController> _logger;
+        private readonly IConfiguration _configuration;
+
+        // کش ساده‌ی توکن حساب سرویسی «پورتال عمومی» — بین درخواست‌های anonymous مختلف به اشتراک می‌ره
+        // تا هر ثبت درخواست مجبور به لاگین دوباره نباشه. Controller instance جدید ولی static field مشترکه.
+        private static string? _publicPortalTokenCache;
+        private static DateTime _publicPortalTokenExpiresAt;
+        private static readonly SemaphoreSlim _publicPortalTokenLock = new(1, 1);
 
         public CartableController(
             IHttpClientFactory httpClientFactory,
             IDNTCaptchaValidatorService captchaValidatorService,
-            ILogger<CartableController> logger)
+            ILogger<CartableController> logger,
+            IConfiguration configuration)
         {
             _client = httpClientFactory.CreateClient("PomixApi");
             _captchaValidatorService = captchaValidatorService ?? throw new ArgumentNullException(nameof(captchaValidatorService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        }
+
+        /// <summary>
+        /// توکن حساب سرویسی «پورتال عمومی» (Bsr:PublicPortal تو appsettings) — برای متقاضی‌هایی که
+        /// بدون لاگین (فقط با تایید OTP) درخواست ثبت می‌کنن. کش می‌شه تا نیازی به لاگین مکرر نباشه.
+        /// </summary>
+        private async Task<string?> GetPublicPortalTokenAsync()
+        {
+            if (!string.IsNullOrEmpty(_publicPortalTokenCache) && DateTime.UtcNow < _publicPortalTokenExpiresAt)
+            {
+                return _publicPortalTokenCache;
+            }
+
+            await _publicPortalTokenLock.WaitAsync();
+            try
+            {
+                if (!string.IsNullOrEmpty(_publicPortalTokenCache) && DateTime.UtcNow < _publicPortalTokenExpiresAt)
+                {
+                    return _publicPortalTokenCache;
+                }
+
+                var username = _configuration["PublicPortal:Username"];
+                var password = _configuration["PublicPortal:Password"];
+                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                {
+                    _logger.LogError("PublicPortal:Username/Password در appsettings تنظیم نشده — ثبت درخواست anonymous ممکن نیست.");
+                    return null;
+                }
+
+                var response = await _client.PostAsJsonAsync("auth/login", new { Username = username, Password = password });
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("لاگین حساب سرویسی پورتال عمومی ناموفق بود: {StatusCode}", response.StatusCode);
+                    return null;
+                }
+
+                var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                if (loginResponse?.Tokens?.AccessToken == null)
+                {
+                    _logger.LogError("پاسخ لاگین حساب سرویسی پورتال عمومی فاقد توکن بود.");
+                    return null;
+                }
+
+                _publicPortalTokenCache = loginResponse.Tokens.AccessToken;
+                // کمی زودتر از انقضای واقعی (۱۵ دقیقه) منقضی در نظر می‌گیریم تا وسط یه درخواست نخوره
+                _publicPortalTokenExpiresAt = DateTime.UtcNow.AddMinutes(12);
+                return _publicPortalTokenCache;
+            }
+            finally
+            {
+                _publicPortalTokenLock.Release();
+            }
         }
 
         #region CartableIndex
@@ -160,29 +221,81 @@ namespace IdentityManagementSystem.UI.Controllers
         [HttpGet]
         public async Task<IActionResult> ClientIndex(int page = 1, string search = "")
         {
-            int roleId = 0;
-
+            // ثبت درخواست دیگه Role-based نیست — هر کسی (حتی بدون لاگین) به این صفحه دسترسی داره.
+            // فقط اگه یه متصدی/ادمین لاگین‌کرده به اشتباه اینجا اومده باشه، به کارتابل خودش برمی‌گردونیمش.
             var roleIdClaim = User.FindFirst("RoleId")?.Value;
-            if (!string.IsNullOrEmpty(roleIdClaim))
+            int? loggedInRoleId = null;
+            if (!string.IsNullOrEmpty(roleIdClaim) && int.TryParse(roleIdClaim, out var parsedRoleId))
             {
-                int.TryParse(roleIdClaim, out roleId);
+                loggedInRoleId = parsedRoleId;
             }
             else if (HttpContext.Session.GetInt32("RoleId").HasValue)
             {
-                roleId = HttpContext.Session.GetInt32("RoleId").Value;
+                loggedInRoleId = HttpContext.Session.GetInt32("RoleId").Value;
             }
 
-            // فقط RoleId = 2 اجازه داره
-            if (roleId != 2)
+            if (loggedInRoleId.HasValue && loggedInRoleId.Value != 2)
             {
                 return RedirectToAction("Index");
             }
 
-            var model = await GetCartableData(page, search, filterStatus: "");
+            PaginatedCartableViewModel model;
+            if (!string.IsNullOrEmpty(HttpContext.Session.GetString("JwtToken")))
+            {
+                // کاربر لاگین‌کرده (حساب متقاضی قدیمی) — لیست درخواست‌های خودش رو ببینه
+                model = await GetCartableData(page, search, filterStatus: "");
+            }
+            else
+            {
+                // بازدیدکننده‌ی anonymous — چیزی برای «درخواست‌های من» نداریم چون هویتی برای فیلتر کردن نیست؛
+                // فقط فرم ثبت درخواست + پیگیری با کد رو می‌بینه.
+                model = new PaginatedCartableViewModel { CurrentPage = 1, PageSize = 10, SearchQuery = search };
+            }
 
             ViewBag.FormModel = new CartableFormViewModel();
 
             return View("ClientIndex", model);   // ویوی ClientIndex.cshtml
+        }
+
+        /// <summary>
+        /// پیگیری وضعیت درخواست با کد پیگیری + شماره موبایل — بدون نیاز به لاگین.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> TrackRequest(string trackingCode, string mobileNumber)
+        {
+            if (string.IsNullOrWhiteSpace(trackingCode) || string.IsNullOrWhiteSpace(mobileNumber))
+            {
+                return Json(new { success = false, message = "کد پیگیری و شماره موبایل الزامی است." });
+            }
+
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken") ?? await GetPublicPortalTokenAsync();
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "سامانه موقتاً در دسترس نیست." });
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _client.GetAsync($"Request/Track?trackingCode={Uri.EscapeDataString(trackingCode)}&mobileNumber={Uri.EscapeDataString(mobileNumber)}");
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    dynamic? errorResult = null;
+                    try { errorResult = JsonConvert.DeserializeObject<dynamic>(content); } catch { }
+                    string errorMessage = (string?)errorResult?.message ?? "درخواستی با این مشخصات یافت نشد.";
+                    return Json(new { success = false, message = errorMessage });
+                }
+
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در پیگیری درخواست {TrackingCode}", trackingCode);
+                return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
+            }
         }
 
         /// <summary>
@@ -222,16 +335,37 @@ namespace IdentityManagementSystem.UI.Controllers
                 formatErrors.Add("شناسه سند نامعتبر است.");
             if (string.IsNullOrEmpty(model.VerifyCode) || !Regex.IsMatch(model.VerifyCode, @"^\d{6}$"))
                 formatErrors.Add("رمز تصدیق نامعتبر است.");
+            if (string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
+                formatErrors.Add("شماره قبض انبار الزامی است.");
 
             if (formatErrors.Count > 0)
             {
                 return Json(new { success = false, message = string.Join(" ", formatErrors) });
             }
 
-            var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken;
-            if (string.IsNullOrEmpty(token))
+            var sessionToken = HttpContext.Session.GetString("JwtToken");
+            string? token;
+
+            if (!string.IsNullOrEmpty(sessionToken))
             {
-                return Json(new { success = false, message = "لطفاً ابتدا وارد سیستم شوید." });
+                // کاربر لاگین‌کرده (متصدی، یا حساب متقاضی قدیمی) — از توکن خودش استفاده می‌شه
+                token = sessionToken;
+            }
+            else
+            {
+                // مسیر متقاضی anonymous — بدون لاگین، ولی باید شماره موبایلش رو با OTP تایید کرده باشه.
+                // این چک سمت سرور انجام می‌شه (نه فقط JS) چون کسی می‌تونه مستقیم این endpoint رو صدا بزنه.
+                var otpVerified = HttpContext.Session.GetString($"OTP_Verified_{model.MobileNumber}") == "true";
+                if (!otpVerified)
+                {
+                    return Json(new { success = false, message = "لطفاً ابتدا شماره موبایل خود را با کد پیامکی تایید کنید." });
+                }
+
+                token = await GetPublicPortalTokenAsync();
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "سامانه موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید." });
+                }
             }
 
             try
@@ -272,11 +406,15 @@ namespace IdentityManagementSystem.UI.Controllers
                     isMatch = (bool)(result.data.Shahkar.IsSuccessful == true);
                 }
 
-                string message = isMatch == false
-                    ? "درخواست شما ثبت شد. وضعیت آن را از جدول درخواست‌ها دنبال کنید."
-                    : "درخواست شما با موفقیت ثبت شد.";
+                string? trackingCode = (string?)result?.data?.TrackingCode;
 
-                return Json(new { success = true, message });
+                string message = !string.IsNullOrEmpty(trackingCode)
+                    ? $"درخواست شما با کد پیگیری {trackingCode} ثبت شد."
+                    : (isMatch == false
+                        ? "درخواست شما ثبت شد. وضعیت آن را از جدول درخواست‌ها دنبال کنید."
+                        : "درخواست شما با موفقیت ثبت شد.");
+
+                return Json(new { success = true, message, trackingCode });
             }
             catch (Exception ex)
             {

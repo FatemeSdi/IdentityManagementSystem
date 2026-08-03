@@ -21,6 +21,7 @@ namespace IdentityManagementSystem.API.Models.ViewModels
         [StringLength(50)]
         public string? VerificationCode { get; set; }
         public string? WarehouseReceiptNumber { get; set; }
+        public string? TrackingCode { get; set; }
         public bool IdentityVerified { get; set; }
         public bool DocumentVerified { get; set; }
         public bool DocumentMatch { get; set; }

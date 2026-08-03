@@ -79,6 +79,11 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "داده‌های ورودی نامعتبر است." });
             }
 
+            if (string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
+            {
+                return new JsonResult(new { success = false, message = "شماره قبض انبار الزامی است." });
+            }
+
             var userIdClaim = User.FindFirst("UserId")?.Value;
             if (!long.TryParse(userIdClaim, out long userId))
             {
@@ -102,6 +107,10 @@ namespace IdentityManagementSystem.API.Controllers
             _context.Request.Add(request);
             await _context.SaveChangesAsync();
 
+            // کد پیگیری رو بعد از ساخته‌شدن RequestId (که auto-increment هست) تولید می‌کنیم —
+            // مشتق‌شده از خودِ RequestId پس همیشه یکتاست، بدون نیاز به retry/collision-check.
+            request.TrackingCode = $"REQ{request.RequestId:D8}";
+
             // === ثبت تاریخچه درخواست (RequestHistory) ===
             var history = new RequestHistory
             {
@@ -120,15 +129,13 @@ namespace IdentityManagementSystem.API.Controllers
 
             long expertId = userId;
 
-            // === قبض انبار — مستقل از گام‌های احراز هویت/سند، فقط اگه شماره‌ش وارد شده باشه.
-            // عمداً همینجا (قبل از Shahkar/VerifyDoc) قرار گرفته که به هیچ‌کدوم از return‌های
-            // early اون دو گام وابسته نباشه و همیشه دقیقاً یک‌بار اجرا بشه.
-            if (!string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
-            {
-                await ProcessWarehouseReceipt_Internal(model.WarehouseReceiptNumber, request.RequestId, userId);
-            }
+            // === زنجیره‌ی سرویس‌ها کاملاً ترتیبیه: هر گام فقط اگه گام قبلی موفق بود اجرا می‌شه.
+            // به محض شکست هر گام، درخواست به‌صورت سیستمی و خودکار «رد» می‌شه (با دلیل مشخص) و
+            // ادامه‌ی زنجیره اصلاً صدا زده نمی‌شه. متصدی فقط زمانی درخواست رو تو صف تاییدش می‌بینه
+            // که همه‌ی گام‌ها یکی‌یکی true بوده باشن — و در اون حالت فقط می‌تونه «تایید» بزنه،
+            // چون رد کردن دیگه یه اکشن دستی نیست.
 
-            // === گام ۱: احراز هویت (شاهکار) — تا این تایید نشه سراغ گام بعد نمی‌ریم ===
+            // === گام ۱: احراز هویت (شاهکار) ===
             ShahkarResponse shahkarResult;
             try
             {
@@ -138,12 +145,12 @@ namespace IdentityManagementSystem.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Shahkar check failed for {RequestId}", request.RequestId);
-                await FinalizeRequestAsync(request, isMatch: false, description: $"خطا در احراز هویت: {ex.Message}");
+                await AutoRejectAsync(request, isMatch: false, reason: $"خطا در ارتباط با سرویس احراز هویت: {ex.Message}");
                 return new JsonResult(new
                 {
                     success = true,
-                    data = new { Shahkar = (ShahkarResponse?)null, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId },
-                    message = "درخواست ثبت شد؛ اما احراز هویت با خطا مواجه شد."
+                    data = new { Shahkar = (ShahkarResponse?)null, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId, TrackingCode = request.TrackingCode },
+                    message = "درخواست ثبت و به‌صورت سیستمی رد شد؛ احراز هویت با خطا مواجه شد."
                 });
             }
 
@@ -163,16 +170,17 @@ namespace IdentityManagementSystem.API.Controllers
 
             if (!isMatch)
             {
-                // احراز هویت رد شد → درخواست همینجا ثبت و متوقف می‌شه، سراغ بررسی سند نمی‌ریم
-                await FinalizeRequestAsync(request, isMatch: false, description: null);
+                // احراز هویت رد شد → همینجا به‌صورت سیستمی رد و متوقف می‌شه، سراغ بررسی سند نمی‌ریم
+                await AutoRejectAsync(request, isMatch: false, reason: GetRejectReasonText(RejectReason.MismatchNationalIdMobile));
                 return new JsonResult(new
                 {
                     success = true,
-                    data = new { Shahkar = shahkarResult, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId }
+                    data = new { Shahkar = shahkarResult, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId, TrackingCode = request.TrackingCode },
+                    message = "درخواست ثبت و به‌صورت سیستمی رد شد؛ کد ملی و شماره موبایل تطابق ندارند."
                 });
             }
 
-            // === گام ۲: بررسی سند (وجود سند، تطابق کدملی، وکالت) — فقط اگه گام ۱ تایید شده باشه ===
+            // === گام ۲: بررسی سند (وجود سند، تطابق کدملی، وکالت) — فقط چون گام ۱ تایید شد ===
             VerifyDocResponse verifyDocResult;
             try
             {
@@ -182,25 +190,63 @@ namespace IdentityManagementSystem.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "VerifyDocument failed for {RequestId}", request.RequestId);
-                await FinalizeRequestAsync(request, isMatch: true, description: $"احراز هویت موفق بود؛ خطا در بررسی سند: {ex.Message}");
+                await AutoRejectAsync(request, isMatch: true, reason: $"خطا در بررسی سند: {ex.Message}");
                 return new JsonResult(new
                 {
                     success = true,
-                    data = new { Shahkar = shahkarResult, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId },
-                    message = "احراز هویت موفق بود؛ اما بررسی سند با خطا مواجه شد."
+                    data = new { Shahkar = shahkarResult, VerifyDoc = (VerifyDocResponse?)null, RequestId = request.RequestId, TrackingCode = request.TrackingCode },
+                    message = "درخواست ثبت و به‌صورت سیستمی رد شد؛ بررسی سند با خطا مواجه شد."
                 });
             }
 
             request.IsExist = verifyDocResult.ExistDoc;
             request.IsNationalIdInResponse = verifyDocResult.IsNationalIdInResponse;
             request.IsNationalIdInLawyers = verifyDocResult.IsNationalIdInLawyers;
+
+            if (!verifyDocResult.ExistDoc)
+            {
+                await AutoRejectAsync(request, isMatch: true, reason: GetRejectReasonText(RejectReason.DocumentNotFound));
+                return new JsonResult(new
+                {
+                    success = true,
+                    data = new { Shahkar = shahkarResult, VerifyDoc = verifyDocResult, RequestId = request.RequestId, TrackingCode = request.TrackingCode },
+                    message = "درخواست ثبت و به‌صورت سیستمی رد شد؛ سندی با این شناسه و رمز تصدیق یافت نشد."
+                });
+            }
+
+            if (!verifyDocResult.IsNationalIdInResponse || !verifyDocResult.IsNationalIdInLawyers)
+            {
+                await AutoRejectAsync(request, isMatch: true, reason: GetRejectReasonText(RejectReason.NoRelationToDocument));
+                return new JsonResult(new
+                {
+                    success = true,
+                    data = new { Shahkar = shahkarResult, VerifyDoc = verifyDocResult, RequestId = request.RequestId, TrackingCode = request.TrackingCode },
+                    message = "درخواست ثبت و به‌صورت سیستمی رد شد؛ ارتباط متقاضی با سند تایید نشد."
+                });
+            }
+
+            // === گام ۳: قبض انبار — فقط چون گام ۱ و ۲ تایید شدن (WarehouseReceiptNumber همیشه الزامیه) ===
+            bool warehouseFound = await ProcessWarehouseReceipt_Internal(model.WarehouseReceiptNumber!, request.RequestId, userId);
+            if (!warehouseFound)
+            {
+                await AutoRejectAsync(request, isMatch: true, reason: "قبض انبار با این شماره یافت نشد یا نامعتبر است.");
+                return new JsonResult(new
+                {
+                    success = true,
+                    data = new { Shahkar = shahkarResult, VerifyDoc = verifyDocResult, RequestId = request.RequestId, TrackingCode = request.TrackingCode },
+                    message = "درخواست ثبت و به‌صورت سیستمی رد شد؛ قبض انبار یافت نشد."
+                });
+            }
+
+            // === همه‌ی گام‌ها true بودن → منتظر تایید دستی متصدی (فقط تایید؛ رد دیگه دستی نیست) ===
             await FinalizeRequestAsync(request, isMatch: true, description: null);
 
             var combinedResult = new
             {
                 Shahkar = shahkarResult,
                 VerifyDoc = verifyDocResult,
-                RequestId = request.RequestId
+                RequestId = request.RequestId,
+                TrackingCode = request.TrackingCode
             };
 
             return new JsonResult(new { success = true, data = combinedResult });
@@ -210,7 +256,7 @@ namespace IdentityManagementSystem.API.Controllers
         /// درخواست رو با نتیجه‌ی نهایی (هر مرحله‌ای که تا اینجا رسیده) در دیتابیس finalize می‌کنه.
         /// طوری طراحی شده که هیچوقت throw نکنه تا رکورد درخواست یتیم/بدون به‌روزرسانی نمونه.
         /// </summary>
-        private async Task FinalizeRequestAsync(Request request, bool isMatch, string? description)
+        private async Task FinalizeRequestAsync(Request request, bool isMatch, string? description, bool? validateByExpert = null)
         {
             try
             {
@@ -218,6 +264,10 @@ namespace IdentityManagementSystem.API.Controllers
                 if (description != null)
                 {
                     request.Description = description;
+                }
+                if (validateByExpert.HasValue)
+                {
+                    request.ValidateByExpert = validateByExpert.Value;
                 }
                 request.UpdatedAt = DateTime.UtcNow;
                 request.UpdatedBy = User.Identity?.Name ?? "Unknown";
@@ -228,6 +278,63 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 _logger.LogError(ex, "Failed to finalize request {RequestId}", request.RequestId);
             }
+        }
+
+        /// <summary>
+        /// رد سیستمی و خودکار درخواست — تنها مسیر ردِ درخواست تو کل برنامه. متصدی هیچ اکشن دستی
+        /// برای رد نداره؛ به محض شکست هر گام از زنجیره‌ی سرویس‌ها همینجا صدا زده می‌شه.
+        /// </summary>
+        private async Task AutoRejectAsync(Request request, bool isMatch, string reason)
+        {
+            await FinalizeRequestAsync(request, isMatch: isMatch, description: reason, validateByExpert: false);
+
+            try
+            {
+                var history = new RequestHistory
+                {
+                    RequestId = request.RequestId,
+                    StatusId = 3, // ۳ = رد شده
+                    ExpertId = "System",
+                    ActionDescription = $"درخواست به‌صورت سیستمی و خودکار رد شد: {reason}",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedStatus = "رد شده (سیستمی)",
+                    UpdatedStatusBy = "سیستم",
+                    UpdatedStatusDate = DateTime.UtcNow
+                };
+                _context.RequestHistory.Add(history);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ثبت تاریخچه‌ی رد سیستمی برای درخواست {RequestId} ناموفق بود", request.RequestId);
+            }
+        }
+
+        private static string GetRejectReasonText(RejectReason reason)
+        {
+            var member = typeof(RejectReason).GetMember(reason.ToString())[0];
+            var display = member.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.DisplayAttribute), false)
+                .Cast<System.ComponentModel.DataAnnotations.DisplayAttribute>()
+                .FirstOrDefault();
+            return display?.Name ?? reason.ToString();
+        }
+
+        public enum RejectReason
+        {
+            [System.ComponentModel.DataAnnotations.Display(Name = "عدم تطابق کد ملی و شماره همراه")]
+            MismatchNationalIdMobile = 1,
+
+            [System.ComponentModel.DataAnnotations.Display(Name = "عدم وجود سند با این شناسه و رمز تصدیق")]
+            DocumentNotFound = 2,
+
+            [System.ComponentModel.DataAnnotations.Display(Name = "عدم ارتباط متقاضی با سند (به عنوان وکیل)")]
+            NoRelationToDocument = 3,
+
+            [System.ComponentModel.DataAnnotations.Display(Name = "عدم اعتبار وکالتنامه (منقضی شده)")]
+            InvalidPowerOfAttorney = 4,
+
+            [System.ComponentModel.DataAnnotations.Display(Name = "سایر دلایل")]
+            Other = 99
         }
 
         private async Task<ShahkarResponse> CheckMobileNationalCode_Internal(
@@ -248,7 +355,7 @@ namespace IdentityManagementSystem.API.Controllers
                 _logger.LogWarning("Invalid NationalId: {NationalId}", nationalId);
                 throw new ArgumentException("کد ملی نامعتبر است.");
             }
-            if (!await CanMakeShahkarRequest(expertId))
+            if (!await CanMakeShahkarRequest(expertId, mobile))
             {
                 _logger.LogWarning("Request limit exceeded for expert {ExpertId}", expertId);
                 throw new InvalidOperationException("تعداد درخواست‌های شما از حد مجاز گذشته است.");
@@ -534,10 +641,10 @@ namespace IdentityManagementSystem.API.Controllers
 
         /// <summary>
         /// دریافت قبض انبار (bsr-GetPortIncomeInvoice) و ثبت جزئیات استخراج‌شده در Define.WarehouseReceipt
-        /// + متن خام پاسخ در Log.WarehouseReceiptLog. طوری نوشته شده که هیچوقت throw نکنه — شکست این گام
-        /// (که مستقل و اختیاریه) نباید مانع ادامه‌ی پردازش Shahkar/VerifyDoc بشه.
+        /// + متن خام پاسخ در Log.WarehouseReceiptLog. true برمی‌گردونه فقط اگه حداقل یه فاکتور واقعی
+        /// برای این شماره قبض انبار پیدا بشه — این خروجی برای gate کردن ادامه‌ی زنجیره استفاده می‌شه.
         /// </summary>
-        private async Task ProcessWarehouseReceipt_Internal(string receiptNumber, long requestId, long userId)
+        private async Task<bool> ProcessWarehouseReceipt_Internal(string receiptNumber, long requestId, long userId)
         {
             var createdBy = User.Identity?.Name ?? userId.ToString();
             var receiptParams = new[] { ("WarehouseReceiptNumber", receiptNumber) };
@@ -616,6 +723,9 @@ namespace IdentityManagementSystem.API.Controllers
 
             var parkingCostResult = await CallBsrServiceAsync("bsr-GetParkingCostInvoic", receiptParams);
             await LogWarehouseReceiptCallAsync(requestId, receiptNumber, "ParkingCostInvoice", parkingCostResult, createdBy);
+
+            // gate فقط بر اساس پیدا شدن حداقل یک فاکتور واقعیه (نه سه سرویس فرعی بالا که صرفاً لاگ می‌شن)
+            return portIncomeResult.IsSuccessful && items.Count > 0;
         }
 
         private async Task LogWarehouseReceiptCallAsync(long requestId, string receiptNumber, string serviceType, BsrServiceCallResult result, string createdBy)
@@ -1139,13 +1249,29 @@ namespace IdentityManagementSystem.API.Controllers
             return $"{_providerCode}{dateTimePart}{microseconds}";
         }
 
-        private async Task<bool> CanMakeShahkarRequest(long expertId)
+        private async Task<bool> CanMakeShahkarRequest(long expertId, string? mobile = null)
         {
             var lastHour = DateTime.UtcNow.AddHours(-1);
             var requestCount = await _context.ShahkarLog
                 .CountAsync(r => r.ExpertId == expertId && r.CreatedAt > lastHour);
             _logger.LogInformation("Request count for expert {ExpertId} in last hour: {RequestCount}", expertId, requestCount);
-            return requestCount < 10;
+            if (requestCount >= 10)
+                return false;
+
+            // موقع ثبت anonymous (بدون لاگین کاربر واقعی)، همه‌ی درخواست‌ها با یک حساب سرویسی مشترک
+            // میان — پس expertId به‌تنهایی کافی نیست، محدودیت جدا بر اساس شماره موبایل هم لازمه.
+            if (!string.IsNullOrWhiteSpace(mobile))
+            {
+                var mobileCount = await _context.ShahkarLog
+                    .CountAsync(r => r.MobileNumber == mobile && r.CreatedAt > lastHour);
+                if (mobileCount >= 5)
+                {
+                    _logger.LogWarning("Request limit exceeded for mobile {Mobile}: {MobileCount} in last hour", mobile, mobileCount);
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private bool EqualsNormalized(string a, string b)

@@ -113,6 +113,10 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(50)]
         public string? WarehouseReceiptNumber { get; set; }
 
+        // کد پیگیری قابل‌جستجو و مناسب پیامک — مثلاً REQ00020198 (مشتق‌شده از RequestId، همیشه یکتا)
+        [StringLength(30)]
+        public string? TrackingCode { get; set; }
+
         public bool? IsMatch { get; set; }
         public bool? IsExist { get; set; }
         public bool? IsNationalIdInResponse { get; set; }

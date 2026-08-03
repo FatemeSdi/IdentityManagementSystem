@@ -134,7 +134,14 @@ app.Use(async (context, next) =>
         path.StartsWith("/css") ||
         path.StartsWith("/js") ||
         path.StartsWith("/lib") ||
-        path.StartsWith("/assets"))
+        path.StartsWith("/assets") ||
+        // ثبت درخواست دیگه Role-based نیست: متقاضی بدون لاگین (فقط با تایید OTP پیامکی) دسترسی داره.
+        // متصدی (بقیه‌ی مسیرهای /Cartable/*) همچنان باید لاگین کنه.
+        path.StartsWith("/cartable/clientindex") ||
+        path.StartsWith("/cartable/sendotp") ||
+        path.StartsWith("/cartable/verifyotp") ||
+        path.StartsWith("/cartable/validatesteps") ||
+        path.StartsWith("/cartable/trackrequest"))
     {
         await next();
         return;
