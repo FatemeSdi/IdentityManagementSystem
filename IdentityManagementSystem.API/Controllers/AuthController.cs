@@ -35,19 +35,24 @@ namespace IdentityManagementSystem.API.Controllers
                 .FirstOrDefaultAsync(u => u.Username == loginViewModel.Username);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(loginViewModel.Password, user.PasswordHash))
+            {
+                await LogAction(user?.UserId ?? 0, "Login_Failed", loginViewModel.Username, "نام کاربری یا رمز عبور اشتباه است");
                 return Unauthorized("نام کاربری یا رمز عبور اشتباه است.");
+            }
 
             // Set convenience properties from first role (if any)
             var firstRole = user.UserRoles?.FirstOrDefault()?.Role;
             user.Role = firstRole;
             user.RoleId = firstRole?.RoleId ?? 0;
 
-            // بروزرسانی آخرین ورود 
+            // بروزرسانی آخرین ورود
             user.LastLogin = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             // تولید توکن‌ها
             var tokens = await _tokenService.GenerateTokensAsync(user);
+
+            await LogAction(user.UserId, "Login_Success", user.Username, "ورود موفق");
 
             // خروجی شامل اطلاعات کاربر و توکن‌ها
             return Ok(new
@@ -394,6 +399,11 @@ namespace IdentityManagementSystem.API.Controllers
                 return BadRequest("Refresh Token ارائه نشده است.");
 
             var result = await _tokenService.RevokeRefreshTokenAsync(model.RefreshToken);
+
+            var callerId = User.FindFirst("UserId")?.Value;
+            long.TryParse(callerId, out long callerUserId);
+            await LogAction(callerUserId, "RevokeRefreshToken", User.Identity?.Name, "Refresh token revoked");
+
             return Ok(result);
         }
 
@@ -402,6 +412,11 @@ namespace IdentityManagementSystem.API.Controllers
         public async Task<IActionResult> RevokeAllRefreshTokens([FromBody] RevokeAllRequestViewModel model)
         {
             var result = await _tokenService.RevokeAllRefreshTokensAsync(model.UserId);
+
+            var callerId = User.FindFirst("UserId")?.Value;
+            long.TryParse(callerId, out long callerUserId);
+            await LogAction(callerUserId, "RevokeAllRefreshTokens", User.Identity?.Name, $"TargetUserId={model.UserId}");
+
             return Ok(result);
         }
 

@@ -25,6 +25,7 @@ namespace IdentityManagementSystem.API.Controllers
         private readonly BsrServiceOptions _bsrOptions;
         private readonly IMemoryCache _cache;
         private readonly ILogger<ServiceController> _logger;
+        private readonly IdentityManagementSystem.API.Services.Logging.UserActionLogger _actionLogger;
         private readonly string _providerCode = "0785";
         private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
 
@@ -34,7 +35,8 @@ namespace IdentityManagementSystem.API.Controllers
             IOptions<ShahkarServiceOptions> options,
             IOptions<BsrServiceOptions> bsrOptions,
             IMemoryCache cache,
-            ILogger<ServiceController> logger)
+            ILogger<ServiceController> logger,
+            IdentityManagementSystem.API.Services.Logging.UserActionLogger actionLogger)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -42,6 +44,7 @@ namespace IdentityManagementSystem.API.Controllers
             _bsrOptions = bsrOptions?.Value ?? new BsrServiceOptions();
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _actionLogger = actionLogger ?? throw new ArgumentNullException(nameof(actionLogger));
 
             if (string.IsNullOrEmpty(_options.BaseUrl) || _options.Credential == null ||
                 string.IsNullOrEmpty(_options.Credential.Code) || string.IsNullOrEmpty(_options.Credential.Password))
@@ -98,6 +101,14 @@ namespace IdentityManagementSystem.API.Controllers
                 .Select(g => (int?)g.Id)
                 .FirstOrDefaultAsync();
 
+            // اگه فراخوانی از سمت متقاضی (anonymous، از طریق حساب سرویسی public-portal-service با RoleId=2) بوده،
+            // CreatedBy باید شماره موبایل خودِ متقاضی باشه، نه یوزرنیم حساب سرویسی مشترک. برای کارشناس/متصدی
+            // لاگین‌کرده (RoleId != 2) همون یوزرنیم خودشه.
+            var callerRoleId = User.FindFirst("RoleId")?.Value;
+            var createdBy = callerRoleId == "2"
+                ? model.MobileNumber
+                : (User.Identity?.Name ?? "Unknown");
+
             var requestCode = GenerateRequestId();
             var request = new Request
             {
@@ -108,7 +119,7 @@ namespace IdentityManagementSystem.API.Controllers
                 VerificationCode = model.VerificationCode,
                 WarehouseReceiptNumber = model.WarehouseReceiptNumber,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = User.Identity?.Name ?? "Unknown",
+                CreatedBy = createdBy,
                 GroupId = groupId
             };
 
@@ -300,11 +311,13 @@ namespace IdentityManagementSystem.API.Controllers
                     _logger.LogError(ex, "Failed to parse internal Shahkar response in CheckShahkarMatch: {ResponseText}", shahkarResult.ResponseText);
                 }
 
+                await _actionLogger.Info(userId, "CheckShahkarMatch", $"MobileNumber={model.MobileNumber}, IsMatch={isMatch}");
                 return new JsonResult(new { success = true, isMatch });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "CheckShahkarMatch failed for {NationalId}", model.NationalId);
+                await _actionLogger.Error(userId, "CheckShahkarMatch", $"MobileNumber={model.MobileNumber}, Exception={ex.Message}");
                 return new JsonResult(new { success = false, message = $"خطا در ارتباط با سرویس احراز هویت: {ex.Message}" });
             }
         }
@@ -330,6 +343,13 @@ namespace IdentityManagementSystem.API.Controllers
                 request.UpdatedBy = User.Identity?.Name ?? "Unknown";
                 _context.Request.Update(request);
                 await _context.SaveChangesAsync();
+
+                // این یه نقطه‌ی واحده که همه‌ی مسیرهای ProcessCombinedRequest (رد سیستمی از AutoRejectAsync،
+                // یا عبور موفق از هر سه گام) ازش رد می‌شن — پس همینجا لاگ کافیه، نیازی به تکرار سر هر return نیست.
+                long.TryParse(User.FindFirst("UserId")?.Value, out long actingUserId);
+                var outcome = validateByExpert == false ? "SystemRejected" : "Pending";
+                await _actionLogger.Info(actingUserId, "ProcessCombinedRequest",
+                    $"RequestId={request.RequestId}, TrackingCode={request.TrackingCode}, Outcome={outcome}, Reason={description ?? "-"}");
             }
             catch (Exception ex)
             {
@@ -1289,6 +1309,7 @@ namespace IdentityManagementSystem.API.Controllers
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation("Document marked as read for RequestId: {RequestId} by User: {User}", requestId, verifyDocLog.ReadBy);
+                await _actionLogger.Info(userId, "MarkDocumentAsRead", $"RequestId={requestId}");
                 return new JsonResult(new { success = true, message = "سند با موفقیت به عنوان خوانده شده علامت‌گذاری شد." });
             }
             catch (Exception ex)

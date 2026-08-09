@@ -232,13 +232,21 @@ namespace IdentityManagementSystem.API.Controllers
                 .AnyAsync(ug => ug.UserId == userId && ug.GroupId == request.GroupId.Value);
 
             if (!isMember)
+            {
+                await _actionLogger.Warning(userId, "Take_Request", $"RequestId={model.RequestId}, Denied=NotGroupMember");
                 return StatusCode(403, new { success = false, message = "شما عضو گروهی که این درخواست بهش تعلق داره نیستید." });
+            }
 
             var affected = await _context.Database.ExecuteSqlInterpolatedAsync(
                 $"UPDATE [Define].[Request] SET [AssignedTo] = {userId}, [AssignedAt] = {DateTime.UtcNow} WHERE [RequestId] = {model.RequestId} AND [AssignedTo] IS NULL");
 
             if (affected == 0)
+            {
+                await _actionLogger.Warning(userId, "Take_Request", $"RequestId={model.RequestId}, Denied=AlreadyTaken");
                 return Conflict(new { success = false, message = "این درخواست قبلاً توسط کارشناس دیگری take شده است." });
+            }
+
+            await _actionLogger.Info(userId, "Take_Request", $"RequestId={model.RequestId}");
 
             // این take رو تو Cartable/CartableItem هم ثبت می‌کنیم (کارتابل شخصی کارشناس + آیتم مرتبط با درخواست).
             // عمداً best-effort: خودِ take (که روی Request انجام شد و بالا برگشت داده شد) با شکست این بخش نباید لغو بشه.
