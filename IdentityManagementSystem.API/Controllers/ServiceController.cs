@@ -91,6 +91,13 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "کاربر شناسایی نشد." });
             }
 
+            // فعلاً تنها نوع درخواست، ترکیبی با قبض انباره پس همیشه می‌ره تو کارتابل همون گروه.
+            // وقتی نوع‌های دیگه‌ی درخواست اضافه بشن، این‌جا باید بر اساس محتوای درخواست گروه مناسب انتخاب بشه.
+            int? groupId = await _context.Groups
+                .Where(g => g.Title == "قبض انبار")
+                .Select(g => (int?)g.Id)
+                .FirstOrDefaultAsync();
+
             var requestCode = GenerateRequestId();
             var request = new Request
             {
@@ -101,7 +108,8 @@ namespace IdentityManagementSystem.API.Controllers
                 VerificationCode = model.VerificationCode,
                 WarehouseReceiptNumber = model.WarehouseReceiptNumber,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = User.Identity?.Name ?? "Unknown"
+                CreatedBy = User.Identity?.Name ?? "Unknown",
+                GroupId = groupId
             };
 
             _context.Request.Add(request);
@@ -253,6 +261,55 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         /// <summary>
+        /// چک زودهنگام تطابق کد ملی/شماره موبایل (شاهکار) — قبل از ارسال کد تایید پیامکی صدا زده می‌شه
+        /// تا اگه تطابق نداشت، اصلاً کد OTP ارسال نشه. هیچ رکورد Request ای اینجا ساخته نمی‌شه؛ نتیجه‌ش
+        /// با همون کش ۲۴ ساعته‌ی CheckMobileNationalCode_Internal کش می‌شه، پس فراخوانی دوباره‌ش تو
+        /// ProcessCombinedRequest (بعد از تایید OTP) دوباره به سرویس شاهکار نمی‌زنه، از کش می‌خونه.
+        /// </summary>
+        [HttpPost("CheckShahkarMatch")]
+        [Authorize(Policy = "CanAccessServices")]
+        public async Task<IActionResult> CheckShahkarMatch([FromBody] CheckShahkarMatchViewModel model)
+        {
+            if (string.IsNullOrWhiteSpace(model.NationalId) || string.IsNullOrWhiteSpace(model.MobileNumber))
+            {
+                return new JsonResult(new { success = false, message = "کد ملی و شماره موبایل الزامی است." });
+            }
+
+            var userIdClaim = User.FindFirst("UserId")?.Value;
+            if (!long.TryParse(userIdClaim, out long userId))
+            {
+                return new JsonResult(new { success = false, message = "کاربر شناسایی نشد." });
+            }
+
+            try
+            {
+                var requestCode = GenerateRequestId();
+                var shahkarResult = await CheckMobileNationalCode_Internal(
+                    model.NationalId, model.MobileNumber, requestCode, requestId: null, expertId: userId);
+
+                bool isMatch = false;
+                try
+                {
+                    var internalShahkarResponse = JsonSerializer.Deserialize<InternalShahkarResponse>(
+                        shahkarResult.ResponseText,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    isMatch = internalShahkarResponse?.Result?.Data?.Response == 200;
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    _logger.LogError(ex, "Failed to parse internal Shahkar response in CheckShahkarMatch: {ResponseText}", shahkarResult.ResponseText);
+                }
+
+                return new JsonResult(new { success = true, isMatch });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CheckShahkarMatch failed for {NationalId}", model.NationalId);
+                return new JsonResult(new { success = false, message = $"خطا در ارتباط با سرویس احراز هویت: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
         /// درخواست رو با نتیجه‌ی نهایی (هر مرحله‌ای که تا اینجا رسیده) در دیتابیس finalize می‌کنه.
         /// طوری طراحی شده که هیچوقت throw نکنه تا رکورد درخواست یتیم/بدون به‌روزرسانی نمونه.
         /// </summary>
@@ -338,7 +395,7 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         private async Task<ShahkarResponse> CheckMobileNationalCode_Internal(
-            string nationalId, string mobile, string requestCode, long requestId, long expertId)
+            string nationalId, string mobile, string requestCode, long? requestId, long expertId)
         {
             if (nationalId.Length != 10 || !nationalId.All(char.IsDigit))
             {
@@ -1312,6 +1369,12 @@ namespace IdentityManagementSystem.API.Controllers
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
         public string? WarehouseReceiptNumber { get; set; }
+    }
+
+    public class CheckShahkarMatchViewModel
+    {
+        public string NationalId { get; set; } = string.Empty;
+        public string MobileNumber { get; set; } = string.Empty;
     }
 
     public class BsrServiceOptions

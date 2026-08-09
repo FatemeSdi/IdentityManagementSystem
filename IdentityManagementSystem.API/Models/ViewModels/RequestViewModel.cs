@@ -40,6 +40,11 @@ namespace IdentityManagementSystem.API.Models.ViewModels
         public bool? IsNationalIdInResponse { get; set; }
         public bool? IsNationalIdInLawyers { get; set; }
         public string? CreatedBy { get; set; }
+        public int? GroupId { get; set; }
+        public string? GroupTitle { get; set; }
+        public long? AssignedTo { get; set; }
+        public string? AssignedToName { get; set; }
+        public DateTime? AssignedAt { get; set; }
     }
 
     public class CreateRequestViewModel

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - سامانه مدیریت هویت</title>
+
+    <link rel="icon" href="~/assets/images/brand-logos/favicon.ico" type="image/x-icon" />
+
+    <link href="~/assets/libs/bootstrap/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <link href="~/assets/css/styles.css" rel="stylesheet" />
+    <link href="~/assets/css/icons.css" rel="stylesheet" />
+    <link href="~/assets/libs/toastify-js/src/toastify.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+
+    <style>
+        body {
+            background: radial-gradient(1100px 600px at 8% 0%, rgba(27,66,117,.10), transparent 60%), radial-gradient(900px 500px at 100% 100%, rgba(183,138,52,.08), transparent 55%), #eef1f5;
+            min-height: 100vh;
+        }
+
+        .portal-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 24px 16px 8px;
+        }
+
+        .portal-header .badge-line {
+            width: 46px;
+            height: 3px;
+            background: linear-gradient(90deg, #b78a34, #1b4275);
+            border-radius: 3px;
+        }
+
+        .portal-header h6 {
+            margin: 0;
+            color: #0b2540;
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .portal-content {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 8px 16px 48px;
+        }
+
+        .portal-footer {
+            text-align: center;
+            padding: 16px;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
+        .card.custom-card {
+            border-radius: 14px;
+            box-shadow: 0 4px 20px rgba(36, 75, 139, 0.08);
+        }
+
+        .card.custom-card .card-header {
+            border-block-end: 1px solid #eef1f5 !important;
+            position: relative;
+        }
+
+            .card.custom-card .card-header::after {
+                content: "";
+                position: absolute;
+                inset-inline-start: 1rem;
+                bottom: -1px;
+                width: 46px;
+                height: 3px;
+                background: linear-gradient(90deg, #b78a34, #244b8b);
+                border-radius: 3px;
+            }
+
+            .card.custom-card .card-header .card-title {
+                color: #0b2540;
+                font-weight: 700;
+            }
+
+        .modal-header {
+            background: linear-gradient(135deg, #244b8b, #3a6bb5);
+            border-block-end: none;
+        }
+
+            .modal-header .modal-title {
+                color: #fff;
+            }
+
+            .modal-header .btn-close {
+                filter: invert(1);
+                opacity: .8;
+            }
+
+        .btn-primary {
+            background-color: #244b8b !important;
+            border-color: #244b8b !important;
+        }
+
+            .btn-primary:hover, .btn-primary:focus {
+                background-color: #1a3a6e !important;
+                border-color: #1a3a6e !important;
+            }
+
+        .btn-outline-primary {
+            color: #244b8b;
+            border-color: #244b8b;
+        }
+
+            .btn-outline-primary:hover {
+                background-color: #244b8b;
+                border-color: #244b8b;
+            }
+
+        .text-primary {
+            color: #244b8b !important;
+        }
+
+        .form-control:focus {
+            border-color: #244b8b !important;
+            box-shadow: 0 0 0 3px rgba(36, 75, 139, 0.12) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="portal-header">
+        <span class="badge-line"></span>
+        <h6>سامانه مدیریت هویت — پیشخوان متقاضی</h6>
+        <span class="badge-line"></span>
+    </div>
+
+    <div class="portal-content">
+        @RenderBody()
+    </div>
+
+    <div class="portal-footer">
+        <i class="ri-shield-check-line me-1"></i>
+        امنیت اطلاعات شما برای ما اهمیت دارد — تمامی فعالیت‌ها ثبت می‌شود
+    </div>
+
+    <script src="~/assets/js/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+    <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="~/assets/libs/toastify-js/src/toastify.js"></script>
+
+    <script>
+        window.showToast = function (message, type = "info") {
+            let backgroundColor = "#5477f5";
+            if (type === "success") backgroundColor = "#28a745";
+            if (type === "error") backgroundColor = "#dc3545";
+            if (type === "warning") backgroundColor = "#ffc107";
+
+            Toastify({
+                text: message,
+                duration: 4000,
+                gravity: "top",
+                position: "left",
+                style: { background: backgroundColor },
+                close: true
+            }).showToast();
+        };
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

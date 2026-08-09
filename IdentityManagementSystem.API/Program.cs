@@ -15,7 +15,10 @@ builder.Services.AddDbContext<IdentityManagementSystemContext>(options =>
 
 // --- Services ---
 builder.Services.AddControllers();
-builder.Services.AddHttpClient();
+// سرویس‌های خارجی (شاهکار / bsr-*) نباید از پراکسی سیستم (HTTP_PROXY/HTTPS_PROXY محیطی، مثلاً از یه VPN محلی)
+// عبور کنن — این پراکسی هندشیک TLS به core.pomix.pmo.ir رو می‌شکنه، در حالی که اتصال مستقیم سالمه.
+builder.Services.AddHttpClient(string.Empty)
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false });
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TokenService, TokenService>();
 builder.Services.Configure<ShahkarServiceOptions>(builder.Configuration.GetSection("Shahkar"));

@@ -27,28 +27,34 @@ namespace IdentityManagementSystem.API.Data
         public DbSet<WarehouseReceipt> WarehouseReceipts { get; set; }
         public DbSet<WarehouseReceiptLog> WarehouseReceiptLogs { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<Group> Groups { get; set; }
+        public DbSet<GroupPermission> GroupPermissions { get; set; }
+        public DbSet<UserGroup> UserGroups { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // ========== جداول و اسکیما ==========
-            modelBuilder.Entity<User>().ToTable("Users", "Sec");
-            modelBuilder.Entity<Role>().ToTable("Roles", "Sec");
-            modelBuilder.Entity<UserRole>().ToTable("UserRoles", "Sec");
+            modelBuilder.Entity<User>().ToTable("User", "Sec");
+            modelBuilder.Entity<Role>().ToTable("Role", "Sec");
+            modelBuilder.Entity<UserRole>().ToTable("UserRole", "Sec");
             modelBuilder.Entity<Request>().ToTable("Request", "Define");
             modelBuilder.Entity<RequestStatus>().ToTable("RequestStatus", "Define");
             modelBuilder.Entity<Cartable>().ToTable("Cartable", "WF");
-            modelBuilder.Entity<CartableItem>().ToTable("CartableItems", "WF");
+            modelBuilder.Entity<CartableItem>().ToTable("CartableItem", "WF");
             modelBuilder.Entity<UserLog>().ToTable("UserLog", "Log");          // توجه: در DB اسم جدول UserLog است (نه UserLogs)
             modelBuilder.Entity<RequestHistory>().ToTable("RequestHistory", "Sec");
             modelBuilder.Entity<UserAccess>().ToTable("UserAccess", "Sec");
-            modelBuilder.Entity<Permission>().ToTable("Permissions", "Sec");
-            modelBuilder.Entity<RolePermission>().ToTable("RolePermissions", "Sec");
+            modelBuilder.Entity<Permission>().ToTable("Permission", "Sec");
+            modelBuilder.Entity<RolePermission>().ToTable("RolePermission", "Sec");
             modelBuilder.Entity<ShahkarLog>().ToTable("ShahkarLog", "Log");
             modelBuilder.Entity<VerifyDocLog>().ToTable("VerifyDocLog", "Log");
             modelBuilder.Entity<SmsLog>().ToTable("Sms", "Log");
             modelBuilder.Entity<WarehouseReceipt>().ToTable("WarehouseReceipt", "Define");
             modelBuilder.Entity<WarehouseReceiptLog>().ToTable("WarehouseReceiptLog", "Log");
-            modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens", "Sec");
+            modelBuilder.Entity<RefreshToken>().ToTable("RefreshToken", "Sec");
+            modelBuilder.Entity<Group>().ToTable("Group", "Sec");
+            modelBuilder.Entity<GroupPermission>().ToTable("GroupPermission", "Sec");
+            modelBuilder.Entity<UserGroup>().ToTable("UserGroup", "Sec");
 
             // ========== User ==========
             modelBuilder.Entity<User>(entity =>
@@ -93,6 +99,18 @@ namespace IdentityManagementSystem.API.Data
                 entity.HasIndex(r => r.DocumentNumber);
                 entity.HasIndex(r => r.NationalId);
                 entity.HasIndex(r => r.RequestCode);
+                entity.HasIndex(r => r.GroupId);
+                entity.HasIndex(r => r.AssignedTo);
+
+                entity.HasOne(r => r.Group)
+                      .WithMany()
+                      .HasForeignKey(r => r.GroupId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.AssignedToUser)
+                      .WithMany()
+                      .HasForeignKey(r => r.AssignedTo)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ========== Cartable ==========
@@ -195,6 +213,48 @@ namespace IdentityManagementSystem.API.Data
             {
                 entity.HasKey(v => v.VerifyDocLogId);
                 entity.HasIndex(v => v.RequestId);
+            });
+
+            // ========== Group ==========
+            modelBuilder.Entity<Group>(entity =>
+            {
+                entity.HasKey(g => g.Id);
+            });
+
+            // ========== GroupPermission (Many-to-Many) ==========
+            modelBuilder.Entity<GroupPermission>(entity =>
+            {
+                entity.HasKey(gp => gp.Id);
+
+                entity.HasOne(gp => gp.Group)
+                      .WithMany(g => g.GroupPermissions)
+                      .HasForeignKey(gp => gp.GroupId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(gp => gp.Permission)
+                      .WithMany()
+                      .HasForeignKey(gp => gp.PermissionId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(gp => new { gp.GroupId, gp.PermissionId }).IsUnique();
+            });
+
+            // ========== UserGroup (Many-to-Many) ==========
+            modelBuilder.Entity<UserGroup>(entity =>
+            {
+                entity.HasKey(ug => ug.Id);
+
+                entity.HasOne(ug => ug.User)
+                      .WithMany(u => u.UserGroups)
+                      .HasForeignKey(ug => ug.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(ug => ug.Group)
+                      .WithMany(g => g.UserGroups)
+                      .HasForeignKey(ug => ug.GroupId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(ug => new { ug.UserId, ug.GroupId }).IsUnique();
             });
 
             // ========== RefreshToken ==========

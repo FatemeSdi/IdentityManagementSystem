@@ -7,6 +7,7 @@ using IdentityManagementSystem.API.Services.Sms;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
 
 namespace IdentityManagementSystem.API.Controllers
@@ -41,7 +42,9 @@ namespace IdentityManagementSystem.API.Controllers
             int page = 1,
             int pageSize = 10,
             string search = "",
-            string filterStatus = "")
+            string filterStatus = "",
+            string? fromDate = null,
+            string? toDate = null)
         {
             var username = User.Identity?.Name;
 
@@ -57,15 +60,47 @@ namespace IdentityManagementSystem.API.Controllers
 
             var query = _context.Request.AsQueryable();
 
-            // فقط متقاضی (RoleId == 2) به درخواست‌های خودش محدود می‌شه.
-            // کارشناس حراست (RoleId == 1) و ادمین (RoleId == 3) باید همه‌ی درخواست‌ها رو
-            // برای بررسی/تایید/رد ببینن — نه فقط چیزی که خودشون ثبت کردن.
+            // متقاضی (RoleId == 2) فقط درخواست‌های خودش رو می‌بینه.
+            // ادمین (RoleId == 3) همه‌ی درخواست‌ها رو می‌بینه (نظارت کامل).
+            // کارشناس (RoleId == 1) فقط درخواست‌های گروهی که عضوشه رو می‌بینه، و توی اون گروه
+            // فقط چیزی که هنوز کسی take نکرده (AssignedTo == null) یا خودش take کرده.
             bool isApplicant = currentUser.UserRoles.Any(ur => ur.RoleId == 2);
+            bool isAdmin = currentUser.UserRoles.Any(ur => ur.RoleId == 3);
+
             if (isApplicant)
             {
                 query = query.Where(r =>
                     r.CreatedBy == username ||
                     r.CreatedBy == currentUser.UserId.ToString());
+            }
+            else if (!isAdmin)
+            {
+                var myGroupIds = await _context.UserGroups
+                    .Where(ug => ug.UserId == currentUser.UserId)
+                    .Select(ug => ug.GroupId)
+                    .ToListAsync();
+
+                query = query.Where(r =>
+                    r.GroupId != null && myGroupIds.Contains(r.GroupId.Value) &&
+                    (r.AssignedTo == null || r.AssignedTo == currentUser.UserId));
+
+                // کارتابل کارشناس پیش‌فرض فقط درخواست‌های همون روزه؛ برای دیدن روزهای قبل باید
+                // بازه‌ی تاریخ (fromDate/toDate) صریحاً مشخص بشه. تاریخ‌ها به‌صورت میلادی «yyyy/M/d»
+                // (تقویم ایران، نه UTC) از سمت کلاینت میان — همون چیزی که پلاگین تاریخ فارسی برمی‌گردونه.
+                var (defaultFromUtc, defaultToUtcExclusive) = ResolveDateRangeUtc(fromDate, toDate);
+                if (defaultFromUtc.HasValue)
+                    query = query.Where(r => r.CreatedAt >= defaultFromUtc.Value);
+                if (defaultToUtcExclusive.HasValue)
+                    query = query.Where(r => r.CreatedAt < defaultToUtcExclusive.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(fromDate) || !string.IsNullOrWhiteSpace(toDate))
+            {
+                // ادمین/متقاضی پیش‌فرضشون همون رفتار قبلیه (تاریخچه‌ی کامل)؛ فقط اگه صریحاً بازه بدن اعمال می‌شه.
+                var (fromUtc, toUtcExclusive) = ResolveDateRangeUtc(fromDate, toDate, defaultToToday: false);
+                if (fromUtc.HasValue)
+                    query = query.Where(r => r.CreatedAt >= fromUtc.Value);
+                if (toUtcExclusive.HasValue)
+                    query = query.Where(r => r.CreatedAt < toUtcExclusive.Value);
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -120,7 +155,12 @@ namespace IdentityManagementSystem.API.Controllers
                     ValidateByExpert = r.ValidateByExpert,
                     Description = r.Description,
                     CreatedAt = r.CreatedAt,
-                    CreatedBy = r.CreatedBy
+                    CreatedBy = r.CreatedBy,
+                    GroupId = r.GroupId,
+                    GroupTitle = r.Group != null ? r.Group.Title : null,
+                    AssignedTo = r.AssignedTo,
+                    AssignedToName = r.AssignedToUser != null ? (r.AssignedToUser.Name + " " + r.AssignedToUser.LastName) : null,
+                    AssignedAt = r.AssignedAt
                 })
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -169,6 +209,121 @@ namespace IdentityManagementSystem.API.Controllers
                 status = statusText,
                 description = request.ValidateByExpert == false ? request.Description : null
             });
+        }
+
+        /// <summary>
+        /// کارشناس درخواست رو از صف مشترک گروهش «take» می‌کنه. با یه UPDATE شرطی (AssignedTo IS NULL)
+        /// انجام می‌شه تا اگه دو کارشناس همزمان take بزنن، فقط اولی موفق بشه (race-safe).
+        /// </summary>
+        [HttpPost("Take")]
+        [Authorize]
+        public async Task<IActionResult> Take([FromBody] TakeRequestViewModel model)
+        {
+            if (!long.TryParse(User.FindFirst("UserId")?.Value, out long userId))
+                return Unauthorized(new { success = false, message = "کاربر شناسایی نشد." });
+
+            var request = await _context.Request.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.RequestId == model.RequestId);
+
+            if (request == null)
+                return NotFound(new { success = false, message = "درخواست یافت نشد." });
+
+            var isMember = request.GroupId != null && await _context.UserGroups
+                .AnyAsync(ug => ug.UserId == userId && ug.GroupId == request.GroupId.Value);
+
+            if (!isMember)
+                return StatusCode(403, new { success = false, message = "شما عضو گروهی که این درخواست بهش تعلق داره نیستید." });
+
+            var affected = await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE [Define].[Request] SET [AssignedTo] = {userId}, [AssignedAt] = {DateTime.UtcNow} WHERE [RequestId] = {model.RequestId} AND [AssignedTo] IS NULL");
+
+            if (affected == 0)
+                return Conflict(new { success = false, message = "این درخواست قبلاً توسط کارشناس دیگری take شده است." });
+
+            // این take رو تو Cartable/CartableItem هم ثبت می‌کنیم (کارتابل شخصی کارشناس + آیتم مرتبط با درخواست).
+            // عمداً best-effort: خودِ take (که روی Request انجام شد و بالا برگشت داده شد) با شکست این بخش نباید لغو بشه.
+            try
+            {
+                var cartable = await _context.Cartable.FirstOrDefaultAsync(c => c.UserId == userId);
+                if (cartable == null)
+                {
+                    cartable = new Cartable { UserId = userId, CreatedAt = DateTime.UtcNow };
+                    _context.Cartable.Add(cartable);
+                    await _context.SaveChangesAsync();
+                }
+
+                bool alreadyLinked = await _context.CartableItems.AnyAsync(ci => ci.RequestId == model.RequestId);
+                if (!alreadyLinked)
+                {
+                    _context.CartableItems.Add(new CartableItem
+                    {
+                        CartableId = cartable.CartableId,
+                        RequestId = model.RequestId,
+                        AssignedTo = userId,
+                        AssignedAt = DateTime.UtcNow,
+                        Status = "Assigned"
+                    });
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "ثبت CartableItem برای درخواست {RequestId} ناموفق بود (خودِ take انجام شد و معتبره)", model.RequestId);
+            }
+
+            return Ok(new { success = true, message = "درخواست با موفقیت take شد." });
+        }
+
+        private static TimeZoneInfo GetIranTimeZone()
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Iran Standard Time"); }
+            catch
+            {
+                try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran"); }
+                catch { return TimeZoneInfo.Utc; }
+            }
+        }
+
+        /// <summary>
+        /// بازه‌ی fromDate/toDate (رشته‌ی میلادی «yyyy/M/d» بر مبنای روز تقویمی ایران — همون چیزی که
+        /// پلاگین تاریخ فارسی سمت کلاینت تولید می‌کنه) رو به بازه‌ی UTC برای فیلتر CreatedAt تبدیل می‌کنه.
+        /// toUtcExclusive مرز بالاییِ exclusive هست، یعنی کل روزِ toDate رو شامل می‌شه.
+        /// اگه هیچ‌کدوم داده نشده باشن و defaultToToday=true باشه، بازه‌ی «امروز» (به وقت ایران) برمی‌گرده.
+        /// </summary>
+        private static (DateTime? fromUtc, DateTime? toUtcExclusive) ResolveDateRangeUtc(string? fromDate, string? toDate, bool defaultToToday = true)
+        {
+            var iranTz = GetIranTimeZone();
+
+            if (string.IsNullOrWhiteSpace(fromDate) && string.IsNullOrWhiteSpace(toDate))
+            {
+                if (!defaultToToday)
+                    return (null, null);
+
+                var nowIran = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, iranTz);
+                var todayStart = DateTime.SpecifyKind(nowIran.Date, DateTimeKind.Unspecified);
+                var fromTodayUtc = TimeZoneInfo.ConvertTimeToUtc(todayStart, iranTz);
+                return (fromTodayUtc, fromTodayUtc.AddDays(1));
+            }
+
+            DateTime? fromUtc = null;
+            DateTime? toUtcExclusive = null;
+
+            if (!string.IsNullOrWhiteSpace(fromDate) &&
+                DateTime.TryParseExact(fromDate.Trim(), "yyyy/M/d", CultureInfo.InvariantCulture, DateTimeStyles.None, out var fromLocal))
+            {
+                var start = DateTime.SpecifyKind(fromLocal.Date, DateTimeKind.Unspecified);
+                fromUtc = TimeZoneInfo.ConvertTimeToUtc(start, iranTz);
+            }
+
+            if (!string.IsNullOrWhiteSpace(toDate) &&
+                DateTime.TryParseExact(toDate.Trim(), "yyyy/M/d", CultureInfo.InvariantCulture, DateTimeStyles.None, out var toLocal))
+            {
+                var start = DateTime.SpecifyKind(toLocal.Date, DateTimeKind.Unspecified);
+                var toStartUtc = TimeZoneInfo.ConvertTimeToUtc(start, iranTz);
+                toUtcExclusive = toStartUtc.AddDays(1);
+            }
+
+            return (fromUtc, toUtcExclusive);
         }
 
         private string? TryDecrypt(string value)
@@ -376,6 +531,17 @@ namespace IdentityManagementSystem.API.Controllers
                 if (request == null)
                     return NotFound(new { success = false, message = "درخواست یافت نشد." });
 
+                // 2b. فقط کارشناسی که خودش این درخواست رو take کرده می‌تونه تاییدش کنه (ادمین مستثناست)
+                bool isAdminCaller = await _context.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == 3);
+                if (!isAdminCaller && request.AssignedTo != userId)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "❌ ابتدا باید این درخواست را از کارتابل take کنید تا بتوانید آن را تأیید کنید."
+                    });
+                }
+
                 // 3. شرط تأیید: باید سند خوانده شده باشد
                 if (validateByExpert == true)
                 {
@@ -396,6 +562,20 @@ namespace IdentityManagementSystem.API.Controllers
                         {
                             success = false,
                             message = "❌ شما هنوز تیک «سند مشاهده شد» را نزده‌اید. لطفاً ابتدا سند را بخوانید و تأیید کنید."
+                        });
+
+                    // رد کاملاً سیستمیه؛ پس تایید دستی فقط وقتی مجازه که همه‌ی گام‌های احراز از قبل true بوده باشن.
+                    // (این چک عمداً مستقل از فرانت‌اِنده — حتی اگه کسی مستقیم این endpoint رو صدا بزنه هم رعایت می‌شه.)
+                    bool allChecksPassed = request.IsMatch == true
+                        && request.IsExist == true
+                        && request.IsNationalIdInResponse == true
+                        && request.IsNationalIdInLawyers == true;
+
+                    if (!allChecksPassed)
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "❌ این درخواست هنوز همه‌ی مراحل احراز را با موفقیت پشت سر نگذاشته؛ تأیید دستی امکان‌پذیر نیست."
                         });
                 }
 
@@ -435,6 +615,22 @@ namespace IdentityManagementSystem.API.Controllers
                 _context.Request.Update(request);
                 _context.RequestHistory.Add(history);
                 await _context.SaveChangesAsync();
+
+                // 7b. وضعیت CartableItem مرتبط رو هم هماهنگ می‌کنیم (best-effort، شکستش نباید تایید/رد رو لغو کنه)
+                try
+                {
+                    var cartableItem = await _context.CartableItems.FirstOrDefaultAsync(ci => ci.RequestId == requestId);
+                    if (cartableItem != null)
+                    {
+                        cartableItem.Status = statusName;
+                        cartableItem.ViewedAt = cartableItem.ViewedAt ?? DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                catch (Exception cartableEx)
+                {
+                    _logger.LogWarning(cartableEx, "به‌روزرسانی CartableItem برای درخواست {RequestId} ناموفق بود", requestId);
+                }
 
                 // 8. لاگ
                 await _actionLogger.Info(userId, "UpdateValidationStatus",
@@ -519,5 +715,10 @@ namespace IdentityManagementSystem.API.Controllers
         public long RequestId { get; set; }
         public bool ValidateByExpert { get; set; }
         public string? Description { get; set; }
+    }
+
+    public class TakeRequestViewModel
+    {
+        public long RequestId { get; set; }
     }
 }

@@ -1,0 +1,264 @@
+﻿@font-face {
+    font-family: 'FarNazanin';
+    src: url('/fonts/Far_Nazanin.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+.toast-success {
+    background-color: #2b7a4b !important;
+    border-color: #a8e6cf !important;
+}
+
+.toast-error {
+    background-color: #a33d5b !important;
+    border-color: #ffb3c6 !important;
+}
+body {
+    direction: rtl;
+    text-align: right;
+    overflow-x: hidden;
+}
+
+/* مخفی کردن سایدبار و توگل */
+.app-sidebar,
+.app-sidebar__overlay,
+.app-sidebar__toggle {
+    display: none !important;
+}
+
+.app.sidebar-mini .main-content.app-content {
+    margin-right: 0 !important;
+}
+
+.side-app {
+    margin-right: 0 !important;
+}
+
+/* ============================================
+                   هدر جدید با طراحی ثابت و چسبنده
+                ============================================ */
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #fff;
+    box-shadow: 0 1px 15px rgba(0, 0, 0, 0.04), 0 1px 6px rgba(0, 0, 0, 0.04);
+    height: 75px;
+    display: flex;
+    align-items: center;
+}
+
+/* کانتینر اصلی هدر - استفاده از grid برای چیدمان دقیق */
+.header-container {
+    width: 100%;
+    margin-right: 2%;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+}
+
+/* ===== بخش چپ: لوگو (کاملاً چسبیده به چپ و ثابت) ===== */
+.header-left {
+    justify-self: start;
+    min-width: 0;
+}
+
+.logo-horizontal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+    .logo-horizontal img {
+        max-height: 48px;
+        width: auto;
+        display: block;
+    }
+
+/* ===== بخش وسط: فضای خالی (برای جدا کردن لوگو از دکمه‌ها) ===== */
+.header-center {
+    /* فضای خالی که باعث می‌شود لوگو سمت چپ و دکمه‌ها سمت راست بمانند */
+}
+
+/* ===== بخش راست: دکمه‌های مدیریت کاربران، تغییر سایز، پروفایل ===== */
+.header-right {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* استایل دکمه مدیریت کاربران */
+.btn-manage-users {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #3b7ddd;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+    .btn-manage-users:hover {
+        background-color: #e9ecef;
+        border-color: #3b7ddd;
+        color: #2c5bb6;
+    }
+
+    .btn-manage-users i {
+        font-size: 14px;
+    }
+
+/* دکمه Full Screen */
+.full-screen-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+    .full-screen-link:hover {
+        background-color: #e9ecef;
+        color: #3b7ddd;
+    }
+
+    .full-screen-link i {
+        font-size: 18px;
+    }
+
+/* منوی پروفایل */
+.profile-dropdown {
+    position: relative;
+}
+
+.profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 40px;
+    transition: background-color 0.2s ease;
+    text-decoration: none;
+}
+
+    .profile-trigger:hover {
+        background-color: #f8f9fa;
+    }
+
+.profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e9ecef;
+}
+
+.profile-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #495057;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+    .profile-name {
+        display: none;
+    }
+}
+
+/* منوی کشویی پروفایل */
+.dropdown-menu-custom {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: auto;
+    z-index: 1000;
+    min-width: 200px;
+    padding: 8px 0;
+    margin-top: 8px;
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+}
+
+.profile-dropdown.open .dropdown-menu-custom {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-item-custom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #495057;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+    .dropdown-item-custom:hover {
+        background-color: #f8f9fa;
+        color: #3b7ddd;
+    }
+
+.dropdown-divider {
+    height: 1px;
+    margin: 6px 0;
+    background-color: #e9ecef;
+}
+
+/* ریسپانسیو برای صفحات کوچک */
+@media (max-width: 768px) {
+    .header-container {
+        padding: 0 16px;
+        gap: 10px;
+    }
+
+    .btn-manage-users span {
+        display: none;
+    }
+
+    .btn-manage-users i {
+        margin: 0;
+    }
+
+    .btn-manage-users {
+        padding: 6px 10px;
+    }
+}
+
+.left-btn {
+    margin-right: auto;
+    float: left;
+    position: absolute;
+    left: 2%;
+}
+@font-face {
+    font-display: swap;
+}

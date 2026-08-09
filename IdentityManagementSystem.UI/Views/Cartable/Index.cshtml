@@ -6,14 +6,32 @@
     var formModel = ViewBag.FormModel as IdentityManagementSystem.UI.Controllers.CartableFormViewModel ?? new IdentityManagementSystem.UI.Controllers.CartableFormViewModel();
     var currentSearch = Context.Request.Query["search"].ToString();
     var currentFilter = ViewBag.FilterStatus as string ?? "";
+    var currentUserId = Context.Session.GetString("UserId");
+
+    var fromDateGregorian = ViewBag.FromDate as string;
+    var toDateGregorian = ViewBag.ToDate as string;
+
+    string ToPersianDisplay(string? g)
+    {
+        if (string.IsNullOrWhiteSpace(g)) return "";
+        if (!DateTime.TryParseExact(g.Trim(), "yyyy/M/d", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dt))
+            return "";
+        var pc = new System.Globalization.PersianCalendar();
+        return $"{pc.GetYear(dt)}/{pc.GetMonth(dt):00}/{pc.GetDayOfMonth(dt):00}";
+    }
+
+    var fromDatePersianDisplay = ToPersianDisplay(fromDateGregorian);
+    var toDatePersianDisplay = ToPersianDisplay(toDateGregorian);
+    var hasCustomRange = !string.IsNullOrWhiteSpace(fromDateGregorian) || !string.IsNullOrWhiteSpace(toDateGregorian);
 }
 
 <link rel="stylesheet" href="~/css/IndexStyle.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/persianDatepicker-default.css" asp-append-version="true" />
 
 <!-- جستجو و فیلتر -->
-<div class="row mb-4">
+<div class="row mb-1">
     <div class="col-12">
-        <form asp-action="Index" method="get" class="d-flex align-items-center gap-2 flex-wrap">
+        <form asp-action="Index" method="get" id="cartableFilterForm" class="d-flex align-items-center gap-2 flex-wrap">
             <input type="text"
                    class="form-control"
                    name="search"
@@ -28,10 +46,42 @@
                 <option value="pending" selected="@(currentFilter == "pending")">در انتظار بررسی</option>
             </select>
 
+            <input type="text"
+                   id="fromDateDisplay"
+                   class="form-control jalali-date-input"
+                   placeholder="از تاریخ"
+                   value="@fromDatePersianDisplay"
+                   readonly
+                   style="max-width: 140px;" />
+            <input type="text"
+                   id="toDateDisplay"
+                   class="form-control jalali-date-input"
+                   placeholder="تا تاریخ"
+                   value="@toDatePersianDisplay"
+                   readonly
+                   style="max-width: 140px;" />
+            <input type="hidden" name="fromDate" id="fromDateHidden" value="@fromDateGregorian" />
+            <input type="hidden" name="toDate" id="toDateHidden" value="@toDateGregorian" />
+
             <button type="submit" class="btn btn-primary">
                 <i class="ri-search-line"></i>
             </button>
+
+            @if (hasCustomRange)
+            {
+                <a href="@Url.Action("Index", new { search = currentSearch, filterStatus = currentFilter })" class="btn btn-outline-secondary btn-sm">
+                    <i class="ri-calendar-check-line me-1"></i> امروز
+                </a>
+            }
         </form>
+    </div>
+</div>
+<div class="row mb-4">
+    <div class="col-12">
+        <small class="text-muted">
+            <i class="ri-information-line"></i>
+            @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده." : "بدون انتخاب بازه، فقط درخواست‌های امروز نمایش داده می‌شن.")
+        </small>
     </div>
 </div>
 
@@ -71,6 +121,7 @@
                         <th>احراز وکالت</th>
                         <th>نمایش سند</th>
                         <th>قبض انبار</th>
+                        <th>تخصیص</th>
                         <th>تایید درخواست</th>
                     </tr>
                 </thead>
@@ -174,6 +225,28 @@
                                 }
                             </td>
 
+                            <!-- تخصیص: کارشناسی که این درخواست رو take کرده -->
+                            <td class="text-center">
+                                @if (item.AssignedTo == null)
+                                {
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary take-btn"
+                                            data-request-id="@item.RequestId">
+                                        <i class="ri-hand-coin-line me-1"></i> Take
+                                    </button>
+                                }
+                                else if (item.AssignedTo?.ToString() == currentUserId)
+                                {
+                                    <span class="badge bg-primary-transparent">مال شماست</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark" title="این درخواست توسط کارشناس دیگری take شده">
+                                        @item.AssignedToName
+                                    </span>
+                                }
+                            </td>
+
                             <!-- تایید — رد کاملاً سیستمیه و متصدی اکشن دستی براش نداره -->
                             <td class="text-center">
                                 @if (item.ValidateByExpert == false)
@@ -184,13 +257,21 @@
                                 {
                                     <span class="badge bg-success">تایید شده</span>
                                 }
-                                else
+                                else if (item.IsMatch == true && item.IsExist == true && item.IsNationalIdInResponse == true && item.IsNationalIdInLawyers == true && item.AssignedTo?.ToString() == currentUserId)
                                 {
                                     <button type="button"
                                             class="btn btn-sm btn-outline-success approve-btn"
                                             data-request-id="@item.RequestId">
                                         تایید
                                     </button>
+                                }
+                                else if (item.IsMatch == true && item.IsExist == true && item.IsNationalIdInResponse == true && item.IsNationalIdInLawyers == true)
+                                {
+                                    <span class="text-muted small">ابتدا take کنید</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">در انتظار تکمیل احراز</span>
                                 }
 
                                 @if (item.ValidateByExpert == false && !string.IsNullOrEmpty(item.RejectReasonDisplay))
@@ -341,6 +422,35 @@
                             </div>
                         </div>
 
+                        <!-- دکمه ارسال کد دو عاملی -->
+                        <div class="mt-3">
+                            <button type="button" id="btnSendOtp" class="btn btn-outline-primary btn-sm">
+                                <i class="ri-message-2-line me-1"></i> ارسال کد تایید
+                            </button>
+                            <span id="otpTimer" class="text-muted ms-2" style="display:none;"></span>
+                        </div>
+
+                        <!-- فیلد کد دو عاملی -->
+                        <div class="row gy-3 mt-2" id="otpSection" style="display:none;">
+                            <div class="col-md-6">
+                                <label for="OtpCode" class="form-label text-default">کد تایید پیامکی</label>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="OtpCode"
+                                       name="OtpCode"
+                                       placeholder="کد ۶ رقمی"
+                                       maxlength="6"
+                                       inputmode="numeric" />
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <button type="button" id="btnVerifyOtp" class="btn btn-success btn-sm">
+                                    تایید کد
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="otpMessage" class="mt-2"></div>
+
                         @if (!string.IsNullOrEmpty(formModel?.Step1Message))
                         {
                             <div class="mt-2">
@@ -417,7 +527,7 @@
 
             <div class="modal-footer">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
-                <button type="submit" form="needs-validation-form" id="btnVerify" class="btn btn-primary">
+                <button type="submit" form="needs-validation-form" id="btnVerify" class="btn btn-primary" disabled>
                     ثبت درخواست
                 </button>
             </div>
@@ -426,15 +536,162 @@
 </div>
 
 @section Scripts {
+    <script src="~/assets/js/persianDatepicker.min.js"></script>
     <script>
         $(document).ready(function () {
             // مخفی کردن لودر (اگر هنوز مونده باشه)
             $("#global-loader").fadeOut("slow");
 
+            // فیلتر بازه‌ی تاریخ (کارتابل کارشناس) — تقویم فارسی روی فیلدهای نمایشی،
+            // مقدار میلادی معادل (data-gDate که خودِ پلاگین محاسبه می‌کنه) موقع submit تو فیلد hidden می‌ره.
+            try {
+                $('.jalali-date-input').persianDatepicker({ formatDate: 'YYYY/MM/DD' });
+            } catch (e) {
+                console.warn('persianDatepicker init failed, falling back to plain text inputs', e);
+            }
+
+            $('#cartableFilterForm').on('submit', function () {
+                $('#fromDateHidden').val($('#fromDateDisplay').attr('data-gDate') || $('#fromDateHidden').val());
+                $('#toDateHidden').val($('#toDateDisplay').attr('data-gDate') || $('#toDateHidden').val());
+            });
+
+            // وضعیت تایید دو عاملی برای فرم «سند جدید»
+            let otpVerified = false;
+            let otpTimerInterval = null;
+            let remainingSeconds = 0;
+
             // ریست فرم مودال
             $('#scrollingmodal').on('hidden.bs.modal', function () {
                 $('#needs-validation-form')[0].reset();
+                otpVerified = false;
+                $('#otpSection').hide();
+                $('#otpMessage').html('');
+                $('#btnVerify').prop('disabled', true);
+                $('#btnSendOtp').prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                clearInterval(otpTimerInterval);
+                $('#otpTimer').hide();
             });
+
+            // ارسال کد OTP
+            $('#btnSendOtp').click(function () {
+                const nationalCode = $('#NationalCode').val().trim();
+                const mobile = $('#MobileNumber').val().trim();
+
+                if (!nationalCode || nationalCode.length !== 10) {
+                    toastr.warning('کد ملی را به درستی وارد کنید');
+                    return;
+                }
+                if (!mobile || mobile.length !== 11 || !mobile.startsWith('09')) {
+                    toastr.warning('شماره موبایل را به درستی وارد کنید');
+                    return;
+                }
+
+                const btn = $(this);
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> در حال بررسی احراز هویت...');
+
+                // اول شاهکار چک می‌شه — اگه تطابق نداشت، اصلاً کد OTP ارسال نمی‌شه
+                $.post('/Cartable/CheckShahkar', {
+                    nationalCode: nationalCode,
+                    mobileNumber: mobile
+                })
+                .done(function (checkRes) {
+                    if (!checkRes.success) {
+                        toastr.error(checkRes.message || 'خطا در احراز هویت');
+                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                        return;
+                    }
+                    if (!checkRes.isMatch) {
+                        toastr.error('کد ملی و شماره موبایل تطابق ندارند');
+                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                        return;
+                    }
+
+                    btn.html('<span class="spinner-border spinner-border-sm me-1"></span> در حال ارسال کد...');
+
+                    $.post('/Cartable/SendOtp', {
+                        nationalCode: nationalCode,
+                        mobileNumber: mobile
+                    })
+                    .done(function (res) {
+                        if (res.success) {
+                            toastr.success(res.message || 'کد تایید ارسال شد');
+                            if (res.debugOtp) {
+                                toastr.info('کد تست: ' + res.debugOtp);
+                            }
+                            $('#otpSection').slideDown();
+                            startOtpTimer(120);
+                        } else {
+                            toastr.error(res.message || 'خطا در ارسال کد');
+                        }
+                    })
+                    .fail(function () {
+                        toastr.error('خطا در ارتباط با سرور');
+                    })
+                    .always(function () {
+                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                    });
+                })
+                .fail(function () {
+                    toastr.error('خطا در ارتباط با سرور');
+                    btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                });
+            });
+
+            // تایید کد OTP
+            $('#btnVerifyOtp').click(function () {
+                const otp = $('#OtpCode').val().trim();
+                const mobile = $('#MobileNumber').val().trim();
+
+                if (!otp || otp.length !== 6) {
+                    toastr.warning('کد ۶ رقمی را وارد کنید');
+                    return;
+                }
+
+                const btn = $(this);
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+                $.post('/Cartable/VerifyOtp', {
+                    mobileNumber: mobile,
+                    otpCode: otp
+                })
+                .done(function (res) {
+                    if (res.success) {
+                        otpVerified = true;
+                        $('#otpMessage').html('<small class="text-success"><i class="ri-check-line"></i> شماره موبایل تایید شد</small>');
+                        $('#btnVerify').prop('disabled', false);
+                        $('#OtpCode, #btnVerifyOtp, #btnSendOtp').prop('disabled', true);
+                        toastr.success('کد تایید صحیح است');
+                    } else {
+                        $('#otpMessage').html('<small class="text-danger">' + (res.message || 'کد اشتباه است') + '</small>');
+                        toastr.error(res.message || 'کد اشتباه است');
+                        btn.prop('disabled', false).html('تایید کد');
+                    }
+                })
+                .fail(function () {
+                    toastr.error('خطا در ارتباط با سرور');
+                    btn.prop('disabled', false).html('تایید کد');
+                });
+            });
+
+            // تایمر OTP
+            function startOtpTimer(seconds) {
+                remainingSeconds = seconds;
+                $('#otpTimer').show();
+                clearInterval(otpTimerInterval);
+
+                otpTimerInterval = setInterval(function () {
+                    remainingSeconds--;
+                    const min = Math.floor(remainingSeconds / 60);
+                    const sec = remainingSeconds % 60;
+                    $('#otpTimer').text(`ارسال مجدد تا ${min}:${sec.toString().padStart(2, '0')}`);
+
+                    if (remainingSeconds <= 0) {
+                        clearInterval(otpTimerInterval);
+                        $('#otpTimer').hide();
+                        $('#btnSendOtp').prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال مجدد کد');
+                    }
+                }, 1000);
+            }
 
             // نمایش متن سند
             $(document).on('click', '.btn-view-doc', function () {
@@ -515,6 +772,38 @@
                 submitValidation($(this).data('request-id'), true, null);
             });
 
+            // دکمه Take — کارشناس درخواست رو از صف مشترک گروهش برمی‌داره
+            $(document).on('click', '.take-btn', function () {
+                const btn = $(this);
+                const requestId = btn.data('request-id');
+                const row = $(`tr[data-request-id="${requestId}"]`);
+                const token = $('input[name="__RequestVerificationToken"]').val();
+
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+                fetch('/Cartable/TakeRequest?requestId=' + requestId, {
+                    method: 'POST',
+                    headers: { 'RequestVerificationToken': token }
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            toastr.success(data.message || 'درخواست take شد');
+                            row.find('.take-btn').replaceWith('<span class="badge bg-primary-transparent">مال شماست</span>');
+                            row.find('td:last').html(
+                                '<button type="button" class="btn btn-sm btn-outline-success approve-btn" data-request-id="' + requestId + '">تایید</button>'
+                            );
+                        } else {
+                            toastr.error(data.message || 'خطا در take کردن درخواست');
+                            btn.prop('disabled', false).html('<i class="ri-hand-coin-line me-1"></i> Take');
+                        }
+                    })
+                    .catch(() => {
+                        toastr.error('خطا در ارتباط با سرور');
+                        btn.prop('disabled', false).html('<i class="ri-hand-coin-line me-1"></i> Take');
+                    });
+            });
+
             // نمایش دلیل رد سیستمی
             $(document).on('click', '.reject-reason-text', function () {
                 $('#rejectReasonText').text($(this).data('reason') || 'دلیلی ثبت نشده');
@@ -551,6 +840,12 @@
             // فرم درخواست جدید
             $('#needs-validation-form').on('submit', function (e) {
                 e.preventDefault();
+
+                if (!otpVerified) {
+                    toastr.error('لطفاً ابتدا کد تایید پیامکی را وارد و تایید کنید');
+                    return;
+                }
+
                 const btn = $('#btnVerify');
                 if (!this.checkValidity()) {
                     toastr.error('لطفاً فیلدهای الزامی را پر کنید');

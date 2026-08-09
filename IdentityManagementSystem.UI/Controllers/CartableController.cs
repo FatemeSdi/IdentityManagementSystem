@@ -100,7 +100,7 @@ namespace IdentityManagementSystem.UI.Controllers
         #region CartableIndex
 
         [HttpGet]
-        public async Task<IActionResult> Index(int page = 1, string search = "", string filterStatus = "")
+        public async Task<IActionResult> Index(int page = 1, string search = "", string filterStatus = "", string? fromDate = null, string? toDate = null)
         {
             // ========== چک نقش ==========
             int roleId = 0;
@@ -122,8 +122,11 @@ namespace IdentityManagementSystem.UI.Controllers
             }
             // ============================
 
+            ViewBag.FromDate = fromDate;
+            ViewBag.ToDate = toDate;
+
             // گرفتن داده‌ها از API
-            var model = await GetCartableData(page, search, filterStatus);
+            var model = await GetCartableData(page, search, filterStatus, fromDate, toDate);
 
             // بررسی خوانده شدن سندها
             foreach (var item in model.Items)
@@ -158,6 +161,51 @@ namespace IdentityManagementSystem.UI.Controllers
             return View(model);
         }
 
+
+        /// <summary>
+        /// چک تطابق کد ملی/شماره موبایل (شاهکار) — قبل از ارسال کد تایید صدا زده می‌شه.
+        /// اگه تطابق نداشت، فرانت اصلاً SendOtp رو صدا نمی‌زنه.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> CheckShahkar(string nationalCode, string mobileNumber)
+        {
+            if (string.IsNullOrWhiteSpace(nationalCode) || nationalCode.Length != 10)
+                return Json(new { success = false, message = "کد ملی نامعتبر است" });
+
+            if (string.IsNullOrWhiteSpace(mobileNumber) || mobileNumber.Length != 11 || !mobileNumber.StartsWith("09"))
+                return Json(new { success = false, message = "شماره موبایل نامعتبر است" });
+
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    token = await GetPublicPortalTokenAsync();
+                }
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "سامانه موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید." });
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _client.PostAsJsonAsync("Service/CheckShahkarMatch", new { NationalId = nationalCode, MobileNumber = mobileNumber });
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("CheckShahkarMatch returned {StatusCode}: {Content}", response.StatusCode, content);
+                    return Json(new { success = false, message = "خطا در ارتباط با سرویس احراز هویت." });
+                }
+
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در چک شاهکار برای کد ملی {NationalCode}", nationalCode);
+                return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
+            }
+        }
 
         [HttpPost]
         public IActionResult SendOtp(string nationalCode, string mobileNumber)
@@ -215,88 +263,11 @@ namespace IdentityManagementSystem.UI.Controllers
             return Json(new { success = true, message = "شماره موبایل با موفقیت تایید شد" });
         }
 
-        /// <summary>
-        /// داشبورد مخصوص متقاضی (RoleId = 2)
-        /// </summary>
-        [HttpGet]
-        public async Task<IActionResult> ClientIndex(int page = 1, string search = "")
-        {
-            // ثبت درخواست دیگه Role-based نیست — هر کسی (حتی بدون لاگین) به این صفحه دسترسی داره.
-            // فقط اگه یه متصدی/ادمین لاگین‌کرده به اشتباه اینجا اومده باشه، به کارتابل خودش برمی‌گردونیمش.
-            var roleIdClaim = User.FindFirst("RoleId")?.Value;
-            int? loggedInRoleId = null;
-            if (!string.IsNullOrEmpty(roleIdClaim) && int.TryParse(roleIdClaim, out var parsedRoleId))
-            {
-                loggedInRoleId = parsedRoleId;
-            }
-            else if (HttpContext.Session.GetInt32("RoleId").HasValue)
-            {
-                loggedInRoleId = HttpContext.Session.GetInt32("RoleId").Value;
-            }
-
-            if (loggedInRoleId.HasValue && loggedInRoleId.Value != 2)
-            {
-                return RedirectToAction("Index");
-            }
-
-            PaginatedCartableViewModel model;
-            if (!string.IsNullOrEmpty(HttpContext.Session.GetString("JwtToken")))
-            {
-                // کاربر لاگین‌کرده (حساب متقاضی قدیمی) — لیست درخواست‌های خودش رو ببینه
-                model = await GetCartableData(page, search, filterStatus: "");
-            }
-            else
-            {
-                // بازدیدکننده‌ی anonymous — چیزی برای «درخواست‌های من» نداریم چون هویتی برای فیلتر کردن نیست؛
-                // فقط فرم ثبت درخواست + پیگیری با کد رو می‌بینه.
-                model = new PaginatedCartableViewModel { CurrentPage = 1, PageSize = 10, SearchQuery = search };
-            }
-
-            ViewBag.FormModel = new CartableFormViewModel();
-
-            return View("ClientIndex", model);   // ویوی ClientIndex.cshtml
-        }
-
-        /// <summary>
-        /// پیگیری وضعیت درخواست با کد پیگیری + شماره موبایل — بدون نیاز به لاگین.
-        /// </summary>
-        [HttpGet]
-        public async Task<IActionResult> TrackRequest(string trackingCode, string mobileNumber)
-        {
-            if (string.IsNullOrWhiteSpace(trackingCode) || string.IsNullOrWhiteSpace(mobileNumber))
-            {
-                return Json(new { success = false, message = "کد پیگیری و شماره موبایل الزامی است." });
-            }
-
-            try
-            {
-                var token = HttpContext.Session.GetString("JwtToken") ?? await GetPublicPortalTokenAsync();
-                if (string.IsNullOrEmpty(token))
-                {
-                    return Json(new { success = false, message = "سامانه موقتاً در دسترس نیست." });
-                }
-
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                var response = await _client.GetAsync($"Request/Track?trackingCode={Uri.EscapeDataString(trackingCode)}&mobileNumber={Uri.EscapeDataString(mobileNumber)}");
-                var content = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    dynamic? errorResult = null;
-                    try { errorResult = JsonConvert.DeserializeObject<dynamic>(content); } catch { }
-                    string errorMessage = (string?)errorResult?.message ?? "درخواستی با این مشخصات یافت نشد.";
-                    return Json(new { success = false, message = errorMessage });
-                }
-
-                return Content(content, "application/json");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "خطا در پیگیری درخواست {TrackingCode}", trackingCode);
-                return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
-            }
-        }
+        // ClientIndex/TrackRequest کوچ کردن به IdentityManagementSystem.PublicPortal —
+        // متقاضی دیگه از این پروژه (داخلی) به این صفحات دسترسی نداره؛ پروژه‌ی عمومی جداگانه‌ست.
+        // اگه یه حساب متقاضی قدیمی (RoleId=2) اینجا لاگین کنه، Index() هنوز سعی می‌کنه بهش
+        // ریدایرکت بده — که دیگه وجود نداره (404). این یه edge case شناخته‌شده و بی‌خطره،
+        // چون ثبت‌نام متقاضی جدید دیگه از این مسیر انجام نمی‌شه.
 
         /// <summary>
         /// داشبورد مخصوص متقاضی (RoleId = 2)
@@ -343,6 +314,14 @@ namespace IdentityManagementSystem.UI.Controllers
                 return Json(new { success = false, message = string.Join(" ", formatErrors) });
             }
 
+            // تایید OTP الزامیه — چه متقاضی anonymous باشه چه کارشناس/متصدیِ لاگین‌کرده.
+            // این چک سمت سرور انجام می‌شه (نه فقط JS) چون کسی می‌تونه مستقیم این endpoint رو صدا بزنه.
+            var otpVerified = HttpContext.Session.GetString($"OTP_Verified_{model.MobileNumber}") == "true";
+            if (!otpVerified)
+            {
+                return Json(new { success = false, message = "لطفاً ابتدا شماره موبایل متقاضی را با کد پیامکی تایید کنید." });
+            }
+
             var sessionToken = HttpContext.Session.GetString("JwtToken");
             string? token;
 
@@ -353,14 +332,7 @@ namespace IdentityManagementSystem.UI.Controllers
             }
             else
             {
-                // مسیر متقاضی anonymous — بدون لاگین، ولی باید شماره موبایلش رو با OTP تایید کرده باشه.
-                // این چک سمت سرور انجام می‌شه (نه فقط JS) چون کسی می‌تونه مستقیم این endpoint رو صدا بزنه.
-                var otpVerified = HttpContext.Session.GetString($"OTP_Verified_{model.MobileNumber}") == "true";
-                if (!otpVerified)
-                {
-                    return Json(new { success = false, message = "لطفاً ابتدا شماره موبایل خود را با کد پیامکی تایید کنید." });
-                }
-
+                // مسیر متقاضی anonymous — بدون لاگین
                 token = await GetPublicPortalTokenAsync();
                 if (string.IsNullOrEmpty(token))
                 {
@@ -615,6 +587,43 @@ namespace IdentityManagementSystem.UI.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TakeRequest(long requestId)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken;
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "توکن یافت نشد. لطفاً دوباره وارد سیستم شوید." });
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var json = System.Text.Json.JsonSerializer.Serialize(new { RequestId = requestId });
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _client.PostAsync("Request/Take", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var apiResponse = System.Text.Json.JsonSerializer.Deserialize<ApiResponse>(responseContent, options);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return Json(new { success = true, message = apiResponse?.Message ?? "درخواست take شد." });
+                }
+
+                return Json(new { success = false, message = apiResponse?.Message ?? $"خطا از سمت سرور: {response.StatusCode}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in TakeRequest for RequestId: {RequestId}", requestId);
+                return Json(new { success = false, message = $"خطا در برقراری ارتباط با سرور: {ex.Message}" });
+            }
+        }
+
+        [HttpPost]
         public async Task<IActionResult> MarkDocumentAsRead(long requestId)
         {
             try
@@ -712,7 +721,9 @@ namespace IdentityManagementSystem.UI.Controllers
         private async Task<PaginatedCartableViewModel> GetCartableData(
     int page,
     string search,
-    string filterStatus)
+    string filterStatus,
+    string? fromDate = null,
+    string? toDate = null)
         {
             var pageSize = 10;
             var url =$"Request?page={page}&pageSize={pageSize}";
@@ -724,6 +735,16 @@ namespace IdentityManagementSystem.UI.Controllers
             if (!string.IsNullOrWhiteSpace(filterStatus))
             {
                 url += $"&filterStatus={filterStatus}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(fromDate))
+            {
+                url += $"&fromDate={Uri.EscapeDataString(fromDate)}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(toDate))
+            {
+                url += $"&toDate={Uri.EscapeDataString(toDate)}";
             }
 
             try
@@ -1004,6 +1025,11 @@ namespace IdentityManagementSystem.UI.Controllers
         public string CreatedBy { get; set; } = string.Empty;
         public bool IsRead { get; set; } // اضافه شده برای وضعیت خوانده شدن سند
         public string RejectReasonDisplay { get; set; } = string.Empty;
+        public int? GroupId { get; set; }
+        public string? GroupTitle { get; set; }
+        public long? AssignedTo { get; set; }
+        public string? AssignedToName { get; set; }
+        public DateTime? AssignedAt { get; set; }
     }
 
 

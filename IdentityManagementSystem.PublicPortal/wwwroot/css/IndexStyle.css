@@ -1,0 +1,378 @@
+﻿
+.iColor {
+    color: #6c757d !important;
+}
+
+.modern-input .form-control {
+    border: none;
+    border-bottom: 2px solid #ccc;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+    transition: all 0.3s ease;
+    font-size: 0.95rem;
+}
+
+    .modern-input .form-control:focus {
+        border-bottom: 2px solid #6f42c1;
+        box-shadow: none;
+    }
+
+.modern-input label {
+    color: #777;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.modern-input .form-control:focus + label i {
+    color: #6f42c1;
+}
+
+.modal-content {
+    backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 1.25rem;
+    padding: 1.5rem 1.75rem;
+}
+
+.custom-modal {
+    width: 670px;
+    border-radius: 2px;
+}
+
+.btn-close {
+    background: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    position: relative;
+    opacity: 1;
+}
+
+    .btn-close::before,
+    .btn-close::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1.2rem;
+        height: 2px;
+        background-color: #7c3aed;
+        transform-origin: center;
+        transition: all 0.2s ease;
+    }
+
+    .btn-close::before {
+        transform: translate(-50%, -50%) rotate(45deg);
+    }
+
+    .btn-close::after {
+        transform: translate(-50%, -50%) rotate(-45deg);
+    }
+
+    .btn-close:hover::before,
+    .btn-close:hover::after {
+        background-color: #9f67fa;
+    }
+
+.radiobtns .btn-outline-success,
+.radiobtns .btn-outline-danger {
+    background-color: transparent;
+    border-color: #dcdcdc;
+    color: #6c757d;
+    transition: all 0.3s ease;
+}
+
+.radiobtns .btn-check:checked + .btn-outline-success {
+    background-color: #d7f8e4;
+    border-color: #a8e6cf;
+    color: #2b7a4b;
+}
+
+.radiobtns .btn-check:checked + .btn-outline-danger {
+    background-color: #ffe0e9;
+    border-color: #ffb3c6;
+    color: #a33d5b;
+}
+
+.radiobtns .btn-outline-success:hover:not(.active),
+.radiobtns .btn-outline-danger:hover:not(.active) {
+    border-color: #bfbfbf;
+    background-color: #f8f9fa;
+}
+
+.radiobtns label.btn {
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    font-weight: 500;
+}
+
+/* ==== اسکرول زیبا برای متن سند ==== */
+#documentModalBody {
+    max-height: 65vh; /* حداکثر ارتفاع: ۶۵٪ صفحه */
+    overflow-y: auto; /* فقط عمودی اسکرول بشه */
+    padding-right: 12px; /* فاصله از اسکرول‌بار */
+    line-height: 1.8;
+    font-size: 0.95rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    scrollbar-width: thin; /* فایرفاکس */
+    scrollbar-color: #007bff #f1f1f1;
+}
+
+    /* اسکرول‌بار کروم، سافاری، اج */
+    #documentModalBody::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #documentModalBody::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    #documentModalBody::-webkit-scrollbar-thumb {
+        background: #007bff;
+        border-radius: 10px;
+    }
+
+        #documentModalBody::-webkit-scrollbar-thumb:hover {
+            background: #0056b3;
+        }
+
+    /* هایلایت مهلت اعتبار (قرمز) */
+    #documentModalBody strong {
+        background: #ffebee;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+
+
+.modal-content {
+    background: #ffffff;
+}
+
+.modal-header .btn-close {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+    .modal-header .btn-close:hover {
+        opacity: 1;
+    }
+
+.form-control-sm {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e0e4e8;
+    transition: all 0.2s;
+}
+
+    .form-control-sm:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.1);
+        outline: none;
+    }
+
+.form-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.3px;
+}
+
+.btn-sm {
+    font-size: 0.8rem;
+    padding: 0.4rem 1rem;
+    font-weight: 500;
+}
+
+.btn-light {
+    background-color: #f8f9fa;
+    border-color: #e0e4e8;
+    color: #4a5568;
+}
+
+    .btn-light:hover {
+        background-color: #e9ecef;
+        border-color: #d0d4d8;
+    }
+
+.btn-primary {
+    background-color: #244b8b !important;
+    border-color: #244b8b !important;
+}
+
+    .btn-primary:hover,
+    .btn-primary:focus {
+        background-color: #1a3a6e !important;
+        border-color: #1a3a6e !important;
+    }
+
+.btn-outline-primary {
+    color: #244b8b;
+    border-color: #244b8b;
+}
+
+    .btn-outline-primary:hover,
+    .btn-outline-primary:active,
+    .btn-outline-primary:focus {
+        color: #fff;
+        background-color: #244b8b;
+        border-color: #244b8b;
+    }
+
+.text-primary {
+    color: #244b8b !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #244b8b !important;
+    box-shadow: 0 0 0 3px rgba(36, 75, 139, 0.12) !important;
+}
+
+/* ==== هماهنگی رنگ کارت‌ها و جدول با صفحه ورود ==== */
+.card.custom-card {
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(36, 75, 139, 0.08);
+}
+
+.card.custom-card .card-header {
+    border-block-end: 1px solid #eef1f5 !important;
+    position: relative;
+}
+
+    .card.custom-card .card-header::after {
+        content: "";
+        position: absolute;
+        inset-inline-start: 1rem;
+        bottom: -1px;
+        width: 46px;
+        height: 3px;
+        background: linear-gradient(90deg, #b78a34, #244b8b);
+        border-radius: 3px;
+    }
+
+    .card.custom-card .card-header .card-title {
+        color: #0b2540;
+        font-weight: 700;
+    }
+
+#cartableTable thead th,
+#applicantTable thead th {
+    background-color: #244b8b;
+    color: #fff;
+    font-weight: 600;
+    border-color: #244b8b;
+}
+
+.page-item.active .page-link {
+    background-color: #244b8b !important;
+    border-color: #244b8b !important;
+}
+
+.page-link:hover {
+    color: #244b8b !important;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #244b8b, #3a6bb5);
+    border-block-end: none;
+}
+
+    .modal-header .modal-title {
+        color: #fff;
+    }
+
+    .modal-header .btn-close {
+        filter: invert(1);
+        opacity: .8;
+    }
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+.border-top {
+    border-color: #e9ecef !important;
+}
+
+/* استایل مدال نمایش سند در حالت دارک */
+.dark-theme .modal-content,
+body.dark-theme .modal-content {
+    background-color: #1a1a2e !important;
+    color: #e0e0e0 !important;
+}
+
+.dark-theme .modal-header,
+body.dark-theme .modal-header {
+    border-bottom-color: #2d2d44 !important;
+    background-color: #1a1a2e !important;
+}
+
+    .dark-theme .modal-header .btn-close,
+    body.dark-theme .modal-header .btn-close {
+        filter: brightness(0) invert(1);
+        opacity: 0.8;
+    }
+
+.dark-theme .modal-footer,
+body.dark-theme .modal-footer {
+    border-top-color: #2d2d44 !important;
+    background-color: #1a1a2e !important;
+}
+
+/* مهمترین بخش: رنگ متن سند */
+.dark-theme #documentModalBody pre,
+body.dark-theme #documentModalBody pre,
+.dark-theme .modal-body pre,
+body.dark-theme .modal-body pre {
+    color: #f0f0f0 !important;
+    background-color: #0d0d1a !important;
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.dark-theme #documentModalBody,
+body.dark-theme #documentModalBody {
+    background-color: #1a1a2e !important;
+}
+
+.dark-theme .form-check-label,
+body.dark-theme .form-check-label {
+    color: #e0e0e0 !important;
+}
+
+.dark-theme .form-check-input,
+body.dark-theme .form-check-input {
+    background-color: #2d2d44 !important;
+    border-color: #4a4a6a !important;
+}
+
+    .dark-theme .form-check-input:checked,
+    body.dark-theme .form-check-input:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+/* حالت معمولی (لایت) - متن تیره */
+.document-content {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+}
+
+/* حالت دارک - متن روشن */
+body.dark-theme .document-content,
+.dark-theme .document-content {
+    background-color: #1e1e2e !important;
+    color: #e8e8e8 !important;
+    border: 1px solid #3a3a4e !important;
+}
+
+/* برای اطمینان از اعمال شدن در مدال */
+.dark-theme .modal-body pre,
+body.dark-theme .modal-body pre {
+    background-color: #1e1e2e !important;
+    color: #e8e8e8 !important;
+}

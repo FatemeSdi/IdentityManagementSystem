@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace IdentityManagementSystem.API.Models
 {
-    [Table("Users", Schema = "Sec")]
+    [Table("User", Schema = "Sec")]
     public class User
     {
         [Key]
@@ -47,6 +47,9 @@ namespace IdentityManagementSystem.API.Models
         // Navigation for many-to-many roles via UserRoles
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
+        // Navigation for many-to-many groups via UserGroups
+        public ICollection<UserGroup> UserGroups { get; set; } = new List<UserGroup>();
+
         // Convenience for single role (common in this app) - not mapped to DB
         [NotMapped]
         public Role? Role { get; set; }
@@ -57,7 +60,7 @@ namespace IdentityManagementSystem.API.Models
         public string? NationalIdHash { get; set; }
     }
 
-    [Table("Roles", Schema = "Sec")]
+    [Table("Role", Schema = "Sec")]
     public class Role
     {
         [Key]
@@ -72,7 +75,7 @@ namespace IdentityManagementSystem.API.Models
         public DateTime? UpdatedAt { get; set; }
     }
 
-    [Table("UserRoles", Schema = "Sec")]
+    [Table("UserRole", Schema = "Sec")]
     public class UserRole
     {
         [Key]
@@ -122,6 +125,15 @@ namespace IdentityManagementSystem.API.Models
         public bool? IsNationalIdInResponse { get; set; }
         public bool? IsNationalIdInLawyers { get; set; }
 
+        // گروه کارشناسی که این درخواست باید بره تو کارتابلش (بر اساس نوع درخواست تعیین می‌شه)
+        public int? GroupId { get; set; }
+        public Group? Group { get; set; }
+
+        // کارشناسی که این درخواست رو Take کرده (NULL = هنوز کسی take نکرده)
+        public long? AssignedTo { get; set; }
+        public User? AssignedToUser { get; set; }
+        public DateTime? AssignedAt { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         [StringLength(100)]
         public string? CreatedBy { get; set; }
@@ -149,7 +161,7 @@ namespace IdentityManagementSystem.API.Models
         public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
-    [Table("CartableItems", Schema = "WF")]
+    [Table("CartableItem", Schema = "WF")]
     public class CartableItem
     {
         [Key]
@@ -270,7 +282,7 @@ namespace IdentityManagementSystem.API.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
-    [Table("Permissions", Schema = "Sec")]
+    [Table("Permission", Schema = "Sec")]
     public class Permission
     {
         [Key]
@@ -293,7 +305,7 @@ namespace IdentityManagementSystem.API.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
-    [Table("RolePermissions", Schema = "Sec")]
+    [Table("RolePermission", Schema = "Sec")]
     public class RolePermission
     {
         [Key]
@@ -307,6 +319,49 @@ namespace IdentityManagementSystem.API.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public string? CreatedBy { get; set; }
+    }
+
+    // ---------------------------------------------------------------------
+    // گروه‌ها: یک گروه مجموعه‌ای از Permission هاست و کاربران می‌تونن عضو یک یا چند گروه باشن
+    // ---------------------------------------------------------------------
+    [Table("Group", Schema = "Sec")]
+    public class Group
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string Title { get; set; } = string.Empty;
+
+        public ICollection<GroupPermission> GroupPermissions { get; set; } = new List<GroupPermission>();
+        public ICollection<UserGroup> UserGroups { get; set; } = new List<UserGroup>();
+    }
+
+    [Table("GroupPermission", Schema = "Sec")]
+    public class GroupPermission
+    {
+        [Key]
+        public int Id { get; set; }
+
+        public int GroupId { get; set; }
+        public Group? Group { get; set; }
+
+        public int PermissionId { get; set; }
+        public Permission? Permission { get; set; }
+    }
+
+    [Table("UserGroup", Schema = "Sec")]
+    public class UserGroup
+    {
+        [Key]
+        public int Id { get; set; }
+
+        public long UserId { get; set; }
+        public User? User { get; set; }
+
+        public int GroupId { get; set; }
+        public Group? Group { get; set; }
     }
 
     [Table("ShahkarLog", Schema = "Log")]
@@ -494,7 +549,7 @@ namespace IdentityManagementSystem.API.Models
         public string? CreatedBy { get; set; }
     }
 
-    [Table("RefreshTokens", Schema = "Sec")]
+    [Table("RefreshToken", Schema = "Sec")]
     public class RefreshToken
     {
         [Key]
