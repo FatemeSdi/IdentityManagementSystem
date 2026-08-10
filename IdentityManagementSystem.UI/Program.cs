@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using IdentityManagementSystem.UI.Filters;
+using IdentityManagementSystem.Shared.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +43,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 var apiUrl = builder.Configuration["ApiSettings:URL"];
 var apiKey = builder.Configuration["ApiSettings:ApiKey"];
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<ClientContextForwardingHandler>();
+
 builder.Services.AddHttpClient("PomixApi", client =>
 {
     client.BaseAddress = new Uri($"{apiUrl}/api/");
@@ -55,7 +59,8 @@ builder.Services.AddHttpClient("PomixApi", client =>
         ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
     };
-});
+})
+.AddHttpMessageHandler<ClientContextForwardingHandler>();
 
 builder.Services.AddHttpClient("PomixApiPublic", client =>
 {
@@ -69,7 +74,8 @@ builder.Services.AddHttpClient("PomixApiPublic", client =>
         ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
     };
-});
+})
+.AddHttpMessageHandler<ClientContextForwardingHandler>();
 
 // ================= Captcha =================
 builder.Services.AddDNTCaptcha(options =>

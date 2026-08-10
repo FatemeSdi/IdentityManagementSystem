@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using IdentityManagementSystem.API.Controllers;
@@ -111,6 +112,17 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // --- Middleware ---
+// UI/PublicPortal سرور-به-سرور به API وصل می‌شن؛ بدون این، UserLog فقط IP/UserAgent خودِ سرور UI رو
+// می‌بینه نه کاربر واقعی رو. UI با ClientContextForwardingHandler هدر X-Forwarded-For رو ست می‌کنه؛
+// اینجا با اعتماد به همه‌ی پراکسی‌ها (چون API فقط از شبکه‌ی داخلی/سرورهای خودمون صدا زده می‌شه) قبولش می‌کنیم.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {

@@ -139,7 +139,7 @@ namespace IdentityManagementSystem.API.Controllers
                 ActionDescription = "درخواست جدید از فرم کارتابل ایجاد شد.",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedStatus = "در انتظار بررسی",
-                UpdatedStatusBy = User.Identity?.Name ?? "سیستم",
+                UpdatedStatusBy = createdBy,
                 UpdatedStatusDate = DateTime.UtcNow
             };
 
@@ -634,8 +634,13 @@ namespace IdentityManagementSystem.API.Controllers
                     try
                     {
                         using var responseTextDoc = JsonDocument.Parse(responseTextElement.GetString());
+                        // سرویس بیرونی وقتی سندی پیدا نمی‌کنه، "result" یا "data" رو null برمی‌گردونه (نه یه object خالی) —
+                        // چک ValueKind لازمه، وگرنه TryGetProperty روی یه المنت Null یه InvalidOperationException می‌ندازه
+                        // که JsonException نیست و از catch زیرش رد می‌شه.
                         if (responseTextDoc.RootElement.TryGetProperty("result", out var resultElement) &&
-                            resultElement.TryGetProperty("data", out var dataElement))
+                            resultElement.ValueKind == JsonValueKind.Object &&
+                            resultElement.TryGetProperty("data", out var dataElement) &&
+                            dataElement.ValueKind == JsonValueKind.Object)
                         {
                             isExist = dataElement.TryGetProperty("ExistDoc", out var existDocElement) && existDocElement.GetBoolean();
                             succseed = dataElement.TryGetProperty("succseed", out var succseedElement) && succseedElement.GetBoolean();

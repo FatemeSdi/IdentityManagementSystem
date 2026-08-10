@@ -1,4 +1,5 @@
 using IdentityManagementSystem.PublicPortal.Filters;
+using IdentityManagementSystem.Shared.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,9 @@ builder.Services.AddAntiforgery(options =>
 var apiUrl = builder.Configuration["ApiSettings:URL"];
 var apiKey = builder.Configuration["ApiSettings:ApiKey"];
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<ClientContextForwardingHandler>();
+
 builder.Services.AddHttpClient("PomixApi", client =>
 {
     client.BaseAddress = new Uri($"{apiUrl}/api/");
@@ -40,7 +44,8 @@ builder.Services.AddHttpClient("PomixApi", client =>
         ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
     };
-});
+})
+.AddHttpMessageHandler<ClientContextForwardingHandler>();
 
 // ================= Session =================
 // وضعیت تایید OTP (قبل از ثبت درخواست) اینجا نگه‌داری می‌شه.
