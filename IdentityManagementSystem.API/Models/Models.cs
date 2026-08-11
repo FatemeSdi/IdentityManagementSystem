@@ -44,6 +44,10 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(11)]
         public string? MobileNumber { get; set; }
 
+        // شماره داخلی — برای تماس متقاضی با کارشناسی که درخواستش رو رد/تایید کرده
+        [StringLength(10)]
+        public string? Extension { get; set; }
+
         // Navigation for many-to-many roles via UserRoles
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 

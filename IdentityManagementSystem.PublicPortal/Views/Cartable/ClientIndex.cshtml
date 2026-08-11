@@ -1,9 +1,14 @@
+@using IdentityManagementSystem.PublicPortal.Controllers
 @{
     ViewData["Title"] = "ثبت درخواست";
+    string? trackMobile = ViewBag.TrackMobile as string;
+    bool trackOtpVerified = ViewBag.TrackOtpVerified is bool b && b;
+    var pendingRequests = ViewBag.PendingRequests as List<PendingRequestItem>;
 }
 
+
 <!-- پیگیری درخواست با کد پیگیری + شماره موبایل (بدون نیاز به لاگین) -->
-<div class="card custom-card mb-4">
+<div class="card custom-card mb-2 w-100" style="max-width: 100%;">
     <div class="card-header">
         <div class="card-title mb-0">
             <i class="ri-search-eye-line me-1"></i>
@@ -11,14 +16,14 @@
         </div>
     </div>
     <div class="card-body">
-        <form id="trackRequestForm" class="row g-3 align-items-end">
+        <form id="trackRequestForm" class="row g-3 align-items-end" method="get" asp-action="ClientIndex">
             <div class="col-md-4">
-                <label for="trackTrackingCode" class="form-label text-default">کد پیگیری</label>
-                <input type="text" class="form-control" id="trackTrackingCode" placeholder="مثلاً REQ00020198" required />
+                <label for="trackTrackingCode" class="form-label text-default">کد پیگیری (اختیاری)</label>
+                <input type="text" class="form-control" id="trackTrackingCode" placeholder="مثلاً REQ00020198" />
             </div>
             <div class="col-md-4">
                 <label for="trackMobileNumber" class="form-label text-default">شماره موبایل</label>
-                <input type="text" class="form-control" id="trackMobileNumber" placeholder="مثلاً 09123456789" maxlength="11" inputmode="numeric" required />
+                <input type="text" class="form-control" name="trackMobile" id="trackMobileNumber" value="@trackMobile" placeholder="مثلاً 09123456789" maxlength="11" inputmode="numeric" required />
             </div>
             <div class="col-md-4">
                 <button type="submit" class="btn btn-primary">
@@ -26,12 +31,60 @@
                 </button>
             </div>
         </form>
+
+       
+
+        <!-- فقط وقتی کد پیگیری خالیه و باید شماره موبایل با OTP تایید بشه نشون داده می‌شه -->
+        <div id="trackOtpSection" class="row g-3 align-items-end mt-1" style="@(!string.IsNullOrEmpty(trackMobile) && !trackOtpVerified ? "" : "display:none;")">
+            <div class="col-md-4">
+                <button type="button" id="trackBtnSendOtp" class="btn btn-outline-primary btn-sm">
+                    <i class="ri-message-2-line me-1"></i> ارسال کد تایید
+                </button>
+                <span id="trackOtpTimer" class="text-muted ms-2" style="display:none;"></span>
+            </div>
+            <div class="col-md-4">
+                <label for="trackOtpCode" class="form-label text-default">کد تایید پیامکی</label>
+                <input type="text" class="form-control" id="trackOtpCode" placeholder="کد ۶ رقمی" maxlength="6" inputmode="numeric" />
+            </div>
+            <div class="col-md-4">
+                <button type="button" id="trackBtnVerifyOtp" class="btn btn-success btn-sm">تایید کد</button>
+            </div>
+        </div>
+        <div id="trackOtpMessage" class="mt-2"></div>
+
         <div id="trackRequestResult" class="mt-3"></div>
+
+        @* --- نتیجه‌ی پیگیری با موبایل: کاملاً سمت کنترلر رندر می‌شه، نه با جاوااسکریپت --- *@
+        @if (!string.IsNullOrEmpty(trackMobile) && trackOtpVerified)
+        {
+            <div class="mt-3">
+                @if (pendingRequests == null || pendingRequests.Count == 0)
+                {
+                    <p class="text-muted text-center mb-0">درخواست «در انتظار بررسی»ای برای این شماره یافت نشد.</p>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var item in pendingRequests)
+                        {
+                            <div class="list-group-item d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div>
+                                    <strong>قبض انبار: @(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</strong>
+                                    <br />
+                                    <small class="text-muted">کد پیگیری: @item.TrackingCode — @item.CreatedAt.ToString("yyyy/MM/dd HH:mm")</small>
+                                </div>
+                                <span class="badge bg-warning text-dark">در انتظار بررسی</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
     </div>
 </div>
 
 <!-- کارت ایجاد درخواست جدید -->
-<div class="card custom-card">
+<div class="card custom-card w-100" style="max-width: 100%;">
     <div class="card-header">
         <div class="card-title mb-0">
             <i class="ri-file-add-line me-1"></i>
@@ -331,32 +384,54 @@
                 location.reload();
             });
 
-            // پیگیری درخواست با کد + شماره موبایل
+            // پیگیری درخواست — با کد پیگیری (مشخص، همچنان AJAX) یا فقط با موبایل+OTP.
+            // مسیر دوم (لیست «در انتظار بررسی») دیگه با جاوااسکریپت رندر نمی‌شه — فرم به‌صورت GET معمولی
+            // submit می‌شه و کنترلر (اکشن ClientIndex با پارامتر trackMobile) خودش لیست رو تو Razor رندر می‌کنه.
+            let trackOtpTimerInterval = null;
+            let trackRemainingSeconds = 0;
+
+            function renderSingleTrackResult(res) {
+                const badgeClass = res.status === 'تایید شده' ? 'bg-success' : (res.status === 'رد شده' ? 'bg-danger' : 'bg-warning text-dark');
+                let html = '<div class="alert alert-light border">';
+                html += '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">';
+                html += '<div><strong>' + res.trackingCode + '</strong><br><small class="text-muted">' + new Date(res.createdAt).toLocaleDateString('fa-IR') + '</small></div>';
+                html += '<span class="badge ' + badgeClass + '">' + res.status + '</span>';
+                html += '</div>';
+                if (res.description) {
+                    html += '<div class="mt-2 text-danger small">دلیل: ' + $('<div/>').text(res.description).html() + '</div>';
+                }
+                if (res.handlerName) {
+                    html += '<div class="mt-2 small text-muted"><i class="ri-user-line me-1"></i> کارشناس مربوطه: ' + $('<div/>').text(res.handlerName).html();
+                    if (res.handlerExtension) {
+                        html += ' — داخلی: ' + $('<div/>').text(res.handlerExtension).html();
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+                $('#trackRequestResult').html(html);
+            }
+
             $('#trackRequestForm').on('submit', function (e) {
-                e.preventDefault();
                 const trackingCode = $('#trackTrackingCode').val().trim();
                 const mobileNumber = $('#trackMobileNumber').val().trim();
-                const resultBox = $('#trackRequestResult');
 
-                if (!trackingCode || !mobileNumber) {
-                    window.showToast('کد پیگیری و شماره موبایل را وارد کنید', 'warning');
+                if (!trackingCode) {
+                    // کد پیگیری خالیه → بذار فرم به‌صورت معمولی (GET) submit بشه؛ سرور خودش تصمیم می‌گیره
+                    // OTP رو بخواد یا لیست در انتظار رو نشون بده.
+                    $('#trackRequestResult').empty();
                     return;
                 }
 
+                // مسیر مشخص: کد پیگیری + موبایل — بدون نیاز به OTP، صفحه رفرش نمی‌شه
+                e.preventDefault();
+                const resultBox = $('#trackRequestResult');
+                $('#trackOtpSection').hide();
                 resultBox.html('<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>');
 
                 $.get('/Cartable/TrackRequest', { trackingCode: trackingCode, mobileNumber: mobileNumber })
                     .done(function (res) {
                         if (res && res.success) {
-                            const badgeClass = res.status === 'تایید شده' ? 'bg-success' : (res.status === 'رد شده' ? 'bg-danger' : 'bg-warning text-dark');
-                            let html = '<div class="alert alert-light border d-flex align-items-center justify-content-between flex-wrap gap-2">';
-                            html += '<div><strong>' + res.trackingCode + '</strong><br><small class="text-muted">' + new Date(res.createdAt).toLocaleDateString('fa-IR') + '</small></div>';
-                            html += '<span class="badge ' + badgeClass + '">' + res.status + '</span>';
-                            if (res.description) {
-                                html += '<div class="w-100 mt-2 text-danger small">دلیل: ' + $('<div/>').text(res.description).html() + '</div>';
-                            }
-                            html += '</div>';
-                            resultBox.html(html);
+                            renderSingleTrackResult(res);
                         } else {
                             resultBox.html('<p class="text-danger text-center mb-0">' + ((res && res.message) || 'درخواستی یافت نشد.') + '</p>');
                         }
@@ -365,6 +440,82 @@
                         resultBox.html('<p class="text-danger text-center mb-0">' + (xhr.responseJSON?.message || 'خطا در پیگیری درخواست') + '</p>');
                     });
             });
+
+            $('#trackBtnSendOtp').click(function () {
+                const mobile = $('#trackMobileNumber').val().trim();
+                if (!mobile || mobile.length !== 11 || !mobile.startsWith('09')) {
+                    window.showToast('شماره موبایل را به درستی وارد کنید', 'warning');
+                    return;
+                }
+                const btn = $(this);
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> در حال ارسال...');
+
+                $.post('/Cartable/SendOtp', { mobileNumber: mobile })
+                    .done(function (res) {
+                        if (res.success) {
+                            window.showToast(res.message || 'کد تایید ارسال شد', 'success');
+                            if (res.debugOtp) {
+                                window.showToast('کد تست: ' + res.debugOtp, 'info');
+                            }
+                            startTrackOtpTimer(120);
+                        } else {
+                            window.showToast(res.message || 'خطا در ارسال کد', 'error');
+                        }
+                    })
+                    .fail(function () {
+                        window.showToast('خطا در ارتباط با سرور', 'error');
+                    })
+                    .always(function () {
+                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                    });
+            });
+
+            $('#trackBtnVerifyOtp').click(function () {
+                const mobile = $('#trackMobileNumber').val().trim();
+                const otp = $('#trackOtpCode').val().trim();
+                if (!otp || otp.length !== 6) {
+                    window.showToast('کد ۶ رقمی را وارد کنید', 'warning');
+                    return;
+                }
+                const btn = $(this);
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+                $.post('/Cartable/VerifyOtp', { mobileNumber: mobile, otpCode: otp })
+                    .done(function (res) {
+                        if (res.success) {
+                            $('#trackOtpMessage').html('<small class="text-success"><i class="ri-check-line"></i> شماره موبایل تایید شد</small>');
+                            window.showToast('کد تایید صحیح است', 'success');
+                            // OTP سمت سرور تایید شد؛ حالا صفحه رو با trackMobile رفرش می‌کنیم تا
+                            // کنترلر خودش لیست درخواست‌های در انتظار رو (سمت سرور) رندر کنه.
+                            window.location.href = '/Cartable/ClientIndex?trackMobile=' + encodeURIComponent(mobile);
+                        } else {
+                            window.showToast(res.message || 'کد اشتباه است', 'error');
+                            btn.prop('disabled', false).html('تایید کد');
+                        }
+                    })
+                    .fail(function () {
+                        window.showToast('خطا در ارتباط با سرور', 'error');
+                        btn.prop('disabled', false).html('تایید کد');
+                    });
+            });
+
+            function startTrackOtpTimer(seconds) {
+                trackRemainingSeconds = seconds;
+                $('#trackOtpTimer').show();
+                clearInterval(trackOtpTimerInterval);
+
+                trackOtpTimerInterval = setInterval(function () {
+                    trackRemainingSeconds--;
+                    const min = Math.floor(trackRemainingSeconds / 60);
+                    const sec = trackRemainingSeconds % 60;
+                    $('#trackOtpTimer').text(`ارسال مجدد تا ${min}:${sec.toString().padStart(2, '0')}`);
+
+                    if (trackRemainingSeconds <= 0) {
+                        clearInterval(trackOtpTimerInterval);
+                        $('#trackOtpTimer').hide();
+                    }
+                }, 1000);
+            }
 
             // فرم درخواست جدید
             $('#needs-validation-form').on('submit', function (e) {

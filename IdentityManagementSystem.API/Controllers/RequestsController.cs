@@ -188,6 +188,7 @@ namespace IdentityManagementSystem.API.Controllers
             }
 
             var request = await _context.Request
+                .Include(r => r.AssignedToUser)
                 .FirstOrDefaultAsync(r => r.TrackingCode == trackingCode.Trim() && r.MobileNumber == mobileNumber.Trim());
 
             if (request == null)
@@ -201,14 +202,56 @@ namespace IdentityManagementSystem.API.Controllers
                     ? "رد شده"
                     : "در انتظار بررسی";
 
+            // اطلاعات تماس کارشناس فقط برای درخواست‌های نهایی‌شده (تایید/رد) نشون داده می‌شه —
+            // نه برای Pending، چون هنوز تصمیمی گرفته نشده که بخوان درباره‌ش تماس بگیرن.
+            // عمداً هیچ‌جا وارد متن پیامک نمی‌شه، فقط تو همین پاسخ وب.
+            string? handlerName = null;
+            string? handlerExtension = null;
+            if (request.ValidateByExpert.HasValue && request.AssignedToUser != null)
+            {
+                handlerName = $"{request.AssignedToUser.Name} {request.AssignedToUser.LastName}".Trim();
+                handlerExtension = request.AssignedToUser.Extension;
+            }
+
             return Ok(new
             {
                 success = true,
                 trackingCode = request.TrackingCode,
                 createdAt = request.CreatedAt,
                 status = statusText,
-                description = request.ValidateByExpert == false ? request.Description : null
+                description = request.ValidateByExpert == false ? request.Description : null,
+                handlerName,
+                handlerExtension
             });
+        }
+
+        /// <summary>
+        /// لیست درخواست‌های «در انتظار بررسی» یک متقاضی بر اساس شماره موبایل — بدون نیاز به کد پیگیری.
+        /// سمت UI قبل از صدا زدن این endpoint باید OTP شماره موبایل رو تایید کرده باشه (کنترل سمت UI/Session).
+        /// درخواست‌های نهایی‌شده (رد/تایید) عمداً اینجا برنمی‌گردن — برای اونا کد پیگیری لازمه، نه فقط موبایل.
+        /// </summary>
+        [HttpGet("TrackByMobile")]
+        public async Task<IActionResult> TrackByMobile(string mobileNumber)
+        {
+            if (string.IsNullOrWhiteSpace(mobileNumber))
+            {
+                return BadRequest(new { success = false, message = "شماره موبایل الزامی است." });
+            }
+
+            var pendingRequests = await _context.Request
+                // TrackingCode خالی یعنی رکورد قدیمی/ناقصه (قبل از این‌که تولید خودکار کد پیگیری همیشگی بشه) —
+                // بدون کد پیگیری، متقاضی هیچ راهی برای تشخیص این درخواست نداره، پس نشونش نمی‌دیم.
+                .Where(r => r.MobileNumber == mobileNumber.Trim() && r.ValidateByExpert == null && r.TrackingCode != null)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    trackingCode = r.TrackingCode,
+                    warehouseReceiptNumber = r.WarehouseReceiptNumber,
+                    createdAt = r.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, items = pendingRequests });
         }
 
         /// <summary>
@@ -227,6 +270,12 @@ namespace IdentityManagementSystem.API.Controllers
 
             if (request == null)
                 return NotFound(new { success = false, message = "درخواست یافت نشد." });
+
+            if (request.ValidateByExpert == false)
+            {
+                await _actionLogger.Warning(userId, "Take_Request", $"RequestId={model.RequestId}, Denied=AlreadyRejected");
+                return BadRequest(new { success = false, message = "این درخواست به‌صورت سیستمی رد شده؛ دیگه قابل take نیست." });
+            }
 
             var isMember = request.GroupId != null && await _context.UserGroups
                 .AnyAsync(ug => ug.UserId == userId && ug.GroupId == request.GroupId.Value);

@@ -80,7 +80,7 @@
     <div class="col-12">
         <small class="text-muted">
             <i class="ri-information-line"></i>
-            @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده." : "بدون انتخاب بازه، فقط درخواست‌های امروز نمایش داده می‌شن.")
+            @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده." : "بدون انتخاب بازه، فقط درخواست‌های امروز نمایش داده می‌شود .")
         </small>
     </div>
 </div>
@@ -227,7 +227,13 @@
 
                             <!-- تخصیص: کارشناسی که این درخواست رو take کرده -->
                             <td class="text-center">
-                                @if (item.AssignedTo == null)
+                                @if (item.ValidateByExpert == false)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="این درخواست به‌صورت سیستمی رد شده؛ دیگه قابل take نیست">
+                                        <i class="ri-hand-coin-line me-1"></i> Take
+                                    </button>
+                                }
+                                else if (item.AssignedTo == null)
                                 {
                                     <button type="button"
                                             class="btn btn-sm btn-outline-primary take-btn"

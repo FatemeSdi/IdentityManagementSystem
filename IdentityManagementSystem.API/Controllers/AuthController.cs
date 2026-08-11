@@ -242,6 +242,9 @@ namespace IdentityManagementSystem.API.Controllers
             if (!string.IsNullOrEmpty(model.MobileNumber))
                 user.MobileNumber = model.MobileNumber;
 
+            if (!string.IsNullOrEmpty(model.Extension))
+                user.Extension = model.Extension;
+
             // RoleId از طریق UserRoles مدیریت شود
             if (model.RoleId.HasValue && model.RoleId.Value > 0)
             {

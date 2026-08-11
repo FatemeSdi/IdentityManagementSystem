@@ -71,6 +71,7 @@ namespace IdentityManagementSystem.API.Models.ViewModels
         public string? Password { get; set; }
         public string? NationalId { get; set; }
         public string? MobileNumber { get; set; }
+        public string? Extension { get; set; }
         public int? RoleId { get; set; }
     }
 }

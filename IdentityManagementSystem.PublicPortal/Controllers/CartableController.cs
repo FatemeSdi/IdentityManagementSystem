@@ -81,10 +81,61 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
             }
         }
 
+        /// <summary>
+        /// اگه trackMobile داده شده باشه، یعنی متقاضی داره درخواست‌های «در انتظار بررسی»ش رو با موبایل
+        /// (بدون کد پیگیری) پیگیری می‌کنه. لیست اینجا، سمت کنترلر، از API گرفته و به View داده می‌شه —
+        /// نه با AJAX/جاوااسکریپت. اگه هنوز OTP اون شماره تایید نشده باشه، فقط پرچمش به View می‌ره
+        /// تا فرم OTP رو نشون بده؛ لیستی گرفته نمی‌شه.
+        /// </summary>
         [HttpGet]
-        public IActionResult ClientIndex()
+        public async Task<IActionResult> ClientIndex(string? trackMobile)
         {
+            ViewBag.FormModel = new CartableFormViewModel();
+
+            if (!string.IsNullOrWhiteSpace(trackMobile))
+            {
+                trackMobile = trackMobile.Trim();
+                ViewBag.TrackMobile = trackMobile;
+
+                var otpVerified = HttpContext.Session.GetString($"OTP_Verified_{trackMobile}") == "true";
+                ViewBag.TrackOtpVerified = otpVerified;
+
+                if (otpVerified)
+                {
+                    ViewBag.PendingRequests = await GetPendingRequestsByMobileAsync(trackMobile);
+                }
+            }
+
             return View();
+        }
+
+        private async Task<List<PendingRequestItem>> GetPendingRequestsByMobileAsync(string mobileNumber)
+        {
+            try
+            {
+                var token = await GetPublicPortalTokenAsync();
+                if (string.IsNullOrEmpty(token))
+                {
+                    return new List<PendingRequestItem>();
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _client.GetAsync($"Request/TrackByMobile?mobileNumber={Uri.EscapeDataString(mobileNumber)}");
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new List<PendingRequestItem>();
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                var result = JsonConvert.DeserializeObject<TrackByMobileResult>(content);
+                return result?.Items ?? new List<PendingRequestItem>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در دریافت درخواست‌های در انتظار برای موبایل {MobileNumber}", mobileNumber);
+                return new List<PendingRequestItem>();
+            }
         }
 
         /// <summary>
@@ -129,9 +180,11 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
         }
 
         [HttpPost]
-        public IActionResult SendOtp(string nationalCode, string mobileNumber)
+        public IActionResult SendOtp(string? nationalCode, string mobileNumber)
         {
-            if (string.IsNullOrWhiteSpace(nationalCode) || nationalCode.Length != 10)
+            // این endpoint بین فرم «ثبت درخواست» (که کد ملی داره) و فرم «پیگیری با موبایل» (که نداره)
+            // مشترکه — فقط وقتی مقدار داده شده چک فرمتش می‌شه، نبودنش (مسیر پیگیری) اوکیه.
+            if (!string.IsNullOrWhiteSpace(nationalCode) && nationalCode.Length != 10)
                 return Json(new { success = false, message = "کد ملی نامعتبر است" });
 
             if (string.IsNullOrWhiteSpace(mobileNumber) || mobileNumber.Length != 11 || !mobileNumber.StartsWith("09"))
@@ -224,6 +277,10 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
                 return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
             }
         }
+
+        // لیست درخواست‌های «در انتظار بررسی» با فقط موبایل (بدون کد پیگیری) دیگه از این کنترلر به‌صورت
+        // AJAX سرو نمی‌شه — سمت کنترلر تو خودِ اکشن ClientIndex (پارامتر trackMobile) رندر می‌شه.
+        // به GetPendingRequestsByMobileAsync بالا نگاه کن.
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -339,6 +396,19 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
     public class LoginResponse
     {
         public TokenInfo? Tokens { get; set; }
+    }
+
+    public class TrackByMobileResult
+    {
+        public bool Success { get; set; }
+        public List<PendingRequestItem>? Items { get; set; }
+    }
+
+    public class PendingRequestItem
+    {
+        public string? TrackingCode { get; set; }
+        public string? WarehouseReceiptNumber { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     public class TokenInfo
