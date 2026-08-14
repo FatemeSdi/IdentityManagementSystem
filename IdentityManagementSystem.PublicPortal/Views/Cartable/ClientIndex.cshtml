@@ -4,235 +4,520 @@
     string? trackMobile = ViewBag.TrackMobile as string;
     bool trackOtpVerified = ViewBag.TrackOtpVerified is bool b && b;
     var pendingRequests = ViewBag.PendingRequests as List<PendingRequestItem>;
+    var companies = ViewBag.Companies as List<CompanyOption> ?? new List<CompanyOption>();
 }
 
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #eef2f8 0%, #e4ebf5 55%, #f2f5f9 100%);
+        padding: 40px 0 32px;
+        overflow: hidden;
+    }
 
-<!-- پیگیری درخواست با کد پیگیری + شماره موبایل (بدون نیاز به لاگین) -->
-<div class="card custom-card mb-2 w-100" style="max-width: 100%;">
-    <div class="card-header">
-        <div class="card-title mb-0">
-            <i class="ri-search-eye-line me-1"></i>
-            پیگیری درخواست
-        </div>
-    </div>
-    <div class="card-body">
-        <form id="trackRequestForm" class="row g-3 align-items-end" method="get" asp-action="ClientIndex">
-            <div class="col-md-4">
-                <label for="trackTrackingCode" class="form-label text-default">کد پیگیری (اختیاری)</label>
-                <input type="text" class="form-control" id="trackTrackingCode" placeholder="مثلاً REQ00020198" />
-            </div>
-            <div class="col-md-4">
-                <label for="trackMobileNumber" class="form-label text-default">شماره موبایل</label>
-                <input type="text" class="form-control" name="trackMobile" id="trackMobileNumber" value="@trackMobile" placeholder="مثلاً 09123456789" maxlength="11" inputmode="numeric" required />
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary">
-                    <i class="ri-search-line me-1"></i> پیگیری وضعیت
-                </button>
-            </div>
-        </form>
+    .hero-section h2 {
+        color: var(--portal-navy);
+        font-weight: 700;
+        font-size: 28px;
+        margin-bottom: 10px;
+    }
 
-       
+    .hero-section > .container > .row > div p.lead {
+        color: #4d5b72;
+        font-size: 14.5px;
+        margin-bottom: 22px;
+    }
 
-        <!-- فقط وقتی کد پیگیری خالیه و باید شماره موبایل با OTP تایید بشه نشون داده می‌شه -->
-        <div id="trackOtpSection" class="row g-3 align-items-end mt-1" style="@(!string.IsNullOrEmpty(trackMobile) && !trackOtpVerified ? "" : "display:none;")">
-            <div class="col-md-4">
-                <button type="button" id="trackBtnSendOtp" class="btn btn-outline-primary btn-sm">
-                    <i class="ri-message-2-line me-1"></i> ارسال کد تایید
-                </button>
-                <span id="trackOtpTimer" class="text-muted ms-2" style="display:none;"></span>
-            </div>
-            <div class="col-md-4">
-                <label for="trackOtpCode" class="form-label text-default">کد تایید پیامکی</label>
-                <input type="text" class="form-control" id="trackOtpCode" placeholder="کد ۶ رقمی" maxlength="6" inputmode="numeric" />
-            </div>
-            <div class="col-md-4">
-                <button type="button" id="trackBtnVerifyOtp" class="btn btn-success btn-sm">تایید کد</button>
-            </div>
-        </div>
-        <div id="trackOtpMessage" class="mt-2"></div>
+    .hero-feature {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 4px 14px rgba(20, 51, 94, 0.06);
+        height: 100%;
+    }
 
-        <div id="trackRequestResult" class="mt-3"></div>
+    .hero-feature .hf-icon {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 19px;
+        color: #fff;
+        background: linear-gradient(135deg, var(--portal-navy-2), var(--portal-navy-light));
+    }
 
-        @* --- نتیجه‌ی پیگیری با موبایل: کاملاً سمت کنترلر رندر می‌شه، نه با جاوااسکریپت --- *@
-        @if (!string.IsNullOrEmpty(trackMobile) && trackOtpVerified)
-        {
-            <div class="mt-3">
-                @if (pendingRequests == null || pendingRequests.Count == 0)
-                {
-                    <p class="text-muted text-center mb-0">درخواست «در انتظار بررسی»ای برای این شماره یافت نشد.</p>
-                }
-                else
-                {
-                    <div class="list-group">
-                        @foreach (var item in pendingRequests)
-                        {
-                            <div class="list-group-item d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                <div>
-                                    <strong>قبض انبار: @(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</strong>
-                                    <br />
-                                    <small class="text-muted">کد پیگیری: @item.TrackingCode — @item.CreatedAt.ToString("yyyy/MM/dd HH:mm")</small>
-                                </div>
-                                <span class="badge bg-warning text-dark">در انتظار بررسی</span>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
+    .hero-feature .hf-text b {
+        display: block;
+        font-size: 12.5px;
+        color: var(--portal-navy);
+        font-weight: 700;
+    }
+
+    .hero-feature .hf-text span {
+        font-size: 11px;
+        color: #7c8798;
+    }
+
+    .hero-illustration {
+        width: 100%;
+        max-width: 380px;
+        margin: 0 auto;
+        display: block;
+    }
+
+    .portal-main {
+        padding: 28px 0 48px;
+    }
+
+    /* ---------- ویزارد مرحله‌ای ---------- */
+    .step-indicator {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        position: relative;
+    }
+
+        .step-indicator::before {
+            content: "";
+            position: absolute;
+            top: 17px;
+            right: 8%;
+            left: 8%;
+            height: 2px;
+            background: #e6e9ef;
+            z-index: 0;
         }
-    </div>
-</div>
 
-<!-- کارت ایجاد درخواست جدید -->
-<div class="card custom-card w-100" style="max-width: 100%;">
-    <div class="card-header">
-        <div class="card-title mb-0">
-            <i class="ri-file-add-line me-1"></i>
-            ایجاد درخواست جدید
-        </div>
-    </div>
-    <div class="card-body p-4">
-        <form asp-action="ValidateSteps" method="post" id="needs-validation-form" autocomplete="off">
-            @Html.AntiForgeryToken()
+    .step-item {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+    }
 
-            <!-- بخش اطلاعات متقاضی -->
-            <div class="mb-4">
-                <p class="fw-semibold mb-3 text-primary">
-                    <i class="ri-user-line me-1"></i>
-                    اطلاعات متقاضی
-                </p>
-                <div class="row gy-3">
-                    <div class="col-md-6">
-                        <label for="NationalCode" class="form-label text-default">کد ملی</label>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="NationalCode"
-                               name="NationalCode"
-                               placeholder="کد ملی ۱۰ رقمی"
-                               maxlength="10"
-                               inputmode="numeric"
-                               required />
+    .step-item .step-circle {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        border: 2px solid #dfe4ec;
+        color: #9aa5b5;
+        font-weight: 700;
+        font-size: 14px;
+        transition: all .2s ease;
+    }
+
+    .step-item .step-label {
+        font-size: 12px;
+        color: #9aa5b5;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .step-item.active .step-circle {
+        border-color: var(--portal-navy-2);
+        background: var(--portal-navy-2);
+        color: #fff;
+    }
+
+    .step-item.active .step-label {
+        color: var(--portal-navy);
+    }
+
+    .step-item.completed .step-circle {
+        border-color: #2b9e6b;
+        background: #2b9e6b;
+        color: #fff;
+    }
+
+    .step-item.completed .step-label {
+        color: #2b9e6b;
+    }
+
+    .wizard-step {
+        display: none;
+    }
+
+        .wizard-step.active {
+            display: block;
+        }
+
+    .wizard-nav {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 22px;
+    }
+
+    .notice-box {
+        background: #fff8e6;
+        border: 1px solid #f2e2b3;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 12.5px;
+        color: #8a6d1f;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    @@media (max-width: 991px) {
+        .hero-illustration {
+            max-width: 260px;
+        }
+    }
+</style>
+
+<!-- ==================== هیرو ==================== -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center gy-4">
+            <div class="col-lg-7">
+                <h2>سامانه احراز اصالت سند و قبض انبار</h2>
+                <p class="lead">ثبت و پیگیری درخواست مجوز بارگیری از کانتینرها در محوطه‌های اسکله</p>
+
+                <div class="row g-3">
+                    <div class="col-4">
+                        <div class="hero-feature">
+                            <div class="hf-icon"><i class="ri-shield-check-line"></i></div>
+                            <div class="hf-text">
+                                <b>احراز صریح و امن</b>
+                                <span>امنیت کامل اطلاعات شما</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label for="MobileNumber" class="form-label text-default">شماره موبایل</label>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="MobileNumber"
-                               name="MobileNumber"
-                               placeholder="مثلاً 09123456789"
-                               maxlength="11"
-                               inputmode="numeric"
-                               required />
+                    <div class="col-4">
+                        <div class="hero-feature">
+                            <div class="hf-icon"><i class="ri-time-line"></i></div>
+                            <div class="hf-text">
+                                <b>پاسخگویی آنلاین</b>
+                                <span>نتیجه استعلام در کمترین زمان</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="hero-feature">
+                            <div class="hf-icon"><i class="ri-file-list-3-line"></i></div>
+                            <div class="hf-text">
+                                <b>پیگیری آسان</b>
+                                <span>با کد پیگیری، وضعیت را ببینید</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div class="col-lg-5 text-center">
+                <svg class="hero-illustration" viewBox="0 0 480 380" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="240" cy="180" r="170" fill="#dfe8f5" />
+                    <rect x="0" y="300" width="480" height="30" fill="#1b4275" opacity="0.12" />
+                    <rect x="60" y="240" width="300" height="70" rx="10" fill="#14335e" />
+                    <rect x="90" y="200" width="55" height="45" rx="4" fill="#b78a34" />
+                    <rect x="150" y="200" width="55" height="45" rx="4" fill="#ffffff" stroke="#dfe4ec" stroke-width="2" />
+                    <rect x="210" y="200" width="55" height="45" rx="4" fill="#1b4275" />
+                    <rect x="270" y="200" width="55" height="45" rx="4" fill="#b78a34" />
+                    <rect x="120" y="160" width="55" height="45" rx="4" fill="#1b4275" />
+                    <rect x="180" y="160" width="55" height="45" rx="4" fill="#ffffff" stroke="#dfe4ec" stroke-width="2" />
+                    <rect x="240" y="160" width="55" height="45" rx="4" fill="#b78a34" />
+                    <rect x="345" y="120" width="10" height="140" fill="#7c8798" />
+                    <rect x="300" y="110" width="140" height="12" rx="4" fill="#7c8798" />
+                    <rect x="325" y="122" width="6" height="60" fill="#9aa5b5" />
+                    <circle cx="328" cy="184" r="5" fill="#b78a34" />
+                    <rect x="316" y="184" width="24" height="4" fill="#b78a34" />
+                    <rect x="336" y="60" width="16" height="60" rx="3" fill="#14335e" />
+                    <rect x="326" y="50" width="36" height="14" rx="3" fill="#14335e" />
+                </svg>
+            </div>
+        </div>
+    </div>
+</section>
 
-                <!-- دکمه ارسال کد دو عاملی -->
-                <div class="mt-3">
-                    <button type="button" id="btnSendOtp" class="btn btn-outline-primary btn-sm">
+<div class="container portal-main" id="trackSection">
+    <!-- پیگیری درخواست با کد پیگیری + شماره موبایل (بدون نیاز به لاگین) -->
+    <div class="card custom-card mb-3 w-100" style="max-width: 100%;">
+        <div class="card-header">
+            <div class="card-title mb-0">
+                <i class="ri-search-eye-line me-1"></i>
+                پیگیری درخواست
+            </div>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-3">برای مشاهده وضعیت درخواست قبلی، شماره موبایل و کد پیگیری خود را وارد کنید.</p>
+            <form id="trackRequestForm" class="row g-3 align-items-end" method="get" asp-action="ClientIndex">
+                <div class="col-md-4">
+                    <label for="trackMobileNumber" class="form-label text-default">شماره موبایل</label>
+                    <input type="text" class="form-control" name="trackMobile" id="trackMobileNumber" value="@trackMobile" placeholder="مثلاً 09123456789" maxlength="11" inputmode="numeric" required />
+                </div>
+                <div class="col-md-4">
+                    <label for="trackTrackingCode" class="form-label text-default">کد پیگیری (اختیاری)</label>
+                    <input type="text" class="form-control" id="trackTrackingCode" placeholder="مثلاً REQ00020198" />
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ri-search-line me-1"></i> پیگیری وضعیت
+                    </button>
+                </div>
+            </form>
+
+            <!-- فقط وقتی کد پیگیری خالیه و باید شماره موبایل با OTP تایید بشه نشون داده می‌شه -->
+            <div id="trackOtpSection" class="row g-3 align-items-end mt-1" style="@(!string.IsNullOrEmpty(trackMobile) && !trackOtpVerified ? "" : "display:none;")">
+                <div class="col-md-4">
+                    <button type="button" id="trackBtnSendOtp" class="btn btn-outline-primary btn-sm">
                         <i class="ri-message-2-line me-1"></i> ارسال کد تایید
                     </button>
-                    <span id="otpTimer" class="text-muted ms-2" style="display:none;"></span>
+                    <span id="trackOtpTimer" class="text-muted ms-2" style="display:none;"></span>
+                </div>
+                <div class="col-md-4">
+                    <label for="trackOtpCode" class="form-label text-default">کد تایید پیامکی</label>
+                    <input type="text" class="form-control" id="trackOtpCode" placeholder="کد ۶ رقمی" maxlength="6" inputmode="numeric" />
+                </div>
+                <div class="col-md-4">
+                    <button type="button" id="trackBtnVerifyOtp" class="btn btn-success btn-sm">تایید کد</button>
+                </div>
+            </div>
+            <div id="trackOtpMessage" class="mt-2"></div>
+
+            <div id="trackRequestResult" class="mt-3"></div>
+
+            @* --- نتیجه‌ی پیگیری با موبایل: کاملاً سمت کنترلر رندر می‌شه، نه با جاوااسکریپت --- *@
+            @if (!string.IsNullOrEmpty(trackMobile) && trackOtpVerified)
+            {
+                <div class="mt-3">
+                    @if (pendingRequests == null || pendingRequests.Count == 0)
+                    {
+                        <p class="text-muted text-center mb-0">درخواست «در انتظار بررسی»ای برای این شماره یافت نشد.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group">
+                            @foreach (var item in pendingRequests)
+                            {
+                                <div class="list-group-item d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div>
+                                        <strong>قبض انبار: @(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</strong>
+                                        <br />
+                                        <small class="text-muted">کد پیگیری: @item.TrackingCode — @item.CreatedAt.ToString("yyyy/MM/dd HH:mm")</small>
+                                    </div>
+                                    <span class="badge bg-warning text-dark">در انتظار بررسی</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- کارت ایجاد درخواست جدید -->
+    <div class="card custom-card w-100" style="max-width: 100%;">
+        <div class="card-header">
+            <div class="card-title mb-0">
+                <i class="ri-file-add-line me-1"></i>
+                ثبت درخواست جدید
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted small mb-4">لطفا اطلاعات مورد نیاز را به صورت کامل وارد کنید.</p>
+
+            <!-- نشانگر مراحل -->
+            <div class="step-indicator">
+                <div class="step-item active" data-step="1">
+                    <div class="step-circle">۱</div>
+                    <div class="step-label">اطلاعات متقاضی</div>
+                </div>
+                <div class="step-item" data-step="2">
+                    <div class="step-circle">۲</div>
+                    <div class="step-label">اطلاعات سند و قبض انبار</div>
+                </div>
+                <div class="step-item" data-step="3">
+                    <div class="step-circle"><i class="ri-check-line"></i></div>
+                    <div class="step-label">تکمیل ثبت</div>
+                </div>
+            </div>
+
+            <form asp-action="ValidateSteps" method="post" id="needs-validation-form" autocomplete="off">
+                @Html.AntiForgeryToken()
+
+                <!-- مرحله ۱: اطلاعات متقاضی -->
+                <div class="wizard-step active" data-step="1">
+                    <div class="row gy-3">
+                        <div class="col-md-6">
+                            <label for="MobileNumber" class="form-label text-default">شماره موبایل *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-smartphone-line"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="MobileNumber"
+                                       name="MobileNumber"
+                                       placeholder="مثال: 09123456789"
+                                       maxlength="11"
+                                       inputmode="numeric"
+                                       required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="NationalCode" class="form-label text-default">کد ملی *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-id-card-line"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="NationalCode"
+                                       name="NationalCode"
+                                       placeholder="مثال: 1234567890"
+                                       maxlength="10"
+                                       inputmode="numeric"
+                                       required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- دکمه ارسال کد دو عاملی -->
+                    <div class="mt-3">
+                        <button type="button" id="btnSendOtp" class="btn btn-outline-primary btn-sm">
+                            <i class="ri-message-2-line me-1"></i> ارسال کد تایید
+                        </button>
+                        <span id="otpTimer" class="text-muted ms-2" style="display:none;"></span>
+                    </div>
+
+                    <!-- فیلد کد دو عاملی -->
+                    <div class="row gy-3 mt-2" id="otpSection" style="display:none;">
+                        <div class="col-md-6">
+                            <label for="OtpCode" class="form-label text-default">کد تایید پیامک‌شده *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-shield-check-line"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="OtpCode"
+                                       name="OtpCode"
+                                       placeholder="کد ۶ رقمی را وارد کنید"
+                                       maxlength="6"
+                                       inputmode="numeric" />
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="button" id="btnVerifyOtp" class="btn btn-success btn-sm">
+                                تایید کد
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="otpMessage" class="mt-2"></div>
                 </div>
 
-                <!-- فیلد کد دو عاملی -->
-                <div class="row gy-3 mt-2" id="otpSection" style="display:none;">
-                    <div class="col-md-6">
-                        <label for="OtpCode" class="form-label text-default">کد تایید پیامکی</label>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="OtpCode"
-                               name="OtpCode"
-                               placeholder="کد ۶ رقمی"
-                               maxlength="6"
-                               inputmode="numeric" />
+                <!-- مرحله ۲: اطلاعات سند و قبض انبار (بعد از تایید هویت، خودکار به این مرحله می‌رسیم) -->
+                <div class="wizard-step" data-step="2">
+                    <p class="fw-semibold mb-3 text-primary">
+                        <i class="ri-file-text-line me-1"></i>
+                        اطلاعات سند
+                    </p>
+                    <div class="row gy-3">
+                        <div class="col-md-6">
+                            <label for="DocumentNumber" class="form-label text-default">شناسه سند *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-file-text-line"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="DocumentNumber"
+                                       name="DocumentNumber"
+                                       placeholder="شناسه ۱۸ رقمی سند"
+                                       maxlength="18"
+                                       inputmode="numeric"
+                                       required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="VerifyCode" class="form-label text-default">رمز تصدیق *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-lock-password-line"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="VerifyCode"
+                                       name="VerifyCode"
+                                       placeholder="رمز تصدیق ۶ رقمی"
+                                       maxlength="6"
+                                       inputmode="numeric"
+                                       required />
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6 d-flex align-items-end">
-                        <button type="button" id="btnVerifyOtp" class="btn btn-success btn-sm">
-                            تایید کد
+
+                    <hr class="my-4" />
+
+                    <p class="fw-semibold mb-3 text-primary">
+                        <i class="ri-archive-line me-1"></i>
+                        اطلاعات قبض انبار
+                    </p>
+                    <div class="row gy-3">
+                        <div class="col-md-6">
+                            <label for="CompanyId" class="form-label text-default">شرکت *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-building-2-line"></i></span>
+                                <select class="form-select form-control-lg" id="CompanyId" name="CompanyId" required>
+                                    <option value="">انتخاب شرکت</option>
+                                    @foreach (var company in companies)
+                                    {
+                                        <option value="@company.CompanyId">@company.CompanyName</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="WarehouseReceiptNumber" class="form-label text-default">شماره قبض انبار *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ri-archive-line"></i></span>
+                                <input type="text"
+                                       class="form-control form-control-lg"
+                                       id="WarehouseReceiptNumber"
+                                       name="WarehouseReceiptNumber"
+                                       placeholder="مثال: 987654321"
+                                       required />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="notice-box mt-4">
+                        <i class="ri-error-warning-line mt-1"></i>
+                        <div>لطفا اطلاعات را به‌صورت صحیح وارد کنید. در صورت مغایرت اطلاعات، درخواست شما رد خواهد شد.</div>
+                    </div>
+
+                    <div class="wizard-nav">
+                        <button type="button" class="btn btn-light btn-prev-step" data-step="2">قبلی</button>
+                        <button type="submit" id="btnVerify" class="btn btn-primary">
+                            <i class="ri-shield-check-line me-1"></i> احراز و ثبت درخواست
                         </button>
                     </div>
                 </div>
+            </form>
 
-                <div id="otpMessage" class="mt-2"></div>
-            </div>
-
-            <hr class="my-4" />
-
-            <!-- بخش اطلاعات سند -->
-            <div class="mb-2">
-                <p class="fw-semibold mb-3 text-primary">
-                    <i class="ri-file-text-line me-1"></i>
-                    اطلاعات سند
-                </p>
-                <div class="row gy-3">
-                    <div class="col-md-6">
-                        <label for="DocumentNumber" class="form-label text-default">شناسه سند</label>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="DocumentNumber"
-                               name="DocumentNumber"
-                               placeholder="شناسه سند را وارد کنید"
-                               required />
-                    </div>
-                    <div class="col-md-6">
-                        <label for="VerifyCode" class="form-label text-default">رمز تصدیق</label>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="VerifyCode"
-                               name="VerifyCode"
-                               placeholder="رمز تصدیق را وارد کنید"
-                               required />
-                    </div>
+            <!-- مرحله ۳: تکمیل ثبت — بعد از ثبت موفق، به‌جای مودال همینجا نشون داده می‌شه -->
+            <div class="wizard-step text-center py-4" data-step="3">
+                <div class="mb-3">
+                    <i class="ri-checkbox-circle-fill text-success" style="font-size:64px;"></i>
                 </div>
-            </div>
-
-            <hr class="my-4" />
-
-            <!-- بخش قبض انبار -->
-            <div class="mb-2">
-                <p class="fw-semibold mb-3 text-primary">
-                    <i class="ri-archive-line me-1"></i>
-                    قبض انبار
-                </p>
-                <div class="row gy-3">
-                    <div class="col-md-6">
-                        <label for="WarehouseReceiptNumber" class="form-label text-default">شماره قبض انبار</label>
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="WarehouseReceiptNumber"
-                               name="WarehouseReceiptNumber"
-                               placeholder="شماره قبض انبار را وارد کنید"
-                               required />
-                    </div>
-                </div>
-            </div>
-
-            <div class="d-flex justify-content-end gap-2 mt-4">
-                <button type="reset" class="btn btn-light">پاک کردن فرم</button>
-                <button type="submit" id="btnVerify" class="btn btn-primary" disabled>
-                    ثبت درخواست
+                <h5 class="fw-bold mb-2">درخواست شما با موفقیت ثبت شد</h5>
+                <p class="text-muted mb-3">درخواست شما به کارتابل کارشناسان مربوطه ارسال شد.</p>
+                <p class="mb-2">کد پیگیری درخواست شما:</p>
+                <div class="fs-3 fw-bold text-primary mb-3" id="trackingCodeValue" style="letter-spacing:1px;"></div>
+                <p class="text-muted small mb-4">این کد به‌صورت پیامک هم برای شما ارسال می‌شود. برای پیگیری وضعیت درخواست، این کد را همراه با شماره موبایل خود در بخش «پیگیری درخواست» وارد کنید.</p>
+                <button type="button" class="btn btn-primary" id="newRequestBtn">
+                    <i class="ri-add-line me-1"></i> ثبت درخواست جدید
                 </button>
             </div>
-        </form>
-    </div>
-</div>
 
-<!-- ==================== مودال‌ها ==================== -->
-<!-- مودال نمایش کد پیگیری بعد از ثبت موفق -->
-<div class="modal fade" id="trackingCodeModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="ri-checkbox-circle-line text-success me-1"></i> درخواست شما ثبت شد</h5>
-            </div>
-            <div class="modal-body text-center py-4">
-                <p class="mb-2">کد پیگیری درخواست شما:</p>
-                <div class="fs-3 fw-bold text-primary mb-2" id="trackingCodeValue" style="letter-spacing:1px;"></div>
-                <small class="text-muted">این کد به‌صورت پیامک هم برای شما ارسال می‌شود. برای پیگیری وضعیت درخواست، این کد را همراه با شماره موبایل خود در بخش «پیگیری درخواست» وارد کنید.</small>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-primary" id="trackingCodeCloseBtn">متوجه شدم</button>
-            </div>
+            <p class="text-muted small text-center mt-3 mb-0" id="termsNotice">
+                با ثبت درخواست، <a href="#">قوانین و مقررات سامانه</a> را می‌پذیرم.
+            </p>
         </div>
     </div>
 </div>
@@ -244,6 +529,23 @@
             let otpTimerInterval = null;
             let remainingSeconds = 0;
 
+            // ===================== ویزارد مرحله‌ای =====================
+            function showWizardStep(step) {
+                $('.wizard-step').removeClass('active');
+                $('.wizard-step[data-step="' + step + '"]').addClass('active');
+
+                $('.step-item').removeClass('active completed');
+                $('.step-item').each(function () {
+                    const s = parseInt($(this).data('step'));
+                    if (s < step) $(this).addClass('completed');
+                    else if (s === step) $(this).addClass('active');
+                });
+            }
+
+            $('.btn-prev-step').click(function () {
+                showWizardStep(parseInt($(this).data('step')) - 1);
+            });
+
             // ریست فرم (دکمه «پاک کردن فرم» یا بعد از ثبت موفق)
             $('#needs-validation-form').on('reset', function () {
                 otpVerified = false;
@@ -253,6 +555,8 @@
                 $('#OtpCode, #btnVerifyOtp, #btnSendOtp').prop('disabled', false).filter('#btnSendOtp').html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
                 clearInterval(otpTimerInterval);
                 $('#otpTimer').hide();
+                $('#termsNotice').show();
+                showWizardStep(1);
             });
 
             // ارسال کد OTP
@@ -343,9 +647,10 @@
                     if (res.success) {
                         otpVerified = true;
                         $('#otpMessage').html('<small class="text-success"><i class="ri-check-line"></i> شماره موبایل تایید شد</small>');
-                        $('#btnVerify').prop('disabled', false);
                         $('#OtpCode, #btnVerifyOtp, #btnSendOtp').prop('disabled', true);
-                        window.showToast('کد تایید صحیح است', 'success');
+                        window.showToast('هویت شما تایید شد', 'success');
+                        // احراز هویت تایید شد → خودکار به مرحله‌ی بعد (اطلاعات سند و قبض انبار) می‌ریم
+                        showWizardStep(2);
                     } else {
                         $('#otpMessage').html('<small class="text-danger">' + (res.message || 'کد اشتباه است') + '</small>');
                         window.showToast(res.message || 'کد اشتباه است', 'error');
@@ -378,10 +683,9 @@
                 }, 1000);
             }
 
-            // بستن مودال کد پیگیری — صفحه رو رفرش می‌کنیم
-            $('#trackingCodeCloseBtn').on('click', function () {
-                $('#trackingCodeModal').modal('hide');
-                location.reload();
+            // «ثبت درخواست جدید» تو مرحله‌ی تکمیل — فرم رو واقعاً ریست می‌کنه و برمی‌گرده مرحله‌ی ۱
+            $('#newRequestBtn').on('click', function () {
+                $('#needs-validation-form')[0].reset();
             });
 
             // پیگیری درخواست — با کد پیگیری (مشخص، همچنان AJAX) یا فقط با موبایل+OTP.
@@ -543,24 +847,24 @@
                     .done(function (data) {
                         if (data && data.success) {
                             const trackingCode = data.trackingCode;
-                            $('#needs-validation-form')[0].reset();
-                            // فرم ریست شد یعنی تایید OTP هم پاک شد؛ دکمه عمداً غیرفعال می‌مونه تا درخواست بعدی دوباره تایید بشه
-                            btn.html('ثبت درخواست');
+                            btn.prop('disabled', false).html('<i class="ri-shield-check-line me-1"></i> احراز و ثبت درخواست');
                             if (trackingCode) {
+                                // فرم عمداً اینجا reset نمی‌شه — تا کاربر «ثبت درخواست جدید» رو نزنه همینطور می‌مونه.
                                 $('#trackingCodeValue').text(trackingCode);
                                 $('#trackTrackingCode').val(trackingCode);
-                                $('#trackingCodeModal').modal('show');
+                                $('#termsNotice').hide();
+                                showWizardStep(3);
                             } else {
                                 window.showToast(data.message || 'درخواست با موفقیت ثبت شد', 'success');
                             }
                         } else {
                             window.showToast((data && data.message) || 'اطلاعات وارد شده معتبر نیست.', 'error');
-                            btn.prop('disabled', false).html('ثبت درخواست');
+                            btn.prop('disabled', false).html('<i class="ri-shield-check-line me-1"></i> احراز و ثبت درخواست');
                         }
                     })
                     .fail(function (xhr) {
                         window.showToast(xhr.responseJSON?.message || 'خطا در ارسال درخواست', 'error');
-                        btn.prop('disabled', false).html('ثبت درخواست');
+                        btn.prop('disabled', false).html('<i class="ri-shield-check-line me-1"></i> احراز و ثبت درخواست');
                     });
             });
         });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - سامانه مدیریت هویت</title>
+    <title>@ViewData["Title"] - سامانه احراز اصالت سند و قبض انبار</title>
 
     <link rel="icon" href="~/assets/images/brand-logos/favicon.ico" type="image/x-icon" />
 
@@ -14,74 +14,198 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
     <style>
-        body {
-            background: radial-gradient(1100px 600px at 8% 0%, rgba(27,66,117,.10), transparent 60%), radial-gradient(900px 500px at 100% 100%, rgba(183,138,52,.08), transparent 55%), #eef1f5;
+        @@font-face {
+            font-family: 'Vazirmatn';
+            src: url('/fonts/Vazir/Vazirmatn-Regular.woff2') format('woff2');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @@font-face {
+            font-family: 'Vazirmatn';
+            src: url('/fonts/Vazir/Vazirmatn-Medium.woff2') format('woff2');
+            font-weight: 500;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @@font-face {
+            font-family: 'Vazirmatn';
+            src: url('/fonts/Vazir/Vazirmatn-SemiBold.woff2') format('woff2');
+            font-weight: 600;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @@font-face {
+            font-family: 'Vazirmatn';
+            src: url('/fonts/Vazir/Vazirmatn-Bold.woff2') format('woff2');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        :root {
+            --portal-navy: #14335e;
+            --portal-navy-2: #1b4275;
+            --portal-navy-light: #2f5a9c;
+            --portal-gold: #b78a34;
+            --portal-bg: #f2f5f9;
+        }
+
+        * {
+            font-family: 'Vazirmatn', 'FarNazanin', Tahoma, sans-serif;
+        }
+
+        html, body {
+            background: var(--portal-bg);
             min-height: 100vh;
         }
 
-        .portal-header {
+        body {
+            direction: rtl;
+            text-align: right;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===================== هدر ===================== */
+        .portal-topbar {
+            background: linear-gradient(120deg, var(--portal-navy), var(--portal-navy-light));
+            padding: 14px 0;
+        }
+
+        .portal-topbar .container {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .portal-brand {
+            display: flex;
+            align-items: center;
             gap: 12px;
-            padding: 24px 16px 8px;
         }
 
-        .portal-header .badge-line {
-            width: 46px;
-            height: 3px;
-            background: linear-gradient(90deg, #b78a34, #1b4275);
-            border-radius: 3px;
-        }
+            .portal-brand img {
+                height: 44px;
+                width: auto;
+                flex-shrink: 0;
+            }
 
-        .portal-header h6 {
-            margin: 0;
-            color: #0b2540;
+        .portal-brand-text h1 {
+            color: #fff;
+            font-size: 16px;
             font-weight: 700;
-            font-size: 15px;
+            margin: 0;
         }
 
-        .portal-content {
-            max-width: 720px;
-            margin: 0 auto;
-            padding: 8px 16px 48px;
-        }
-
-        .portal-footer {
-            text-align: center;
-            padding: 16px;
-            color: #94a3b8;
+        .portal-brand-text p {
+            color: rgba(255, 255, 255, .72);
             font-size: 12px;
+            margin: 2px 0 0;
         }
 
+        .portal-nav {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+            .portal-nav a {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                color: rgba(255, 255, 255, .85);
+                text-decoration: none;
+                font-size: 13px;
+                font-weight: 500;
+                padding: 8px 14px;
+                border-radius: 8px;
+                transition: background-color .15s ease, color .15s ease;
+            }
+
+                .portal-nav a:hover {
+                    background: rgba(255, 255, 255, .12);
+                    color: #fff;
+                }
+
+        /* ===================== فوتر ===================== */
+        .portal-footer {
+            margin-top: auto;
+            background: #fff;
+            border-top: 1px solid #e6e9ef;
+            padding: 22px 0;
+        }
+
+        .portal-footer .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .portal-footer p {
+            margin: 0;
+            font-size: 12.5px;
+            color: #7c8798;
+        }
+
+        .portal-footer-links {
+            display: flex;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+            .portal-footer-links a {
+                font-size: 12.5px;
+                color: #556077;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+                .portal-footer-links a:hover {
+                    color: var(--portal-navy-2);
+                }
+
+        /* ===================== عناصر مشترک ===================== */
         .card.custom-card {
-            border-radius: 14px;
-            box-shadow: 0 4px 20px rgba(36, 75, 139, 0.08);
+            border: 1px solid #eef1f5;
+            border-radius: 16px;
+            box-shadow: 0 6px 24px rgba(20, 51, 94, 0.06);
         }
 
         .card.custom-card .card-header {
             border-block-end: 1px solid #eef1f5 !important;
             position: relative;
+            background: transparent;
         }
 
             .card.custom-card .card-header::after {
                 content: "";
                 position: absolute;
-                inset-inline-start: 1rem;
+                inset-inline-start: 1.25rem;
                 bottom: -1px;
                 width: 46px;
                 height: 3px;
-                background: linear-gradient(90deg, #b78a34, #244b8b);
+                background: linear-gradient(90deg, var(--portal-gold), var(--portal-navy-2));
                 border-radius: 3px;
             }
 
             .card.custom-card .card-header .card-title {
-                color: #0b2540;
+                color: var(--portal-navy);
                 font-weight: 700;
             }
 
         .modal-header {
-            background: linear-gradient(135deg, #244b8b, #3a6bb5);
+            background: linear-gradient(135deg, var(--portal-navy), var(--portal-navy-light));
             border-block-end: none;
         }
 
@@ -95,50 +219,82 @@
             }
 
         .btn-primary {
-            background-color: #244b8b !important;
-            border-color: #244b8b !important;
+            background-color: var(--portal-navy-2) !important;
+            border-color: var(--portal-navy-2) !important;
         }
 
             .btn-primary:hover, .btn-primary:focus {
-                background-color: #1a3a6e !important;
-                border-color: #1a3a6e !important;
+                background-color: var(--portal-navy) !important;
+                border-color: var(--portal-navy) !important;
             }
 
         .btn-outline-primary {
-            color: #244b8b;
-            border-color: #244b8b;
+            color: var(--portal-navy-2);
+            border-color: var(--portal-navy-2);
         }
 
             .btn-outline-primary:hover {
-                background-color: #244b8b;
-                border-color: #244b8b;
+                background-color: var(--portal-navy-2);
+                border-color: var(--portal-navy-2);
             }
 
         .text-primary {
-            color: #244b8b !important;
+            color: var(--portal-navy-2) !important;
         }
 
-        .form-control:focus {
-            border-color: #244b8b !important;
-            box-shadow: 0 0 0 3px rgba(36, 75, 139, 0.12) !important;
+        .form-control, .form-select {
+            border-radius: 10px;
+        }
+
+            .form-control:focus, .form-select:focus {
+                border-color: var(--portal-navy-2) !important;
+                box-shadow: 0 0 0 3px rgba(27, 66, 117, 0.12) !important;
+            }
+
+        @@media (max-width: 576px) {
+            .portal-brand-text p {
+                display: none;
+            }
+
+            .portal-nav a span {
+                display: none;
+            }
+
+            .portal-nav a {
+                padding: 8px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="portal-header">
-        <span class="badge-line"></span>
-        <h6>سامانه مدیریت هویت — پیشخوان متقاضی</h6>
-        <span class="badge-line"></span>
-    </div>
+    <header class="portal-topbar">
+        <div class="container">
+            <a href="@Url.Action("ClientIndex", "Cartable")" class="portal-brand text-decoration-none">
+                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" onerror="this.style.display='none'" />
+                <div class="portal-brand-text">
+                    <h1>سازمان بنادر و دریانوردی</h1>
+                    <p>سامانه احراز اصالت سند و قبض انبار</p>
+                </div>
+            </a>
+            <nav class="portal-nav">
+                <a href="@Url.Action("ClientIndex", "Cartable")"><i class="ri-home-5-line"></i><span>صفحه اصلی</span></a>
+                <a href="#trackSection"><i class="ri-search-eye-line"></i><span>پیگیری درخواست</span></a>
+            </nav>
+        </div>
+    </header>
 
-    <div class="portal-content">
-        @RenderBody()
-    </div>
+    @RenderBody()
 
-    <div class="portal-footer">
-        <i class="ri-shield-check-line me-1"></i>
-        امنیت اطلاعات شما برای ما اهمیت دارد — تمامی فعالیت‌ها ثبت می‌شود
-    </div>
+    <footer class="portal-footer">
+        <div class="container">
+            <p>کلیه حقوق این سامانه متعلق به سازمان بنادر و دریانوردی می‌باشد.</p>
+            <div class="portal-footer-links">
+                <a href="#"><i class="ri-phone-line"></i>تماس با ما</a>
+                <a href="#"><i class="ri-question-line"></i>سوالات متداول</a>
+                <a href="#"><i class="ri-book-open-line"></i>راهنما</a>
+            </div>
+        </div>
+    </footer>
 
     <script src="~/assets/js/jquery.min.js"></script>
     <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>

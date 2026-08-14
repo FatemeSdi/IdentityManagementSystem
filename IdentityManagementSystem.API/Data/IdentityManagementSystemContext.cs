@@ -30,6 +30,9 @@ namespace IdentityManagementSystem.API.Data
         public DbSet<Group> Groups { get; set; }
         public DbSet<GroupPermission> GroupPermissions { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
+        public DbSet<Company> Companies { get; set; }
+        public DbSet<CartableRole> CartableRoles { get; set; }
+        public DbSet<RequestType> RequestTypes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -55,6 +58,9 @@ namespace IdentityManagementSystem.API.Data
             modelBuilder.Entity<Group>().ToTable("Group", "Sec");
             modelBuilder.Entity<GroupPermission>().ToTable("GroupPermission", "Sec");
             modelBuilder.Entity<UserGroup>().ToTable("UserGroup", "Sec");
+            modelBuilder.Entity<Company>().ToTable("Company", "Define");
+            modelBuilder.Entity<CartableRole>().ToTable("CartableRoles", "WF");
+            modelBuilder.Entity<RequestType>().ToTable("RequestType", "Define");
 
             // ========== User ==========
             modelBuilder.Entity<User>(entity =>
@@ -111,6 +117,16 @@ namespace IdentityManagementSystem.API.Data
                       .WithMany()
                       .HasForeignKey(r => r.AssignedTo)
                       .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.Company)
+                      .WithMany()
+                      .HasForeignKey(r => r.CompanyId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.RequestType)
+                      .WithMany()
+                      .HasForeignKey(r => r.RequestTypeId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ========== Cartable ==========
@@ -122,6 +138,23 @@ namespace IdentityManagementSystem.API.Data
                 entity.HasOne(c => c.User)
                       .WithMany()
                       .HasForeignKey(c => c.UserId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========== CartableRoles (Many-to-Many بین Cartable و Role) ==========
+            modelBuilder.Entity<CartableRole>(entity =>
+            {
+                entity.HasKey(cr => cr.CartableRoleId);
+                entity.HasIndex(cr => new { cr.CartableId, cr.RoleId }).IsUnique();
+
+                entity.HasOne(cr => cr.Cartable)
+                      .WithMany()
+                      .HasForeignKey(cr => cr.CartableId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(cr => cr.Role)
+                      .WithMany()
+                      .HasForeignKey(cr => cr.RoleId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -143,10 +176,13 @@ namespace IdentityManagementSystem.API.Data
                       .HasForeignKey(ci => ci.RequestId)
                       .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasOne(ci => ci.AssignedToUser)
+                entity.HasOne(ci => ci.IsTakenByUser)
                       .WithMany()
-                      .HasForeignKey(ci => ci.AssignedTo)
-                      .OnDelete(DeleteBehavior.SetNull);
+                      .HasForeignKey(ci => ci.IsTakenBy)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                // AssignedTo دیگه FK واقعی نداره — قبل از take مقدارش GroupId‌ه، بعد از take UserId
+                // (نگاه کن به کامنت روی خودِ property تو Models.cs)
 
                 // فیلدهای NotMapped
                 entity.Ignore(ci => ci.ValidateByExpert);
@@ -215,10 +251,32 @@ namespace IdentityManagementSystem.API.Data
                 entity.HasIndex(v => v.RequestId);
             });
 
+            // ========== Company ==========
+            modelBuilder.Entity<Company>(entity =>
+            {
+                entity.HasKey(c => c.CompanyId);
+            });
+
+            // ========== RequestType ==========
+            modelBuilder.Entity<RequestType>(entity =>
+            {
+                entity.HasKey(rt => rt.RequestTypeId);
+
+                entity.HasOne(rt => rt.Cartable)
+                      .WithMany()
+                      .HasForeignKey(rt => rt.CartableId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
             // ========== Group ==========
             modelBuilder.Entity<Group>(entity =>
             {
                 entity.HasKey(g => g.Id);
+
+                entity.HasOne(g => g.Company)
+                      .WithMany()
+                      .HasForeignKey(g => g.CompanyId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ========== GroupPermission (Many-to-Many) ==========
@@ -255,6 +313,17 @@ namespace IdentityManagementSystem.API.Data
                       .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(ug => new { ug.UserId, ug.GroupId }).IsUnique();
+            });
+
+            // ========== WarehouseReceipt ==========
+            modelBuilder.Entity<WarehouseReceipt>(entity =>
+            {
+                entity.HasKey(wr => wr.WarehouseReceiptId);
+
+                entity.HasOne(wr => wr.Company)
+                      .WithMany()
+                      .HasForeignKey(wr => wr.CompanyId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ========== RefreshToken ==========

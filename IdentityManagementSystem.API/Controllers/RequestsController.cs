@@ -255,6 +255,38 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         /// <summary>
+        /// تاریخچه‌ی کامل یک درخواست (Sec.RequestHistory) — دقیقاً کی چیکار کرد: ایجاد، take،
+        /// تایید/رد (دستی یا سیستمی). IsSystemAction وقتی true‌ه که ExpertId == "System" باشه
+        /// (فقط رد خودکار تو AutoRejectAsync)؛ بقیه‌ی ردیف‌ها UpdatedStatusBy رو به اسم واقعی کاربر دارن.
+        /// </summary>
+        [HttpGet("{id}/History")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<RequestHistoryViewModel>>> GetRequestHistory(long id)
+        {
+            var exists = await _context.Request.AnyAsync(r => r.RequestId == id);
+            if (!exists)
+                return NotFound(new { success = false, message = "درخواست یافت نشد." });
+
+            var history = await _context.RequestHistory
+                .Include(h => h.Status)
+                .Where(h => h.RequestId == id)
+                .OrderBy(h => h.CreatedAt)
+                .Select(h => new RequestHistoryViewModel
+                {
+                    LogId = h.LogId,
+                    StatusName = h.Status != null ? h.Status.StatusName : null,
+                    ActionDescription = h.ActionDescription,
+                    UpdatedStatus = h.UpdatedStatus,
+                    UpdatedStatusBy = h.UpdatedStatusBy,
+                    CreatedAt = h.CreatedAt,
+                    IsSystemAction = h.ExpertId == "System"
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
+
+        /// <summary>
         /// کارشناس درخواست رو از صف مشترک گروهش «take» می‌کنه. با یه UPDATE شرطی (AssignedTo IS NULL)
         /// انجام می‌شه تا اگه دو کارشناس همزمان take بزنن، فقط اولی موفق بشه (race-safe).
         /// </summary>
@@ -297,35 +329,52 @@ namespace IdentityManagementSystem.API.Controllers
 
             await _actionLogger.Info(userId, "Take_Request", $"RequestId={model.RequestId}");
 
-            // این take رو تو Cartable/CartableItem هم ثبت می‌کنیم (کارتابل شخصی کارشناس + آیتم مرتبط با درخواست).
+            // این take رو تو CartableItem هم ثبت می‌کنیم. CartableId و AssignedTo (که GroupId‌ه) از همون
+            // لحظه‌ی ثبت درخواست پر شدن و دست‌نخورده می‌مونن — take فقط IsTakenBy/Status/UpdatedAt رو عوض می‌کنه.
             // عمداً best-effort: خودِ take (که روی Request انجام شد و بالا برگشت داده شد) با شکست این بخش نباید لغو بشه.
             try
             {
-                var cartable = await _context.Cartable.FirstOrDefaultAsync(c => c.UserId == userId);
-                if (cartable == null)
+                // یه ردیف CartableItem از همون لحظه‌ی ثبت درخواست وجود داره (نگاه کن به ServiceController) —
+                // اینجا همون ردیف رو آپدیت می‌کنیم، نه ردیف جدید. اگه به هر دلیلی وجود نداشت (داده‌ی قدیمی‌تر
+                // از این تغییر)، همینجا می‌سازیمش (CartableId از روی نوع درخواست، AssignedTo از روی GroupId).
+                var cartableItem = await _context.CartableItems.FirstOrDefaultAsync(ci => ci.RequestId == model.RequestId);
+                if (cartableItem == null)
                 {
-                    cartable = new Cartable { UserId = userId, CreatedAt = DateTime.UtcNow };
-                    _context.Cartable.Add(cartable);
-                    await _context.SaveChangesAsync();
+                    var requestType = request.RequestTypeId.HasValue
+                        ? await _context.RequestTypes.FindAsync(request.RequestTypeId.Value)
+                        : null;
+
+                    cartableItem = new CartableItem
+                    {
+                        RequestId = model.RequestId,
+                        CartableId = requestType?.CartableId,
+                        AssignedTo = request.GroupId
+                    };
+                    _context.CartableItems.Add(cartableItem);
                 }
 
-                bool alreadyLinked = await _context.CartableItems.AnyAsync(ci => ci.RequestId == model.RequestId);
-                if (!alreadyLinked)
+                cartableItem.IsTakenBy = userId;
+                cartableItem.UpdatedAt = DateTime.UtcNow;
+                cartableItem.Status = "Assigned";
+                await _context.SaveChangesAsync();
+
+                // این take رو تو RequestHistory هم ثبت می‌کنیم — تا مشخص باشه دقیقاً چه کسی و کِی take کرده
+                _context.RequestHistory.Add(new RequestHistory
                 {
-                    _context.CartableItems.Add(new CartableItem
-                    {
-                        CartableId = cartable.CartableId,
-                        RequestId = model.RequestId,
-                        AssignedTo = userId,
-                        AssignedAt = DateTime.UtcNow,
-                        Status = "Assigned"
-                    });
-                    await _context.SaveChangesAsync();
-                }
+                    RequestId = model.RequestId,
+                    StatusId = 1,
+                    ExpertId = userId.ToString(),
+                    ActionDescription = "درخواست توسط کارشناس take شد.",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedStatus = "Take شده",
+                    UpdatedStatusBy = User.Identity?.Name ?? userId.ToString(),
+                    UpdatedStatusDate = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "ثبت CartableItem برای درخواست {RequestId} ناموفق بود (خودِ take انجام شد و معتبره)", model.RequestId);
+                _logger.LogWarning(ex, "ثبت CartableItem/RequestHistory برای درخواست {RequestId} ناموفق بود (خودِ take انجام شد و معتبره)", model.RequestId);
             }
 
             return Ok(new { success = true, message = "درخواست با موفقیت take شد." });

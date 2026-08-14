@@ -26,6 +26,7 @@ namespace IdentityManagementSystem.UI.Controllers
         private readonly IDNTCaptchaValidatorService _captchaValidatorService;
         private readonly ILogger<CartableController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _env;
 
         // کش ساده‌ی توکن حساب سرویسی «پورتال عمومی» — بین درخواست‌های anonymous مختلف به اشتراک می‌ره
         // تا هر ثبت درخواست مجبور به لاگین دوباره نباشه. Controller instance جدید ولی static field مشترکه.
@@ -37,12 +38,14 @@ namespace IdentityManagementSystem.UI.Controllers
             IHttpClientFactory httpClientFactory,
             IDNTCaptchaValidatorService captchaValidatorService,
             ILogger<CartableController> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IWebHostEnvironment env)
         {
             _client = httpClientFactory.CreateClient("PomixApi");
             _captchaValidatorService = captchaValidatorService ?? throw new ArgumentNullException(nameof(captchaValidatorService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _env = env ?? throw new ArgumentNullException(nameof(env));
         }
 
         /// <summary>
@@ -157,8 +160,75 @@ namespace IdentityManagementSystem.UI.Controllers
             ViewBag.FormModel = new CartableFormViewModel();
             ViewBag.FilterStatus = filterStatus;
             ViewBag.RejectReasons = EnumHelper.ToSelectList<RejectReason>();
+            ViewBag.Companies = await GetCompaniesAsync();
 
             return View(model);
+        }
+
+        /// <summary>
+        /// تاریخچه‌ی یک درخواست (کی ایجاد کرد، کی take کرد، تایید/رد دستی یا سیستمی) — برای مودال «تاریخچه».
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> RequestHistory(long id)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken") ?? ViewBag.JwtToken as string;
+                if (!string.IsNullOrEmpty(token))
+                {
+                    _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                }
+
+                var response = await _client.GetAsync($"Request/{id}/History");
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Json(new { success = false, message = "خطا در دریافت تاریخچه‌ی درخواست." });
+                }
+
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در دریافت تاریخچه‌ی درخواست {RequestId}", id);
+                return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// لیست شرکت‌های فعال — برای دراپ‌داون انتخاب شرکتِ قبض انبار تو فرم «ایجاد درخواست جدید».
+        /// </summary>
+        private async Task<List<CompanyOption>> GetCompaniesAsync()
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    token = await GetPublicPortalTokenAsync();
+                }
+                if (string.IsNullOrEmpty(token))
+                {
+                    return new List<CompanyOption>();
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _client.GetAsync("Company");
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new List<CompanyOption>();
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<List<CompanyOption>>(content) ?? new List<CompanyOption>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در دریافت لیست شرکت‌ها");
+                return new List<CompanyOption>();
+            }
         }
 
 
@@ -208,7 +278,7 @@ namespace IdentityManagementSystem.UI.Controllers
         }
 
         [HttpPost]
-        public IActionResult SendOtp(string nationalCode, string mobileNumber)
+        public async Task<IActionResult> SendOtp(string nationalCode, string mobileNumber)
         {
             if (string.IsNullOrWhiteSpace(nationalCode) || nationalCode.Length != 10)
                 return Json(new { success = false, message = "کد ملی نامعتبر است" });
@@ -221,14 +291,48 @@ namespace IdentityManagementSystem.UI.Controllers
             HttpContext.Session.SetString($"OTP_{mobileNumber}", otp);
             HttpContext.Session.SetString($"OTP_Time_{mobileNumber}", DateTime.UtcNow.ToString("O"));
 
-            _logger.LogWarning("===== OTP برای تست: {Otp} | موبایل: {Mobile} =====", otp, mobileNumber);
-
-            return Json(new
+            // تو محیط توسعه پیامک واقعی ارسال نمی‌شه — کد از همین پاسخ (debugOtp) در دسترسه.
+            // تو Production واقعاً از طریق API (که به ISmsService و Log.Sms وصله) ارسال می‌شه.
+            if (_env.IsDevelopment())
             {
-                success = true,
-                message = "کد تایید ارسال شد",
-                debugOtp = otp   // فقط برای تست
-            });
+                _logger.LogWarning("===== OTP برای تست: {Otp} | موبایل: {Mobile} =====", otp, mobileNumber);
+                return Json(new
+                {
+                    success = true,
+                    message = "کد تایید ارسال شد (محیط توسعه)",
+                    debugOtp = otp
+                });
+            }
+
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken") ?? await GetPublicPortalTokenAsync();
+                if (string.IsNullOrEmpty(token))
+                {
+                    return Json(new { success = false, message = "سامانه موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید." });
+                }
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await _client.PostAsJsonAsync("Service/SendOtpSms", new { MobileNumber = mobileNumber, OtpCode = otp });
+                var content = await response.Content.ReadAsStringAsync();
+
+                dynamic? result = null;
+                try { result = JsonConvert.DeserializeObject<dynamic>(content); } catch { }
+                bool smsSuccess = response.IsSuccessStatusCode && result?.success == true;
+
+                if (!smsSuccess)
+                {
+                    _logger.LogWarning("ارسال پیامک OTP برای {Mobile} ناموفق بود: {Content}", mobileNumber, content);
+                    return Json(new { success = false, message = "خطا در ارسال پیامک. لطفاً دوباره تلاش کنید." });
+                }
+
+                return Json(new { success = true, message = "کد تایید پیامک شد" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در ارسال OTP به {Mobile}", mobileNumber);
+                return Json(new { success = false, message = $"خطا در ارتباط با سرور: {ex.Message}" });
+            }
         }
 
         [HttpPost]
@@ -308,6 +412,8 @@ namespace IdentityManagementSystem.UI.Controllers
                 formatErrors.Add("رمز تصدیق نامعتبر است.");
             if (string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
                 formatErrors.Add("شماره قبض انبار الزامی است.");
+            if (!model.CompanyId.HasValue || model.CompanyId.Value <= 0)
+                formatErrors.Add("شرکت مربوط به قبض انبار را انتخاب کنید.");
 
             if (formatErrors.Count > 0)
             {
@@ -350,7 +456,8 @@ namespace IdentityManagementSystem.UI.Controllers
                     MobileNumber = model.MobileNumber,
                     DocumentNumber = model.DocumentNumber,
                     VerificationCode = model.VerifyCode,
-                    WarehouseReceiptNumber = model.WarehouseReceiptNumber
+                    WarehouseReceiptNumber = model.WarehouseReceiptNumber,
+                    CompanyId = model.CompanyId!.Value
                 });
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -372,13 +479,15 @@ namespace IdentityManagementSystem.UI.Controllers
 
                 // درخواست تو دیتابیس ثبت شده — صرف‌نظر از نتیجه‌ی تطابق. جزئیات وضعیت رو
                 // متقاضی/متصدی از ستون «وضعیت» تو جدول کارتابل می‌بینن، نه از این پیام.
+                // نکته: API با camelCase پاسخ می‌ده (shahkar/trackingCode) — دسترسی dynamic روی Newtonsoft
+                // حروف بزرگ/کوچک رو دقیق تطبیق می‌ده، پس این اسم‌ها باید دقیقاً camelCase باشن.
                 bool? isMatch = null;
-                if (result?.data?.Shahkar != null)
+                if (result?.data?.shahkar != null)
                 {
-                    isMatch = (bool)(result.data.Shahkar.IsSuccessful == true);
+                    isMatch = (bool)(result.data.shahkar.isSuccessful == true);
                 }
 
-                string? trackingCode = (string?)result?.data?.TrackingCode;
+                string? trackingCode = (string?)result?.data?.trackingCode;
 
                 string message = !string.IsNullOrEmpty(trackingCode)
                     ? $"درخواست شما با کد پیگیری {trackingCode} ثبت شد."
@@ -432,7 +541,8 @@ namespace IdentityManagementSystem.UI.Controllers
                     MobileNumber = model.MobileNumber,
                     DocumentNumber = model.DocumentNumber,
                     VerificationCode = model.VerifyCode,
-                    WarehouseReceiptNumber = model.WarehouseReceiptNumber
+                    WarehouseReceiptNumber = model.WarehouseReceiptNumber,
+                    CompanyId = model.CompanyId ?? 0
                 };
 
                 var response = await _client.PostAsJsonAsync("Service/ProcessCombinedRequest", requestData);
@@ -952,6 +1062,7 @@ namespace IdentityManagementSystem.UI.Controllers
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
         public string? WarehouseReceiptNumber { get; set; }
+        public int CompanyId { get; set; }
     }
 
     public class VerifyDocResponse
@@ -999,10 +1110,17 @@ namespace IdentityManagementSystem.UI.Controllers
         public string DocumentNumber { get; set; } = string.Empty;
         public string ClientNationalCode { get; set; } = string.Empty;
         public string? WarehouseReceiptNumber { get; set; }
+        public int? CompanyId { get; set; }
         public bool AgreeToTerms { get; set; }
         public string Step1Message { get; set; } = string.Empty;
         public string Step2Message { get; set; } = string.Empty;
         public string Step3Message { get; set; } = string.Empty;
+    }
+
+    public class CompanyOption
+    {
+        public int CompanyId { get; set; }
+        public string CompanyName { get; set; } = string.Empty;
     }
 
     public class CartableItemViewModel

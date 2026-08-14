@@ -26,6 +26,9 @@ namespace IdentityManagementSystem.API.Controllers
         private readonly IMemoryCache _cache;
         private readonly ILogger<ServiceController> _logger;
         private readonly IdentityManagementSystem.API.Services.Logging.UserActionLogger _actionLogger;
+        private readonly IdentityManagementSystem.API.Services.Sms.ISmsService _smsService;
+        private readonly IdentityManagementSystem.API.Helpers.EncryptionHelper _encryptionHelper;
+        private readonly IWebHostEnvironment _env;
         private readonly string _providerCode = "0785";
         private readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
 
@@ -36,7 +39,10 @@ namespace IdentityManagementSystem.API.Controllers
             IOptions<BsrServiceOptions> bsrOptions,
             IMemoryCache cache,
             ILogger<ServiceController> logger,
-            IdentityManagementSystem.API.Services.Logging.UserActionLogger actionLogger)
+            IdentityManagementSystem.API.Services.Logging.UserActionLogger actionLogger,
+            IdentityManagementSystem.API.Services.Sms.ISmsService smsService,
+            IdentityManagementSystem.API.Helpers.EncryptionHelper encryptionHelper,
+            IWebHostEnvironment env)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -45,6 +51,9 @@ namespace IdentityManagementSystem.API.Controllers
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _actionLogger = actionLogger ?? throw new ArgumentNullException(nameof(actionLogger));
+            _smsService = smsService ?? throw new ArgumentNullException(nameof(smsService));
+            _encryptionHelper = encryptionHelper ?? throw new ArgumentNullException(nameof(encryptionHelper));
+            _env = env ?? throw new ArgumentNullException(nameof(env));
 
             if (string.IsNullOrEmpty(_options.BaseUrl) || _options.Credential == null ||
                 string.IsNullOrEmpty(_options.Credential.Code) || string.IsNullOrEmpty(_options.Credential.Password))
@@ -87,6 +96,13 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "شماره قبض انبار الزامی است." });
             }
 
+            var company = await _context.Companies
+                .FirstOrDefaultAsync(c => c.CompanyId == model.CompanyId && c.IsActive);
+            if (company == null)
+            {
+                return new JsonResult(new { success = false, message = "شرکت انتخاب‌شده معتبر نیست." });
+            }
+
             var userIdClaim = User.FindFirst("UserId")?.Value;
             if (!long.TryParse(userIdClaim, out long userId))
             {
@@ -94,12 +110,27 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "کاربر شناسایی نشد." });
             }
 
-            // فعلاً تنها نوع درخواست، ترکیبی با قبض انباره پس همیشه می‌ره تو کارتابل همون گروه.
-            // وقتی نوع‌های دیگه‌ی درخواست اضافه بشن، این‌جا باید بر اساس محتوای درخواست گروه مناسب انتخاب بشه.
+            // گروهی که به شرکت انتخاب‌شده مقیده (مثلاً «قبض انبار - افق») — کارتابل این درخواست همینجا می‌شینه.
+            // فعلاً تنها نوع درخواست، ترکیبی با قبض انباره؛ وقتی نوع‌های دیگه اضافه بشن، این‌جا باید بر
+            // اساس نوع درخواست + شرکت گروه مناسب انتخاب بشه.
             int? groupId = await _context.Groups
-                .Where(g => g.Title == "قبض انبار")
+                .Where(g => g.CompanyId == model.CompanyId)
                 .Select(g => (int?)g.Id)
                 .FirstOrDefaultAsync();
+
+            if (groupId == null)
+            {
+                _logger.LogError("No Group is configured for CompanyId={CompanyId}", model.CompanyId);
+                return new JsonResult(new { success = false, message = "برای این شرکت گروه کارشناسی تعریف نشده است." });
+            }
+
+            // نوع این درخواست (فعلاً تنها نوع موجود: قبض انبار) — از روی همین، Cartable مقصد مشخص می‌شه.
+            var requestType = await _context.RequestTypes.FirstOrDefaultAsync(rt => rt.Code == "WAREHOUSE_RECEIPT" && rt.IsActive);
+            if (requestType == null)
+            {
+                _logger.LogError("RequestType با Code=WAREHOUSE_RECEIPT تعریف نشده است.");
+                return new JsonResult(new { success = false, message = "نوع درخواست تعریف نشده است." });
+            }
 
             // اگه فراخوانی از سمت متقاضی (anonymous، از طریق حساب سرویسی public-portal-service با RoleId=2) بوده،
             // CreatedBy باید شماره موبایل خودِ متقاضی باشه، نه یوزرنیم حساب سرویسی مشترک. برای کارشناس/متصدی
@@ -120,7 +151,9 @@ namespace IdentityManagementSystem.API.Controllers
                 WarehouseReceiptNumber = model.WarehouseReceiptNumber,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = createdBy,
-                GroupId = groupId
+                GroupId = groupId,
+                CompanyId = model.CompanyId,
+                RequestTypeId = requestType.RequestTypeId
             };
 
             _context.Request.Add(request);
@@ -144,6 +177,20 @@ namespace IdentityManagementSystem.API.Controllers
             };
 
             _context.RequestHistory.Add(history);
+
+            // === ثبت آیتم کارتابل برای صفِ گروه — از همون لحظه‌ی ثبت، نه فقط موقع take.
+            // CartableId از روی نوع درخواست مشخصه (requestType.CartableId)، همین الان پر می‌شه — دیگه
+            // منتظر take نمی‌مونیم. AssignedTo تا وقتی کسی take نکنه GroupId رو نگه می‌داره (یعنی
+            // «الان تو صفِ کدوم گروهه»)؛ موقع take با UserId کارشناسی که گرفتتش جایگزین می‌شه.
+            _context.CartableItems.Add(new CartableItem
+            {
+                RequestId = request.RequestId,
+                AssignedTo = groupId,
+                CartableId = requestType.CartableId,
+                Status = "New",
+                AssignedAt = request.CreatedAt
+            });
+
             await _context.SaveChangesAsync();
 
             long expertId = userId;
@@ -245,7 +292,7 @@ namespace IdentityManagementSystem.API.Controllers
             }
 
             // === گام ۳: قبض انبار — فقط چون گام ۱ و ۲ تایید شدن (WarehouseReceiptNumber همیشه الزامیه) ===
-            bool warehouseFound = await ProcessWarehouseReceipt_Internal(model.WarehouseReceiptNumber!, request.RequestId, userId);
+            bool warehouseFound = await ProcessWarehouseReceipt_Internal(model.WarehouseReceiptNumber!, request.RequestId, userId, model.CompanyId);
             if (!warehouseFound)
             {
                 await AutoRejectAsync(request, isMatch: true, reason: "قبض انبار با این شماره یافت نشد یا نامعتبر است.");
@@ -319,6 +366,70 @@ namespace IdentityManagementSystem.API.Controllers
                 _logger.LogError(ex, "CheckShahkarMatch failed for {NationalId}", model.NationalId);
                 await _actionLogger.Error(userId, "CheckShahkarMatch", $"MobileNumber={model.MobileNumber}, Exception={ex.Message}");
                 return new JsonResult(new { success = false, message = $"خطا در ارتباط با سرویس احراز هویت: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// ارسال پیامک کد تایید (OTP). تو محیط Development واقعاً پیامکی ارسال نمی‌شه (فقط تو Log.Sms با
+        /// وضعیت «Queued» و توضیح اینکه به‌خاطر محیط توسعه رد شده ثبت می‌شه) — کد از طریق debugOtp تو پاسخِ
+        /// اکشن SendOtp سمت UI/PublicPortal برمی‌گرده، نه پیامک واقعی. تو Production واقعاً از طریق
+        /// ISmsService ارسال و نتیجه‌ی واقعی تو Log.Sms ثبت می‌شه.
+        /// </summary>
+        [HttpPost("SendOtpSms")]
+        [Authorize(Policy = "CanAccessServices")]
+        public async Task<IActionResult> SendOtpSms([FromBody] SendOtpSmsViewModel model)
+        {
+            if (string.IsNullOrWhiteSpace(model.MobileNumber) || string.IsNullOrWhiteSpace(model.OtpCode))
+            {
+                return new JsonResult(new { success = false, message = "اطلاعات ناقص است." });
+            }
+
+            var messageText = $"کد تایید شما: {model.OtpCode}\nسامانه احراز اصالت سند و قبض انبار";
+
+            var log = new SmsLog
+            {
+                MobileNumberEnc = _encryptionHelper.Encrypt(model.MobileNumber),
+                MobileNumberHash = _encryptionHelper.ComputeSearchHash(model.MobileNumber),
+                Purpose = "Otp",
+                MessageText = messageText,
+                Status = "Queued",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            if (_env.IsDevelopment())
+            {
+                // عمداً پیامک واقعی ارسال نمی‌کنیم — کد از پاسخ debugOtp قابل مشاهده‌ست.
+                log.ErrorMessage = "Skipped: Development environment (debugOtp used instead).";
+                _context.SmsLogs.Add(log);
+                await _context.SaveChangesAsync();
+                return new JsonResult(new { success = true, message = "محیط توسعه: پیامک واقعی ارسال نشد." });
+            }
+
+            try
+            {
+                var result = await _smsService.SendAsync(model.MobileNumber, messageText);
+                log.Status = result.IsSuccess ? "Sent" : "Failed";
+                log.ErrorMessage = result.IsSuccess ? null : (result.ErrorMessage ?? result.RawResponse);
+                log.SentAt = result.IsSuccess ? DateTime.UtcNow : null;
+
+                _context.SmsLogs.Add(log);
+                await _context.SaveChangesAsync();
+
+                if (!result.IsSuccess)
+                {
+                    _logger.LogWarning("ارسال پیامک OTP به {Mobile} ناموفق بود: {Error}", model.MobileNumber, log.ErrorMessage);
+                }
+
+                return new JsonResult(new { success = result.IsSuccess, message = result.IsSuccess ? "کد تایید پیامک شد." : "خطا در ارسال پیامک. لطفاً دوباره تلاش کنید." });
+            }
+            catch (Exception ex)
+            {
+                log.Status = "Failed";
+                log.ErrorMessage = ex.Message;
+                _context.SmsLogs.Add(log);
+                await _context.SaveChangesAsync();
+                _logger.LogError(ex, "خطا در ارسال پیامک OTP به {Mobile}", model.MobileNumber);
+                return new JsonResult(new { success = false, message = "خطا در ارتباط با سرویس پیامک." });
             }
         }
 
@@ -637,8 +748,28 @@ namespace IdentityManagementSystem.API.Controllers
                         // سرویس بیرونی وقتی سندی پیدا نمی‌کنه، "result" یا "data" رو null برمی‌گردونه (نه یه object خالی) —
                         // چک ValueKind لازمه، وگرنه TryGetProperty روی یه المنت Null یه InvalidOperationException می‌ندازه
                         // که JsonException نیست و از catch زیرش رد می‌شه.
+                        //
+                        // نکته‌ی مهم: data می‌تونه null باشه هم وقتی سند واقعاً پیدا نشده، هم وقتی خودِ سرویسِ
+                        // دولتیِ داخلی موقتاً از کار افتاده (result.status.statusCode != 200، مثلاً 503). این دو
+                        // حالت کاملاً فرق دارن و نباید هر دو رو «سند یافت نشد» حساب کنیم — وگرنه یه outage موقت
+                        // باعث می‌شه درخواست‌های کاملاً معتبر به‌اشتباه و برای همیشه رد بشن.
                         if (responseTextDoc.RootElement.TryGetProperty("result", out var resultElement) &&
-                            resultElement.ValueKind == JsonValueKind.Object &&
+                            resultElement.ValueKind == JsonValueKind.Object)
+                        {
+                            if (resultElement.TryGetProperty("status", out var innerStatusElement) &&
+                                innerStatusElement.ValueKind == JsonValueKind.Object &&
+                                innerStatusElement.TryGetProperty("statusCode", out var innerStatusCodeElement) &&
+                                innerStatusCodeElement.ValueKind == JsonValueKind.Number &&
+                                innerStatusCodeElement.GetInt32() != 200)
+                            {
+                                var innerStatusMessage = innerStatusElement.TryGetProperty("message", out var innerMsgElement) && innerMsgElement.ValueKind == JsonValueKind.String
+                                    ? innerMsgElement.GetString()
+                                    : "نامشخص";
+                                throw new InvalidOperationException($"سرویس استعلام اصالت سند موقتاً در دسترس نیست ({innerStatusMessage}).");
+                            }
+                        }
+
+                        if (resultElement.ValueKind == JsonValueKind.Object &&
                             resultElement.TryGetProperty("data", out var dataElement) &&
                             dataElement.ValueKind == JsonValueKind.Object)
                         {
@@ -726,7 +857,7 @@ namespace IdentityManagementSystem.API.Controllers
         /// + متن خام پاسخ در Log.WarehouseReceiptLog. true برمی‌گردونه فقط اگه حداقل یه فاکتور واقعی
         /// برای این شماره قبض انبار پیدا بشه — این خروجی برای gate کردن ادامه‌ی زنجیره استفاده می‌شه.
         /// </summary>
-        private async Task<bool> ProcessWarehouseReceipt_Internal(string receiptNumber, long requestId, long userId)
+        private async Task<bool> ProcessWarehouseReceipt_Internal(string receiptNumber, long requestId, long userId, int companyId)
         {
             var createdBy = User.Identity?.Name ?? userId.ToString();
             var receiptParams = new[] { ("WarehouseReceiptNumber", receiptNumber) };
@@ -761,6 +892,7 @@ namespace IdentityManagementSystem.API.Controllers
                         _context.WarehouseReceipts.Add(new WarehouseReceipt
                         {
                             RequestId = requestId,
+                            CompanyId = companyId,
                             ReceiptNumber = string.IsNullOrWhiteSpace(item.ReceiptNumber) ? receiptNumber : item.ReceiptNumber,
                             SerialNumber = item.InvoiceNumber,
                             OwnerNationalId = item.GoodsOwnerNationalID,
@@ -780,6 +912,7 @@ namespace IdentityManagementSystem.API.Controllers
                     _context.WarehouseReceipts.Add(new WarehouseReceipt
                     {
                         RequestId = requestId,
+                        CompanyId = companyId,
                         ReceiptNumber = receiptNumber,
                         IsVerified = false,
                         CreatedAt = DateTime.UtcNow,
@@ -1395,12 +1528,21 @@ namespace IdentityManagementSystem.API.Controllers
         public string DocumentNumber { get; set; } = string.Empty;
         public string VerificationCode { get; set; } = string.Empty;
         public string? WarehouseReceiptNumber { get; set; }
+
+        // شرکتی که متقاضی موقع ثبت درخواست انتخاب کرده — تعیین می‌کنه درخواست تو کارتابل کدوم گروه/شرکت بشینه
+        public int CompanyId { get; set; }
     }
 
     public class CheckShahkarMatchViewModel
     {
         public string NationalId { get; set; } = string.Empty;
         public string MobileNumber { get; set; } = string.Empty;
+    }
+
+    public class SendOtpSmsViewModel
+    {
+        public string MobileNumber { get; set; } = string.Empty;
+        public string OtpCode { get; set; } = string.Empty;
     }
 
     public class BsrServiceOptions

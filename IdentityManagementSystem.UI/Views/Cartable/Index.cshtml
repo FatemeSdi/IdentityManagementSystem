@@ -4,6 +4,7 @@
     ViewData["Title"] = "کارتابل";
     Layout = "~/Views/Shared/_Layout.cshtml";
     var formModel = ViewBag.FormModel as IdentityManagementSystem.UI.Controllers.CartableFormViewModel ?? new IdentityManagementSystem.UI.Controllers.CartableFormViewModel();
+    var companies = ViewBag.Companies as List<IdentityManagementSystem.UI.Controllers.CompanyOption> ?? new List<IdentityManagementSystem.UI.Controllers.CompanyOption>();
     var currentSearch = Context.Request.Query["search"].ToString();
     var currentFilter = ViewBag.FilterStatus as string ?? "";
     var currentUserId = Context.Session.GetString("UserId");
@@ -115,6 +116,7 @@
                         <th>شناسه سند</th>
                         <th>رمز تصدیق</th>
                         <th>شماره قبض انبار</th>
+                        <th>گروه/شرکت</th>
                         <th>احراز هویت متقاضی</th>
                         <th>احراز اصالت سند</th>
                         <th>ارتباط متقاضی با سند</th>
@@ -123,6 +125,7 @@
                         <th>قبض انبار</th>
                         <th>تخصیص</th>
                         <th>تایید درخواست</th>
+                        <th>تاریخچه</th>
                     </tr>
                 </thead>
                 <tbody id="cartableBody">
@@ -139,6 +142,7 @@
                             <td>@item.DocumentNumber</td>
                             <td>@item.VerificationCode</td>
                             <td>@(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</td>
+                            <td>@(string.IsNullOrEmpty(item.GroupTitle) ? "—" : item.GroupTitle)</td>
 
                             <!-- احراز هویت متقاضی -->
                             <td class="text-center">
@@ -254,7 +258,7 @@
                             </td>
 
                             <!-- تایید — رد کاملاً سیستمیه و متصدی اکشن دستی براش نداره -->
-                            <td class="text-center">
+                            <td class="text-center validation-cell">
                                 @if (item.ValidateByExpert == false)
                                 {
                                     <span class="badge bg-danger">رد شده (سیستمی)</span>
@@ -291,6 +295,13 @@
                                         </small>
                                     </div>
                                 }
+                            </td>
+
+                            <!-- تاریخچه: کی ایجاد کرد، کی take کرد، تایید/رد دستی یا سیستمی بود -->
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-light btn-view-history" data-request-id="@item.RequestId" title="مشاهده تاریخچه">
+                                    <i class="ri-history-line text-primary"></i>
+                                </button>
                             </td>
                         </tr>
                     }
@@ -335,6 +346,24 @@
             </div>
             <div class="modal-body">
                 <p id="rejectReasonText" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال تاریخچه‌ی درخواست -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تاریخچه‌ی درخواست</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyModalBody">
+                <div class="text-center text-muted py-5">در حال بارگذاری...</div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">بستن</button>
@@ -525,6 +554,16 @@
                                        name="WarehouseReceiptNumber"
                                        placeholder="شماره قبض انبار را وارد کنید"
                                        required />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="CompanyId" class="form-label text-default">شرکت مربوط به قبض انبار</label>
+                                <select class="form-control form-control-lg" id="CompanyId" name="CompanyId" required>
+                                    <option value="">انتخاب کنید...</option>
+                                    @foreach (var company in companies)
+                                    {
+                                        <option value="@company.CompanyId">@company.CompanyName</option>
+                                    }
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -732,6 +771,45 @@
                     });
             });
 
+            // نمایش تاریخچه‌ی درخواست
+            $(document).on('click', '.btn-view-history', function () {
+                const requestId = $(this).data('request-id');
+                $('#historyModalBody').html('<div class="text-center py-5"><div class="spinner-border"></div><div class="mt-2">در حال بارگذاری...</div></div>');
+                $('#historyModal').modal('show');
+
+                $.get('/Cartable/RequestHistory', { id: requestId })
+                    .done(function (res) {
+                        if (!Array.isArray(res) || res.length === 0) {
+                            $('#historyModalBody').html('<p class="text-muted text-center py-4">تاریخچه‌ای ثبت نشده است.</p>');
+                            return;
+                        }
+
+                        let html = '<ul class="list-group list-group-flush">';
+                        res.forEach(function (h) {
+                            const actorBadge = h.isSystemAction
+                                ? '<span class="badge bg-secondary">سیستم</span>'
+                                : '<span class="badge bg-primary-transparent">' + $('<div/>').text(h.updatedStatusBy || 'نامشخص').html() + '</span>';
+                            const dateStr = new Date(h.createdAt).toLocaleString('fa-IR');
+                            html += '<li class="list-group-item">';
+                            html += '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">';
+                            html += '<div>' + actorBadge + ' <span class="fw-semibold ms-1">' + $('<div/>').text(h.updatedStatus || h.statusName || '').html() + '</span></div>';
+                            html += '<small class="text-muted">' + dateStr + '</small>';
+                            html += '</div>';
+                            if (h.actionDescription) {
+                                html += '<div class="mt-1 small text-muted">' + $('<div/>').text(h.actionDescription).html() + '</div>';
+                            }
+                            html += '</li>';
+                        });
+                        html += '</ul>';
+                        $('#historyModalBody').html(html);
+                    })
+                    .fail(function (xhr) {
+                        const msg = xhr.responseJSON?.message || 'خطا در دریافت تاریخچه';
+                        $('#historyModalBody').html('<p class="text-danger text-center py-4">' + msg + '</p>');
+                        toastr.error(msg);
+                    });
+            });
+
             // نمایش متن قبض انبار
             $(document).on('click', '.btn-view-warehouse-receipt', function () {
                 const requestId = $(this).data('request-id');
@@ -796,7 +874,7 @@
                         if (data.success) {
                             toastr.success(data.message || 'درخواست take شد');
                             row.find('.take-btn').replaceWith('<span class="badge bg-primary-transparent">مال شماست</span>');
-                            row.find('td:last').html(
+                            row.find('.validation-cell').html(
                                 '<button type="button" class="btn btn-sm btn-outline-success approve-btn" data-request-id="' + requestId + '">تایید</button>'
                             );
                         } else {

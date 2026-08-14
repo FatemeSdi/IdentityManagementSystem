@@ -27,14 +27,20 @@ namespace IdentityManagementSystem.API.Controllers
             if (callerUserId == 0 || callerUserId != userId)
                 return Unauthorized("شما مجاز به مشاهده کارتابل این کاربر نیستید.");
 
+            // AssignedTo روی CartableItem همیشه GroupId‌ه (نگاه کن به کامنت روی CartableItem.AssignedTo تو
+            // Models.cs) — عضویت از طریق UserGroups چک می‌شه، و بین آیتم‌های همون گروه فقط اونایی که هنوز
+            // کسی take نکرده یا خودم take کردم رو می‌بینم.
+            var myGroupIds = await _context.UserGroups
+                .Where(ug => ug.UserId == userId)
+                .Select(ug => (long)ug.GroupId)
+                .ToListAsync();
+
             var cartableItems = await _context.CartableItems
                 .Include(ci => ci.Request)
-                .Include(ci => ci.AssignedToUser)
-                .Include(ci => ci.Cartable)
-                .Where(ci => ci.Cartable != null
-                            && ci.Cartable.UserId == userId
-                            && (ci.AssignedTo == userId || ci.AssignedTo == null)
-                            && ci.Request != null)
+                .Include(ci => ci.IsTakenByUser)
+                .Where(ci => ci.Request != null
+                            && ci.AssignedTo != null && myGroupIds.Contains(ci.AssignedTo.Value)
+                            && (ci.IsTakenBy == null || ci.IsTakenBy == userId))
                 .Select(ci => new CartableItemViewModel
                 {
                     ItemId = ci.ItemId,
@@ -47,8 +53,8 @@ namespace IdentityManagementSystem.API.Controllers
                     IsNationalIdInResponse = ci.Request!.IsNationalIdInResponse,
                     IsNationalIdInLawyers = ci.Request!.IsNationalIdInLawyers,
                     CreatedAt = ci.Request!.CreatedAt,
-                    AssignedTo = ci.AssignedTo,
-                    AssignedToName = ci.AssignedToUser != null ? $"{ci.AssignedToUser.Name} {ci.AssignedToUser.LastName}" : null,
+                    AssignedTo = ci.IsTakenBy,
+                    AssignedToName = ci.IsTakenByUser != null ? $"{ci.IsTakenByUser.Name} {ci.IsTakenByUser.LastName}" : null,
                     AssignedAt = ci.AssignedAt,
                     ViewedAt = ci.ViewedAt,
                     Status = ci.Status,

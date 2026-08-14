@@ -47,6 +47,18 @@ namespace IdentityManagementSystem.API.Models.ViewModels
         public DateTime? AssignedAt { get; set; }
     }
 
+    // تاریخچه‌ی کامل یک درخواست (Sec.RequestHistory) — کی چیکار کرد، سیستمی بود یا دستی
+    public class RequestHistoryViewModel
+    {
+        public long LogId { get; set; }
+        public string? StatusName { get; set; }
+        public string? ActionDescription { get; set; }
+        public string? UpdatedStatus { get; set; }
+        public string? UpdatedStatusBy { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsSystemAction { get; set; }
+    }
+
     public class CreateRequestViewModel
     {
         [Required]

@@ -64,6 +64,72 @@ namespace IdentityManagementSystem.API.Models
         public string? NationalIdHash { get; set; }
     }
 
+    // ---------------------------------------------------------------------
+    // نوع درخواست (فعلاً فقط «قبض انبار»؛ در آینده «نوبت‌دهی ارزیابی» و بقیه هم اضافه می‌شن — هرکدوم
+    // فیلدهای مخصوص خودشون رو دارن، مثل WarehouseReceipt برای این یکی). هر نوع دقیقاً به یه Cartable
+    // وصله؛ CartableItem.CartableId همون لحظه‌ی ثبت درخواست از روی همین رابطه پر می‌شه.
+    // ---------------------------------------------------------------------
+    [Table("RequestType", Schema = "Define")]
+    public class RequestType
+    {
+        [Key]
+        public int RequestTypeId { get; set; }
+
+        [Required]
+        [StringLength(100)]
+        public string TypeName { get; set; } = string.Empty;
+
+        [StringLength(50)]
+        public string? Code { get; set; }
+
+        public long? CartableId { get; set; }
+        public Cartable? Cartable { get; set; }
+
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    // ---------------------------------------------------------------------
+    // شرکت‌هایی که محوطه‌ی بندری دارن و درخواست‌های قبض انبار مربوط به اون‌ها رو کارشناس‌های
+    // مقیدشده به گروه همون شرکت بررسی می‌کنن (نگاه کنید به Group.CompanyId)
+    // ---------------------------------------------------------------------
+    [Table("Company", Schema = "Define")]
+    public class Company
+    {
+        [Key]
+        public int CompanyId { get; set; }
+
+        [Required]
+        [StringLength(400)]
+        public string CompanyName { get; set; } = string.Empty;
+
+        [StringLength(22)]
+        public string? NationalId { get; set; }
+
+        [StringLength(40)]
+        public string? EconomicCode { get; set; }
+
+        [StringLength(100)]
+        public string? RegistrationNumber { get; set; }
+
+        [StringLength(1000)]
+        public string? Address { get; set; }
+
+        [StringLength(40)]
+        public string? PhoneNumber { get; set; }
+
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [StringLength(200)]
+        public string? CreatedBy { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
+
+        [StringLength(200)]
+        public string? UpdatedBy { get; set; }
+    }
+
     [Table("Role", Schema = "Sec")]
     public class Role
     {
@@ -129,9 +195,18 @@ namespace IdentityManagementSystem.API.Models
         public bool? IsNationalIdInResponse { get; set; }
         public bool? IsNationalIdInLawyers { get; set; }
 
-        // گروه کارشناسی که این درخواست باید بره تو کارتابلش (بر اساس نوع درخواست تعیین می‌شه)
+        // گروه کارشناسی که این درخواست باید بره تو کارتابلش (بر اساس نوع درخواست + شرکت تعیین می‌شه)
         public int? GroupId { get; set; }
         public Group? Group { get; set; }
+
+        // شرکتی که متقاضی موقع ثبت درخواست انتخاب کرده (برای گزارش‌گیری/ردیابی، مستقل از GroupId)
+        public int? CompanyId { get; set; }
+        public Company? Company { get; set; }
+
+        // نوع درخواست (قبض انبار، نوبت‌دهی ارزیابی، ...) — مشخص می‌کنه CartableItem این درخواست باید
+        // بره تو کدوم Cartable
+        public int? RequestTypeId { get; set; }
+        public RequestType? RequestType { get; set; }
 
         // کارشناسی که این درخواست رو Take کرده (NULL = هنوز کسی take نکرده)
         public long? AssignedTo { get; set; }
@@ -151,12 +226,16 @@ namespace IdentityManagementSystem.API.Models
     }
 
     [Table("Cartable", Schema = "WF")]
+    // یه Cartable یه TYPE/تعریفِ کارتابله (مثلاً «کارتابل کارشناس قبض انبار»)، وصل به Role از طریق
+    // CartableRoles — نه به یه Group یا User خاص. جداسازی شرکت‌ها (افق/بتا/...) کاملاً جدا و از طریق
+    // CartableItem.AssignedTo (که همیشه GroupId رو نگه می‌داره) انجام می‌شه؛ همه‌ی کارشناس‌های قبض
+    // انبار (از هر شرکتی) روی همین یه Cartable کار می‌کنن.
     public class Cartable
     {
         [Key]
         public long CartableId { get; set; }
 
-        public long UserId { get; set; }
+        public long? UserId { get; set; }
         public User? User { get; set; }
 
         [StringLength(200)]
@@ -165,23 +244,48 @@ namespace IdentityManagementSystem.API.Models
         public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    // کدوم Role به کدوم Cartable دسترسی داره — این رابطه‌ست که مشخص می‌کنه کارشناسِ دارای یه نقش
+    // خاص، کدوم کارتابل رو ببینه؛ Cartable ها از روی این رابطه seed/تعریف می‌شن، نه به‌صورت خودکار
+    // موقع اجرا.
+    [Table("CartableRoles", Schema = "WF")]
+    public class CartableRole
+    {
+        [Key]
+        public long CartableRoleId { get; set; }
+
+        public long CartableId { get; set; }
+        public Cartable? Cartable { get; set; }
+
+        public int RoleId { get; set; }
+        public Role? Role { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
     [Table("CartableItem", Schema = "WF")]
     public class CartableItem
     {
         [Key]
         public long ItemId { get; set; }
 
-        public long CartableId { get; set; }
+        public long? CartableId { get; set; }
         public Cartable? Cartable { get; set; }
 
         public long RequestId { get; set; }
         public Request? Request { get; set; }
 
+        // همیشه GroupId گروهی که این آیتم بهش تعلق داره (یعنی «تو کارتابل کدوم گروهه») — چه take شده
+        // باشه چه نه، take شدن این فیلد رو تغییر نمی‌ده. برای همین دیگه FK واقعی به Sec.User نداره.
+        // برای «دقیقاً چه کسی take کرده» به IsTakenBy نگاه کن.
         public long? AssignedTo { get; set; }
-        public User? AssignedToUser { get; set; }
+
+        // دقیقاً چه کسی take کرده — تا وقتی کسی take نکرده NULL می‌مونه
+        public long? IsTakenBy { get; set; }
+        public User? IsTakenByUser { get; set; }
 
         public DateTime? AssignedAt { get; set; }
         public DateTime? ViewedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
         [StringLength(20)]
         public string? Status { get; set; } = "New";
@@ -338,6 +442,10 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(100)]
         public string Title { get; set; } = string.Empty;
 
+        // شرکتی که این گروه بهش مقیده (مثلاً «قبض انبار - افق»)؛ NULL یعنی گروه عمومیه و به شرکت خاصی مقید نیست
+        public int? CompanyId { get; set; }
+        public Company? Company { get; set; }
+
         public ICollection<GroupPermission> GroupPermissions { get; set; } = new List<GroupPermission>();
         public ICollection<UserGroup> UserGroups { get; set; } = new List<UserGroup>();
     }
@@ -489,6 +597,7 @@ namespace IdentityManagementSystem.API.Models
         public long RequestId { get; set; }
 
         public int? CompanyId { get; set; }
+        public Company? Company { get; set; }
 
         [Required]
         [StringLength(50)]
