@@ -91,7 +91,7 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
         /// تا فرم OTP رو نشون بده؛ لیستی گرفته نمی‌شه.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> ClientIndex(string? trackMobile)
+        public async Task<IActionResult> ClientIndex(string? trackMobile, int trackingPage = 1)
         {
             ViewBag.FormModel = new CartableFormViewModel();
             ViewBag.Companies = await GetCompaniesAsync();
@@ -106,7 +106,20 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
 
                 if (otpVerified)
                 {
-                    ViewBag.PendingRequests = await GetPendingRequestsByMobileAsync(trackMobile);
+                    // صفحه‌بندی سمت سرور — پنج‌تا پنج‌تا (جدیدترین اول)؛ اینجا فقط برشِ صفحه‌ی
+                    // درخواستی به View داده می‌شه تا نیازی به مخفی‌سازی سمت جاوااسکریپت نباشه.
+                    const int pageSize = 5;
+                    var allPending = (await GetPendingRequestsByMobileAsync(trackMobile))
+                        .OrderByDescending(x => x.CreatedAt)
+                        .ToList();
+
+                    var totalPages = (int)Math.Ceiling(allPending.Count / (double)pageSize);
+                    if (trackingPage < 1) trackingPage = 1;
+                    if (totalPages > 0 && trackingPage > totalPages) trackingPage = totalPages;
+
+                    ViewBag.PendingRequests = allPending.Skip((trackingPage - 1) * pageSize).Take(pageSize).ToList();
+                    ViewBag.PendingRequestsPage = trackingPage;
+                    ViewBag.PendingRequestsTotalPages = totalPages;
                 }
             }
 

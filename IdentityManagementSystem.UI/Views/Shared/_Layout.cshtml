@@ -1,17 +1,4 @@
 @{
-    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
-    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
-
-    bool IsActive(string controller, params string[] actions) =>
-        string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase) &&
-        actions.Any(a => string.Equals(currentAction, a, StringComparison.OrdinalIgnoreCase));
-
-    string SlideClass(string controller, params string[] actions) =>
-        "slide" + (IsActive(controller, actions) ? " active" : "");
-
-    string ItemClass(string controller, params string[] actions) =>
-        "side-menu__item" + (IsActive(controller, actions) ? " active" : "");
-
     var userRole = Context.Session.GetString("UserRole");
     var userRoleId = Context.Session.GetString("UserRoleId");
     var isAdmin = (userRole == "ادمین" || userRoleId == "3");
@@ -54,76 +41,30 @@
     <!-- Toastr -->
     <link href="~/lib/bootstrap/dist/css/toastr.min.css" rel="stylesheet" />
 
+    <style>
+        /* فعلا منو/سایدبار برداشته شده — هدر و محتوا دیگه نباید فضایی برای سایدبار رزرو کنن
+           (padding-inline-start روی app-header و margin-inline-start روی app-content که
+           پیش‌فرض یزن برای عرض ۱۵rem سایدبار بود) */
+        @@media (min-width: 992px) {
+            .app-header {
+                padding-inline-start: 0;
+            }
+
+            .app-content {
+                margin-inline-start: 0;
+            }
+        }
+    </style>
+
     @RenderSection("Styles", required: false)
 </head>
 
-<body class="app sidebar-mini rtl">
+<body class="app rtl">
 
     <!-- GLOBAL LOADER -->
     <div id="global-loader">
         <img src="~/assets/images/loader.svg" class="loader-img" alt="Loader" onerror="this.parentElement.style.display='none'">
     </div>
-
-    <!-- SIDEBAR -->
-    <aside class="app-sidebar" id="sidebar">
-        <div class="main-sidebar-header">
-            <a asp-controller="Cartable" asp-action="Index" class="header-logo d-flex align-items-center gap-2">
-                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" style="height:40px;">
-                <span class="fw-bold" style="color:#0b2540;font-size:13px;line-height:1.3;">سامانه احراز اصالت سند<br>و قبض انبار</span>
-            </a>
-        </div>
-        <div class="main-sidebar" id="sidebar-scroll">
-            <nav class="main-menu-container nav nav-pills flex-column sub-open">
-                <ul class="main-menu">
-                    <li class="slide__category"><span class="category-name">منوی اصلی</span></li>
-
-                    <li class="@SlideClass("Cartable", "Index")">
-                        <a asp-controller="Cartable" asp-action="Index" class="@ItemClass("Cartable", "Index")">
-                            <i class="ti ti-inbox side-menu__icon"></i>
-                            <span class="side-menu__label">کارتابل</span>
-                        </a>
-                    </li>
-                    <li class="@SlideClass("Cartable", "Shahkar")">
-                        <a asp-controller="Cartable" asp-action="Shahkar" class="@ItemClass("Cartable", "Shahkar")">
-                            <i class="ti ti-fingerprint side-menu__icon"></i>
-                            <span class="side-menu__label">احراز شاهکار</span>
-                        </a>
-                    </li>
-                    <li class="@SlideClass("Cartable", "VerifyDocument")">
-                        <a asp-controller="Cartable" asp-action="VerifyDocument" class="@ItemClass("Cartable", "VerifyDocument")">
-                            <i class="ti ti-file-check side-menu__icon"></i>
-                            <span class="side-menu__label">راستی‌آزمایی سند</span>
-                        </a>
-                    </li>
-                    <li class="@SlideClass("Reports", "Index")">
-                        <a asp-controller="Reports" asp-action="Index" class="@ItemClass("Reports", "Index")">
-                            <i class="ti ti-chart-bar side-menu__icon"></i>
-                            <span class="side-menu__label">گزارش‌ها</span>
-                        </a>
-                    </li>
-
-                    @if (isAdmin)
-                    {
-                        <li class="slide__category"><span class="category-name">مدیریت</span></li>
-                        <li class="@SlideClass("Home", "Users")">
-                            <a asp-controller="Home" asp-action="Users" class="@ItemClass("Home", "Users")">
-                                <i class="ti ti-users side-menu__icon"></i>
-                                <span class="side-menu__label">مدیریت کاربران</span>
-                            </a>
-                        </li>
-                    }
-
-                    <li class="slide__category"><span class="category-name">حساب کاربری</span></li>
-                    <li class="@SlideClass("Home", "EditProfile")">
-                        <a asp-controller="Home" asp-action="EditProfile" class="@ItemClass("Home", "EditProfile")">
-                            <i class="ti ti-user-circle side-menu__icon"></i>
-                            <span class="side-menu__label">پروفایل</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </div>
-    </aside>
 
     <!-- PAGE -->
     <div class="page">
@@ -133,10 +74,6 @@
             <header class="app-header">
                 <div class="main-header-container container-fluid">
                     <div class="header-content-left d-flex align-items-center gap-2">
-                        <!-- توگل سایدبار در DOM نگه داشته می‌شود (فقط مخفی) چون defaultmenu.min.js بدون null-check رویش addEventListener می‌زند -->
-                        <a aria-label="نمایش/پنهان‌سازی منو" class="sidemenu-toggle animated-arrow header-link d-none" href="javascript:void(0);" data-bs-toggle="sidebar">
-                            <i class="ti ti-menu-2 fs-20"></i>
-                        </a>
                         <a asp-controller="Cartable" asp-action="Index" class="d-flex align-items-center gap-2 text-decoration-none">
                             <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" style="height:36px;width:auto;">
                             <span class="d-none d-sm-block fs-14 fw-bold text-default">سامانه احراز اصالت سند و قبض انبار</span>
@@ -254,9 +191,6 @@
 
     <!-- Toastr (باید قبل از کدهای خودمون لود بشه) -->
     <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
-
-    <!-- منوی سایدبار یزن (باز/بسته کردن، زیرمنوها، اورلی موبایل) -->
-    @* <script src="~/assets/js/defaultmenu.min.js"></script> *@
 
     <script>
         // مخفی کردن لودر به محض آماده شدن صفحه

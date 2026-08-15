@@ -4,7 +4,20 @@
     string? trackMobile = ViewBag.TrackMobile as string;
     bool trackOtpVerified = ViewBag.TrackOtpVerified is bool b && b;
     var pendingRequests = ViewBag.PendingRequests as List<PendingRequestItem>;
+    int pendingRequestsPage = ViewBag.PendingRequestsPage is int pp ? pp : 1;
+    int pendingRequestsTotalPages = ViewBag.PendingRequestsTotalPages is int tp ? tp : 0;
     var companies = ViewBag.Companies as List<CompanyOption> ?? new List<CompanyOption>();
+
+    string ToPersianDigits(int n)
+    {
+        var digits = new[] { '۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹' };
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in n.ToString())
+        {
+            sb.Append(char.IsDigit(ch) ? digits[ch - '0'] : ch);
+        }
+        return sb.ToString();
+    }
 }
 
 <link rel="stylesheet" href="~/assets/libs/choices.js/public/assets/styles/choices.min.css" />
@@ -261,7 +274,7 @@
                     }
                     else
                     {
-                        <div class="list-group" id="pendingRequestsList">
+                        <div class="list-group">
                             @foreach (var item in pendingRequests)
                             {
                                 <div class="list-group-item d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -274,7 +287,21 @@
                                 </div>
                             }
                         </div>
-                        <div id="pendingRequestsPagination"></div>
+
+                        @* صفحه‌بندی سمت سرور — پنج‌تا پنج‌تا؛ هر لینک همون trackMobile رو با شماره صفحه‌ی جدید GET می‌کنه *@
+                        @if (pendingRequestsTotalPages > 1)
+                        {
+                            <nav class="pagination-style-1 mt-3" aria-label="صفحه‌بندی درخواست‌های در انتظار بررسی">
+                                <ul class="pagination justify-content-center mb-0">
+                                    @for (int p = 1; p <= pendingRequestsTotalPages; p++)
+                                    {
+                                        <li class="page-item @(p == pendingRequestsPage ? "active" : "")">
+                                            <a class="page-link" href="@Url.Action("ClientIndex", "Cartable", new { trackMobile = trackMobile, trackingPage = p })#trackSection">@ToPersianDigits(p)</a>
+                                        </li>
+                                    }
+                                </ul>
+                            </nav>
+                        }
                     }
                 </div>
             }
@@ -487,57 +514,7 @@
 @section Scripts {
     <script src="~/assets/libs/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
-        // صفحه‌بندی سمت کلاینت برای فهرست درخواست‌های «در انتظار بررسی» — پنج‌تا پنج‌تا
-        // (داده‌ها از قبل کامل توسط سرور رندر شده‌اند؛ اینجا فقط نمایش/مخفی‌سازی مدیریت می‌شود)
-        function paginateList(listId, paginationHostId, pageSize) {
-            var list = document.getElementById(listId);
-            var host = document.getElementById(paginationHostId);
-            if (!list || !host) return;
-
-            var items = Array.prototype.slice.call(list.children);
-            if (items.length <= pageSize) return;
-
-            var pageCount = Math.ceil(items.length / pageSize);
-            var currentPage = 1;
-
-            function toPersianDigits(value) {
-                return value.toString().replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; });
-            }
-
-            function render() {
-                items.forEach(function (item, idx) {
-                    var page = Math.floor(idx / pageSize) + 1;
-                    item.style.display = page === currentPage ? '' : 'none';
-                });
-
-                var ul = document.createElement('ul');
-                ul.className = 'pagination justify-content-center mb-0';
-
-                for (var p = 1; p <= pageCount; p++) {
-                    var li = document.createElement('li');
-                    li.className = 'page-item' + (p === currentPage ? ' active' : '');
-                    var a = document.createElement('a');
-                    a.className = 'page-link';
-                    a.href = 'javascript:void(0);';
-                    a.textContent = toPersianDigits(p);
-                    (function (page) {
-                        a.addEventListener('click', function () { currentPage = page; render(); });
-                    })(p);
-                    li.appendChild(a);
-                    ul.appendChild(li);
-                }
-
-                host.innerHTML = '';
-                host.className = 'pagination-style-1 mt-3';
-                host.appendChild(ul);
-            }
-
-            render();
-        }
-
         $(document).ready(function () {
-            paginateList('pendingRequestsList', 'pendingRequestsPagination', 5);
-
             let otpVerified = false;
             let otpTimerInterval = null;
             let remainingSeconds = 0;
