@@ -1,71 +1,110 @@
-﻿@model IdentityManagementSystem.UI.Controllers.UserInfo
-
+@model IdentityManagementSystem.UI.Controllers.UserInfo
 @{
     ViewData["Title"] = "پروفایل";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">ویرایش پروفایل</div>
+<div class="my-4 page-header-breadcrumb d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+        <nav>
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a asp-controller="Cartable" asp-action="Index">داشبورد</a></li>
+                <li aria-current="page" class="breadcrumb-item active">پروفایل</li>
+            </ol>
+        </nav>
     </div>
-    <div class="card-body">
-        @if (ViewBag.ErrorMessage != null)
-        {
-            <script>
-                toastr.error('@ViewBag.ErrorMessage');
-            </script>
-        }
-        @if (ViewBag.SuccessMessage != null)
-        {
-            <script>
-                toastr.success('@ViewBag.SuccessMessage');
-            </script>
-        }
-        <div class="text-center chat-image mb-5">
-            <div class="avatar avatar-xxl chat-profile mb-3 brround">
-                <a class="" href="#"><img src="~/assets/images/users/22.jfif" alt="profile-user" class="brround"></a>
+</div>
+
+<div class="col-xxl-12">
+    <div class="card custom-card profile-card overflow-hidden bg-transparent shadow-none">
+        <div class="profile-background">
+            <img src="~/assets/images/media/backgrounds/7.png" alt="background">
+        </div>
+        <div class="main-profile-cover">
+            <div class="p-xl-5 pb-xl-0 p-4 position-relative">
+                <div class="d-flex gap-3 align-items-center justify-content-center flex-wrap mb-4">
+                    <div class="main-avatar">
+                        <img alt="پروفایل" class="img-fluid rounded-circle p-1 shadow-sm bg-light"
+                             src="~/assets/images/faces/21.jpg">
+                    </div>
+                    <div class="text-center">
+                        <h4 class="fw-semibold mb-1">
+                            @(Model?.Name ?? "نام کاربر") @(Model?.LastName ?? "")
+                        </h4>
+                        <p class="mb-0 fs-15">
+                            <i class="ti ti-briefcase lh-1 align-middle me-2"></i>
+                            @(Model?.Role ?? "بدون نقش")
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div class="main-chat-msg-name">
-                <a href="#">
-                    <h5 class="mb-1 text-dark fw-semibold">@(Model?.Name ?? "نام کاربر") @(Model?.LastName ?? "")</h5>
-                </a>
-                <p class="text-muted mt-0 mb-0 pt-0 fs-13">@(Model?.Role ?? "بدون نقش")</p>
+
+            <div class="card-body p-0 position-relative mx-3 main-card-body mt-4">
+                <div class="profile-content">
+                    @if (ViewBag.ErrorMessage != null)
+                    {
+                        <script>toastr.error('@ViewBag.ErrorMessage');</script>
+                    }
+                    @if (ViewBag.SuccessMessage != null)
+                    {
+                        <script>toastr.success('@ViewBag.SuccessMessage');</script>
+                    }
+
+                    <form id="changePasswordForm" asp-controller="Home" asp-action="ChangePassword" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <ul class="list-group list-group-flush border rounded-3">
+                            <li class="list-group-item p-3">
+                                <div class="row gy-3 align-items-center">
+                                    <div class="col-xl-3">
+                                        <span class="fw-medium">رمز عبور فعلی:</span>
+                                    </div>
+                                    <div class="col-xl-9">
+                                        <div class="input-group">
+                                            <span class="input-group-text toggle-password" style="cursor: pointer;">
+                                                <i class="ti ti-eye"></i>
+                                            </span>
+                                            <input class="form-control" type="password" name="CurrentPassword"
+                                                   autocomplete="current-password" placeholder="رمز عبور فعلی">
+                                        </div>
+                                    </div>
+
+                                    <div class="col-xl-3">
+                                        <span class="fw-medium">رمز عبور جدید:</span>
+                                    </div>
+                                    <div class="col-xl-9">
+                                        <div class="input-group">
+                                            <span class="input-group-text toggle-password" style="cursor: pointer;">
+                                                <i class="ti ti-eye"></i>
+                                            </span>
+                                            <input class="form-control" type="password" name="NewPassword"
+                                                   autocomplete="new-password" placeholder="رمز عبور جدید">
+                                        </div>
+                                    </div>
+
+                                    <div class="col-xl-3">
+                                        <span class="fw-medium">تایید رمز عبور:</span>
+                                    </div>
+                                    <div class="col-xl-9">
+                                        <div class="input-group">
+                                            <span class="input-group-text toggle-password" style="cursor: pointer;">
+                                                <i class="ti ti-eye"></i>
+                                            </span>
+                                            <input class="form-control" type="password" name="ConfirmNewPassword"
+                                                   autocomplete="new-password" placeholder="تایید رمز عبور">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="text-end mt-4">
+                                    <button type="submit" class="btn btn-primary">ثبت</button>
+                                </div>
+                            </li>
+                        </ul>
+                    </form>
+                </div>
             </div>
         </div>
-        <form id="changePasswordForm" asp-action="ChangePassword" method="post">
-            <div class="form-group">
-                <label class="form-label">رمز عبور فعلی</label>
-                <div class="wrap-input100 validate-input input-group" id="Password-toggle">
-                    <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                        <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
-                    </a>
-                    <input class="input100 form-control" type="password" name="CurrentPassword" autocomplete="current-password">
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">رمز عبور جدید</label>
-                <div class="wrap-input100 validate-input input-group" id="Password-toggle1">
-                    <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                        <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
-                    </a>
-                    <input class="input100 form-control" type="password" name="NewPassword" autocomplete="new-password">
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">تایید رمز عبور</label>
-                <div class="wrap-input100 validate-input input-group" id="Password-toggle2">
-                    <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                        <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
-                    </a>
-                    <input class="input100 form-control" type="password" name="ConfirmNewPassword" autocomplete="new-password">
-                </div>
-            </div>
-            <div class="card-footer text-end">
-                <button type="submit" class="btn btn-primary">ثبت</button>
-                <a href="javascript:void(0)" class="btn btn-danger">انصراف</a>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -74,28 +113,42 @@
         $(document).ready(function () {
             $("#changePasswordForm").submit(function (e) {
                 e.preventDefault();
-                var formData = $(this).serialize();
-
+                var form = $(this);
                 $.ajax({
-                    url: '@Url.Action("ChangePassword", "Home")',
-                    type: 'POST',
-                    data: formData,
-                    headers: {
-                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-                    },
+                    url: form.attr("action"),
+                    type: "POST",
+                    data: form.serialize(),
+                    dataType: "json",
                     success: function (response) {
-                        if (response.success) {
-                            toastr.success(response.message);
-                            $("#changePasswordForm")[0].reset();
+                        if (response && response.success) {
+                            toastr.success(response.message || "رمز عبور با موفقیت تغییر کرد");
+                            form[0].reset();
                         } else {
-                            toastr.error(response.message);
+                            toastr.error((response && response.message) || "خطا در تغییر رمز عبور");
                         }
                     },
                     error: function (xhr) {
-                        var errorMessage = xhr.responseJSON?.message || 'خطایی رخ داد.';
-                        toastr.error(errorMessage);
+                        var msg = "خطا در ارتباط با سرور";
+                        try {
+                            var res = xhr.responseJSON || JSON.parse(xhr.responseText);
+                            msg = (res && res.message) || msg;
+                        } catch (e) { }
+                        toastr.error(msg);
                     }
                 });
+            });
+        });
+        document.querySelectorAll('.toggle-password').forEach(function (element) {
+            element.addEventListener('click', function () {
+                var input = this.closest('.input-group').querySelector('input');
+                var icon = this.querySelector('i');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.className = 'ti ti-eye-off';
+                } else {
+                    input.type = 'password';
+                    icon.className = 'ti ti-eye';
+                }
             });
         });
     </script>

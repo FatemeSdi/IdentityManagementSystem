@@ -36,6 +36,22 @@
         display: block;
     }
 
+    .hero-feature {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 4px 14px rgba(20, 51, 94, 0.06);
+        height: 100%;
+    }
+
+    .hero-feature .hf-text {
+        display: flex;
+        flex-direction: column;
+    }
+
     .portal-main {
         padding: 28px 0 48px;
     }
@@ -142,19 +158,23 @@
                 <h2>سامانه احراز اصالت سند و قبض انبار</h2>
                 <p class="lead">ثبت و پیگیری درخواست مجوز بارگیری از کانتینرها در محوطه‌های اسکله</p>
 
-                <div class="d-flex flex-wrap gap-3">
-                    <div class="d-inline-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm">
-                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-shield-check-line"></i></span>
-                        <div>
-                            <b class="d-block fs-14 fw-bold text-default">احراز صریح و امن</b>
-                            <span class="fs-13 text-muted">امنیت کامل اطلاعات شما</span>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="hero-feature">
+                            <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-shield-check-line"></i></span>
+                            <div class="hf-text">
+                                <b class="fs-14 fw-bold text-default">احراز صریح و امن</b>
+                                <span class="fs-13 text-muted">امنیت کامل اطلاعات شما</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="d-inline-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm">
-                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-file-list-3-line"></i></span>
-                        <div>
-                            <b class="d-block fs-14 fw-bold text-default">پیگیری آسان</b>
-                            <span class="fs-13 text-muted">با کد پیگیری، وضعیت را ببینید</span>
+                    <div class="col-6">
+                        <div class="hero-feature">
+                            <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-file-list-3-line"></i></span>
+                            <div class="hf-text">
+                                <b class="fs-14 fw-bold text-default">پیگیری آسان</b>
+                                <span class="fs-13 text-muted">با کد پیگیری، وضعیت را ببینید</span>
+                            </div>
                         </div>
                     </div>
                 </div>

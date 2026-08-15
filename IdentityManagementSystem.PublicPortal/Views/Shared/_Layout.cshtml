@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html dir="rtl" data-header-styles="light" data-menu-styles="light" data-nav-layout="vertical" data-theme-mode="light" data-toggled="close" data-vertical-style="overlay" lang="fa">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,73 +8,74 @@
     <link rel="icon" href="~/assets/images/brand-logos/favicon.ico" type="image/x-icon" />
 
     <link href="~/assets/libs/bootstrap/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <link href="~/assets/css/vazir-font.css" rel="stylesheet" />
     <link href="~/assets/css/styles.css" rel="stylesheet" />
     <link href="~/assets/css/icons.css" rel="stylesheet" />
     <link href="~/assets/libs/toastify-js/src/toastify.css" rel="stylesheet" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
     <style>
         :root {
             --primary-rgb: 27, 66, 117;
         }
 
-        body {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .footer {
-            margin-top: auto;
-        }
-
-        /* متن‌های فرعی (غیر تیتر) کمی بزرگ‌تر و خواناتر */
         .small, small {
             font-size: 0.8125rem;
         }
     </style>
 </head>
 <body>
-    <header class="app-header sticky-top">
-        <div class="container-fluid d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 px-lg-4">
-            <a href="@Url.Action("ClientIndex", "Cartable")" class="d-flex align-items-center gap-2 text-decoration-none">
-                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" style="height:44px;width:auto;" onerror="this.style.display='none'" />
-                <span>
-                    <span class="d-block fs-15 fw-bold text-default">سازمان بنادر و دریانوردی</span>
-                    <span class="d-none d-sm-block fs-13 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
-                </span>
-            </a>
-            <nav class="d-flex align-items-center gap-1">
-                <div class="dropdown">
-                    <a href="javascript:void(0);" class="btn btn-sm btn-primary-light dropdown-toggle" data-bs-toggle="dropdown">
-                        <i class="ri-apps-2-line"></i><span class="d-none d-sm-inline"> خدمات</span>
+    <header class="app-header">
+        <div class="main-header-container container-fluid px-0">
+            <div class="header-content-left ps-3 ps-lg-4">
+                <div class="header-element">
+                    <a href="@Url.Action("ClientIndex", "Cartable")" class="d-flex align-items-center gap-2 text-decoration-none">
+                        <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" style="height:44px;width:auto;" onerror="this.style.display='none'" />
+                        <span>
+                            <span class="d-block fs-15 fw-bold text-default">سازمان بنادر و دریانوردی</span>
+                            <span class="d-none d-sm-block fs-13 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
+                        </span>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <a class="dropdown-item" href="@Url.Action("ClientIndex", "Cartable")#trackSection">
-                                <i class="ri-archive-line me-2"></i>قبض انبار
-                            </a>
-                        </li>
-                    </ul>
                 </div>
-                <a href="#trackSection" class="btn btn-sm btn-primary-light">
-                    <i class="ri-search-eye-line"></i><span class="d-none d-sm-inline"> پیگیری درخواست</span>
-                </a>
-            </nav>
+            </div>
+            <ul class="header-content-right list-unstyled d-flex align-items-center gap-1 mb-0 pe-3 pe-lg-4">
+                <li class="header-element">
+                    <div class="dropdown">
+                        <a href="javascript:void(0);" class="btn btn-sm btn-primary-light dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="ri-apps-2-line"></i><span class="d-none d-sm-inline"> خدمات</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="@Url.Action("ClientIndex", "Cartable")#trackSection">
+                                    <i class="ri-archive-line me-2"></i>قبض انبار
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="header-element">
+                    <a href="#trackSection" class="btn btn-sm btn-primary-light">
+                        <i class="ri-search-eye-line"></i><span class="d-none d-sm-inline"> پیگیری درخواست</span>
+                    </a>
+                </li>
+            </ul>
         </div>
     </header>
 
     @RenderBody()
 
-    <footer class="footer py-3 border-top">
-        <div class="container-fluid px-3 px-lg-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <p class="mb-0 fs-13 text-muted">کلیه حقوق این سامانه متعلق به سازمان بنادر و دریانوردی می‌باشد.</p>
-            <div class="d-flex gap-3">
-                <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="fs-13 text-muted text-decoration-none">
+    <footer class="footer mt-auto py-3 bg-white text-center">
+        <div class="container">
+            <span class="text-muted">
+                <span id="year"></span>
+                <a class="text-dark fw-medium" href="javascript:void(0);">اداره کل بنادر و دریانوردی هرمزگان</a>
+                — طراحی و توسعه توسط
+                <a href="javascript:void(0);"><span class="fw-medium text-primary">تیم فناوری اطلاعات</span></a>
+                — تمام حقوق محفوظ است
+                <span class="mx-2">|</span>
+                <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="text-muted">
                     <i class="ri-phone-line me-1"></i>تماس با ما
                 </a>
-                <a href="#" class="fs-13 text-muted text-decoration-none"><i class="ri-book-open-line me-1"></i>راهنما</a>
-            </div>
+            </span>
         </div>
     </footer>
 
@@ -134,6 +135,13 @@
                 close: true
             }).showToast();
         };
+
+        document.addEventListener('DOMContentLoaded', function () {
+            var yearEl = document.getElementById('year');
+            if (yearEl) {
+                yearEl.textContent = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
+            }
+        });
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)
