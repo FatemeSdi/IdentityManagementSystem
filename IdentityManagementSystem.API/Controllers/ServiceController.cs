@@ -390,7 +390,7 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "اطلاعات ناقص است." });
             }
 
-            var messageText = $"کد تایید شما: {model.OtpCode}\nسامانه احراز اصالت سند و قبض انبار";
+            var messageText = $"کد تایید شما: {model.OtpCode}\nسامانه احراز اصالت سند و قبض انبار\nاداره کل بنادر و دریانوردی استان هرمزگان";
 
             var log = new SmsLog
             {
@@ -501,6 +501,61 @@ namespace IdentityManagementSystem.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ثبت تاریخچه‌ی رد سیستمی برای درخواست {RequestId} ناموفق بود", request.RequestId);
+            }
+
+            await SendRejectSmsAsync(request, reason);
+        }
+
+        /// <summary>
+        /// اطلاع‌رسانی پیامکی رد سیستمی به متقاضی — عدم موفقیت پیامک نباید رد سیستمی رو خراب کنه.
+        /// </summary>
+        private async Task SendRejectSmsAsync(Request request, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(request.MobileNumber))
+                return;
+
+            var smsText = $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} رد شد. دلیل: {reason}\nاداره کل بنادر و دریانوردی استان هرمزگان";
+
+            long.TryParse(User.FindFirst("UserId")?.Value, out long actingUserId);
+            var smsLog = new SmsLog
+            {
+                UserId = actingUserId == 0 ? null : actingUserId,
+                RequestId = request.RequestId,
+                MobileNumberEnc = _encryptionHelper.Encrypt(request.MobileNumber),
+                MobileNumberHash = _encryptionHelper.ComputeSearchHash(request.MobileNumber),
+                Purpose = "RequestRejected",
+                MessageText = smsText,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                var smsResult = await _smsService.SendAsync(request.MobileNumber, smsText);
+                smsLog.Status = smsResult.IsSuccess ? "Sent" : "Failed";
+                smsLog.ErrorMessage = smsResult.IsSuccess ? null : (smsResult.ErrorMessage ?? smsResult.RawResponse);
+                smsLog.SentAt = smsResult.IsSuccess ? DateTime.UtcNow : null;
+
+                if (!smsResult.IsSuccess)
+                {
+                    _logger.LogWarning("پیامک رد سیستمی برای درخواست {RequestId} ارسال نشد: {Error}",
+                        request.RequestId, smsLog.ErrorMessage);
+                }
+            }
+            catch (Exception smsEx)
+            {
+                smsLog.Status = "Failed";
+                smsLog.ErrorMessage = smsEx.Message;
+                _logger.LogError(smsEx, "خطا در ارسال پیامک رد سیستمی برای درخواست {RequestId}", request.RequestId);
+            }
+
+            try
+            {
+                _context.SmsLogs.Add(smsLog);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception logEx)
+            {
+                _logger.LogError(logEx, "ثبت لاگ پیامک رد برای درخواست {RequestId} در دیتابیس ناموفق بود", request.RequestId);
             }
         }
 

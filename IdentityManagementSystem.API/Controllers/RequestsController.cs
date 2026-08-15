@@ -747,8 +747,8 @@ namespace IdentityManagementSystem.API.Controllers
                 if (!string.IsNullOrWhiteSpace(request.MobileNumber))
                 {
                     var smsText = validateByExpert
-                        ? $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} تایید شد."
-                        : $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} رد شد.{(string.IsNullOrWhiteSpace(description) ? "" : $" دلیل: {description}")}";
+                        ? $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} تایید شد.\nاداره کل بنادر و دریانوردی استان هرمزگان"
+                        : $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} رد شد.{(string.IsNullOrWhiteSpace(description) ? "" : $" دلیل: {description}")}\nاداره کل بنادر و دریانوردی استان هرمزگان";
 
                     var smsLog = new SmsLog
                     {
