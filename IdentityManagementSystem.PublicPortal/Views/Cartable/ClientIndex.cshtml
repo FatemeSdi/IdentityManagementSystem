@@ -7,6 +7,8 @@
     var companies = ViewBag.Companies as List<CompanyOption> ?? new List<CompanyOption>();
 }
 
+<link rel="stylesheet" href="~/assets/libs/choices.js/public/assets/styles/choices.min.css" />
+
 <style>
     .hero-section {
         background: linear-gradient(135deg, #eef2f8 0%, #e4ebf5 55%, #f2f5f9 100%);
@@ -140,23 +142,19 @@
                 <h2>سامانه احراز اصالت سند و قبض انبار</h2>
                 <p class="lead">ثبت و پیگیری درخواست مجوز بارگیری از کانتینرها در محوطه‌های اسکله</p>
 
-                <div class="row g-3">
-                    <div class="col-6">
-                        <div class="d-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm h-100">
-                            <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-shield-check-line"></i></span>
-                            <div>
-                                <b class="d-block fs-12 fw-bold text-default">احراز صریح و امن</b>
-                                <span class="fs-11 text-muted">امنیت کامل اطلاعات شما</span>
-                            </div>
+                <div class="d-flex flex-wrap gap-3">
+                    <div class="d-inline-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm">
+                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-shield-check-line"></i></span>
+                        <div>
+                            <b class="d-block fs-14 fw-bold text-default">احراز صریح و امن</b>
+                            <span class="fs-13 text-muted">امنیت کامل اطلاعات شما</span>
                         </div>
                     </div>
-                    <div class="col-6">
-                        <div class="d-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm h-100">
-                            <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-file-list-3-line"></i></span>
-                            <div>
-                                <b class="d-block fs-12 fw-bold text-default">پیگیری آسان</b>
-                                <span class="fs-11 text-muted">با کد پیگیری، وضعیت را ببینید</span>
-                            </div>
+                    <div class="d-inline-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm">
+                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-file-list-3-line"></i></span>
+                        <div>
+                            <b class="d-block fs-14 fw-bold text-default">پیگیری آسان</b>
+                            <span class="fs-13 text-muted">با کد پیگیری، وضعیت را ببینید</span>
                         </div>
                     </div>
                 </div>
@@ -200,7 +198,7 @@
             <form id="trackRequestForm" class="row g-3 align-items-end" method="get" asp-action="ClientIndex">
                 <div class="col-md-4">
                     <label for="trackMobileNumber" class="form-label text-default">شماره موبایل</label>
-                    <input type="text" class="form-control" name="trackMobile" id="trackMobileNumber" value="@trackMobile" placeholder="مثلاً 09123456789" maxlength="11" inputmode="numeric" required />
+                    <input type="text" class="form-control" name="trackMobile" id="trackMobileNumber" value="@trackMobile" placeholder="09xxxxxxxxx" maxlength="11" inputmode="numeric" required />
                 </div>
                 <div class="col-md-4">
                     <label for="trackTrackingCode" class="form-label text-default">کد پیگیری (اختیاری)</label>
@@ -303,7 +301,7 @@
                                        class="form-control form-control-lg"
                                        id="MobileNumber"
                                        name="MobileNumber"
-                                       placeholder="مثال: 09123456789"
+                                       placeholder="09xxxxxxxxx"
                                        maxlength="11"
                                        inputmode="numeric"
                                        required />
@@ -466,11 +464,16 @@
 </div>
 
 @section Scripts {
+    <script src="~/assets/libs/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
         $(document).ready(function () {
             let otpVerified = false;
             let otpTimerInterval = null;
             let remainingSeconds = 0;
+
+            // دراپ‌داون شرکت با کامپوننت استاندارد یزن (Choices.js) به‌جای select خام
+            // چون تا مرحله ۲ نمایش داده نشه (display:none)، باید بعد از دیده شدنش init بشه
+            var companyChoices = null;
 
             // ===================== ویزارد مرحله‌ای =====================
             function showWizardStep(step) {
@@ -483,6 +486,10 @@
                     if (s < step) $(this).addClass('completed');
                     else if (s === step) $(this).addClass('active');
                 });
+
+                if (step === 2 && !companyChoices && typeof Choices !== 'undefined' && document.getElementById('CompanyId')) {
+                    companyChoices = new Choices('#CompanyId', { searchEnabled: true, shouldSort: false, itemSelectText: '', placeholder: true });
+                }
             }
 
             $('.btn-prev-step').click(function () {
@@ -499,6 +506,7 @@
                 clearInterval(otpTimerInterval);
                 $('#otpTimer').hide();
                 $('#termsNotice').show();
+                if (companyChoices) companyChoices.setChoiceByValue('');
                 showWizardStep(1);
             });
 

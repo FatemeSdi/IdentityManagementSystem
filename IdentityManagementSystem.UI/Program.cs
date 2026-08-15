@@ -140,6 +140,10 @@ app.Use(async (context, next) =>
 
     // مسیرهای آزاد
     if (path.StartsWith("/home/loginpage") ||
+        path.StartsWith("/home/forgotpassword") ||
+        path.StartsWith("/home/startforgotpassword") ||
+        path.StartsWith("/home/verifyforgotpasswordcode") ||
+        path.StartsWith("/home/resetforgotpassword") ||
         path.StartsWith("/api") ||
         path.StartsWith("/swagger") ||
         path.Contains("captcha") ||

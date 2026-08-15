@@ -11,9 +11,6 @@
     <!-- Main Theme Js -->
     <script src="~/assets/js/authentication-main.js"></script>
     <script>
-        // این صفحه (ورود/فراموشی رمز) طراحی مخصوص روشن دارد و از حالت تاریک
-        // برنامه پیروی نمی‌کند؛ حالت تیره‌ای که authentication-main.js از
-        // localStorage اعمال می‌کند، همین‌جا خنثی می‌شود.
         (function () {
             var html = document.querySelector('html');
             html.setAttribute('data-theme-mode', 'light');
@@ -54,7 +51,7 @@
 
     <!-- Validation -->
     <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
-    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+	<script src="~/lib/jquery-ajax-unobtrusive/dist/jquery.unobtrusive-ajax.min.js"></script>
 
     <!-- Bootstrap -->
     <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -62,18 +59,20 @@
     <!-- Toastr -->
     <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
 
-    <!-- Toastify JS -->
-    <script src="~/assets/libs/toastify-js/src/toastify.js"></script>
-
     <!-- Authentication scripts -->
     <script src="~/assets/js/two-step-verification.js"></script>
     <script src="~/assets/js/show-password.js"></script>
-    <!-- <script src="~/assets/js/animation-auth.js"></script> -->
+    
+    <!-- Toastify JS -->
+    <link href="~/assets/libs/toastify-js/src/toastify.css" rel="stylesheet" />
+    <script src="~/assets/libs/toastify-js/src/toastify.js"></script>
+
+    <!-- Toast JS -->
+    <script src="~/assets/js/toasts.js"> </script>
 
     <script>
-        // تابع کمکی برای استفاده راحت‌تر از Toastify
         window.showToast = function (message, type = "info") {
-            let backgroundColor = "#5477f5"; // پیش‌فرض آبی
+            let backgroundColor = "#5477f5"; //‌ آبی
 
             if (type === "success") backgroundColor = "#28a745";
             if (type === "error") backgroundColor = "#dc3545";

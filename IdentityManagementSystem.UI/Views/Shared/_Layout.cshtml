@@ -135,11 +135,14 @@
             <header class="app-header">
                 <div class="main-header-container container-fluid">
                     <div class="header-content-left d-flex align-items-center gap-2">
-                        <div class="header-element">
-                            <a aria-label="نمایش/پنهان‌سازی منو" class="sidemenu-toggle animated-arrow header-link" href="javascript:void(0);" data-bs-toggle="sidebar">
-                                <i class="ti ti-menu-2 fs-20"></i>
-                            </a>
-                        </div>
+                        <!-- توگل سایدبار در DOM نگه داشته می‌شود (فقط مخفی) چون defaultmenu.min.js بدون null-check رویش addEventListener می‌زند -->
+                        <a aria-label="نمایش/پنهان‌سازی منو" class="sidemenu-toggle animated-arrow header-link d-none" href="javascript:void(0);" data-bs-toggle="sidebar">
+                            <i class="ti ti-menu-2 fs-20"></i>
+                        </a>
+                        <a asp-controller="Cartable" asp-action="Index" class="d-flex align-items-center gap-2 text-decoration-none">
+                            <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" style="height:36px;width:auto;">
+                            <span class="d-none d-sm-block fs-14 fw-bold text-default">سامانه احراز اصالت سند و قبض انبار</span>
+                        </a>
                     </div>
 
                     <div class="header-content-right d-flex align-items-center gap-3">

@@ -27,22 +27,36 @@
         .footer {
             margin-top: auto;
         }
+
+        /* متن‌های فرعی (غیر تیتر) کمی بزرگ‌تر و خواناتر */
+        .small, small {
+            font-size: 0.8125rem;
+        }
     </style>
 </head>
 <body>
     <header class="app-header sticky-top">
-        <div class="container d-flex align-items-center justify-content-between flex-wrap gap-2 py-2">
+        <div class="container-fluid d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 px-3 px-lg-4">
             <a href="@Url.Action("ClientIndex", "Cartable")" class="d-flex align-items-center gap-2 text-decoration-none">
                 <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" style="height:44px;width:auto;" onerror="this.style.display='none'" />
                 <span>
                     <span class="d-block fs-15 fw-bold text-default">سازمان بنادر و دریانوردی</span>
-                    <span class="d-none d-sm-block fs-12 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
+                    <span class="d-none d-sm-block fs-13 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
                 </span>
             </a>
             <nav class="d-flex align-items-center gap-1">
-                <a href="@Url.Action("ClientIndex", "Cartable")" class="btn btn-sm btn-primary-light">
-                    <i class="ri-home-5-line"></i><span class="d-none d-sm-inline"> صفحه اصلی</span>
-                </a>
+                <div class="dropdown">
+                    <a href="javascript:void(0);" class="btn btn-sm btn-primary-light dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="ri-apps-2-line"></i><span class="d-none d-sm-inline"> خدمات</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a class="dropdown-item" href="@Url.Action("ClientIndex", "Cartable")#trackSection">
+                                <i class="ri-archive-line me-2"></i>قبض انبار
+                            </a>
+                        </li>
+                    </ul>
+                </div>
                 <a href="#trackSection" class="btn btn-sm btn-primary-light">
                     <i class="ri-search-eye-line"></i><span class="d-none d-sm-inline"> پیگیری درخواست</span>
                 </a>
@@ -53,14 +67,13 @@
     @RenderBody()
 
     <footer class="footer py-3 border-top">
-        <div class="container d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <p class="mb-0 fs-12 text-muted">کلیه حقوق این سامانه متعلق به سازمان بنادر و دریانوردی می‌باشد.</p>
+        <div class="container-fluid px-3 px-lg-4 d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <p class="mb-0 fs-13 text-muted">کلیه حقوق این سامانه متعلق به سازمان بنادر و دریانوردی می‌باشد.</p>
             <div class="d-flex gap-3">
-                <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="fs-12 text-muted text-decoration-none">
+                <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="fs-13 text-muted text-decoration-none">
                     <i class="ri-phone-line me-1"></i>تماس با ما
                 </a>
-                <a href="#" class="fs-12 text-muted text-decoration-none"><i class="ri-question-line me-1"></i>سوالات متداول</a>
-                <a href="#" class="fs-12 text-muted text-decoration-none"><i class="ri-book-open-line me-1"></i>راهنما</a>
+                <a href="#" class="fs-13 text-muted text-decoration-none"><i class="ri-book-open-line me-1"></i>راهنما</a>
             </div>
         </div>
     </footer>
@@ -76,21 +89,21 @@
                     <div class="d-flex align-items-center gap-3 mb-3">
                         <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-phone-line"></i></span>
                         <div>
-                            <div class="fs-12 text-muted">فاوا — نرم‌افزار (ساعات اداری)</div>
+                            <div class="fs-13 text-muted">فاوا — نرم‌افزار (ساعات اداری)</div>
                             <div class="fw-semibold" style="direction:ltr;text-align:right;">۰۹۹۴۰۶۵۷۷۵۳ — فاطمه صادقی</div>
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-3 mb-3">
                         <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-phone-line"></i></span>
                         <div>
-                            <div class="fs-12 text-muted">داخلی</div>
+                            <div class="fs-13 text-muted">داخلی</div>
                             <div class="fw-semibold" style="direction:ltr;text-align:right;">۴۶۴۷</div>
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-3">
                         <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-mail-line"></i></span>
                         <div>
-                            <div class="fs-12 text-muted">ایمیل</div>
+                            <div class="fs-13 text-muted">ایمیل</div>
                             <div class="fw-semibold">sdi10fateme@@gmail.com</div>
                         </div>
                     </div>
