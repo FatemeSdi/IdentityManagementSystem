@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using IdentityManagementSystem.API.Models.ViewModels;
 using IdentityManagementSystem.API.Data;
 using IdentityManagementSystem.API.Models;
+using IdentityManagementSystem.API.Helpers;
 
 namespace IdentityManagementSystem.API.Controllers
 {
@@ -13,10 +14,12 @@ namespace IdentityManagementSystem.API.Controllers
     public class CartablesController : ControllerBase
     {
         private readonly IdentityManagementSystemContext _context;
+        private readonly EncryptionHelper _encryptionHelper;
 
-        public CartablesController(IdentityManagementSystemContext context)
+        public CartablesController(IdentityManagementSystemContext context, EncryptionHelper encryptionHelper)
         {
             _context = context;
+            _encryptionHelper = encryptionHelper;
         }
 
         // GET: api/Cartables/user/{userId}
@@ -35,33 +38,36 @@ namespace IdentityManagementSystem.API.Controllers
                 .Select(ug => (long)ug.GroupId)
                 .ToListAsync();
 
-            var cartableItems = await _context.CartableItems
+            // decrypt کردن با متد C# داخل .Select() قابل ترجمه به SQL نیست — اول entity های خام رو
+            // میاریم تو حافظه (ToListAsync)، بعد map به ViewModel همراه با decrypt رو این‌جا انجام می‌دیم.
+            var rawCartableItems = await _context.CartableItems
                 .Include(ci => ci.Request)
                 .Include(ci => ci.IsTakenByUser)
                 .Where(ci => ci.Request != null
                             && ci.AssignedTo != null && myGroupIds.Contains(ci.AssignedTo.Value)
                             && (ci.IsTakenBy == null || ci.IsTakenBy == userId))
-                .Select(ci => new CartableItemViewModel
-                {
-                    ItemId = ci.ItemId,
-                    RequestId = ci.RequestId,
-                    NationalId = ci.Request!.NationalId,
-                    DocumentNumber = ci.Request!.DocumentNumber,
-                    VerificationCode = ci.Request!.VerificationCode,
-                    IsMatch = ci.Request!.IsMatch,
-                    IsExist = ci.Request!.IsExist,
-                    IsNationalIdInResponse = ci.Request!.IsNationalIdInResponse,
-                    IsNationalIdInLawyers = ci.Request!.IsNationalIdInLawyers,
-                    CreatedAt = ci.Request!.CreatedAt,
-                    AssignedTo = ci.IsTakenBy,
-                    AssignedToName = ci.IsTakenByUser != null ? $"{ci.IsTakenByUser.Name} {ci.IsTakenByUser.LastName}" : null,
-                    AssignedAt = ci.AssignedAt,
-                    ViewedAt = ci.ViewedAt,
-                    Status = ci.Status,
-                    Description = ci.Description, // NotMapped - will be null unless populated
-                    ValidateByExpert = ci.ValidateByExpert // NotMapped
-                })
                 .ToListAsync();
+
+            var cartableItems = rawCartableItems.Select(ci => new CartableItemViewModel
+            {
+                ItemId = ci.ItemId,
+                RequestId = ci.RequestId,
+                NationalId = _encryptionHelper.DecryptOrFallback(ci.Request!.NationalIdEnc, ci.Request!.NationalId),
+                DocumentNumber = ci.Request!.DocumentNumber,
+                VerificationCode = _encryptionHelper.DecryptOrFallback(ci.Request!.VerificationCodeEnc, ci.Request!.VerificationCode),
+                IsMatch = ci.Request!.IsMatch,
+                IsExist = ci.Request!.IsExist,
+                IsNationalIdInResponse = ci.Request!.IsNationalIdInResponse,
+                IsNationalIdInLawyers = ci.Request!.IsNationalIdInLawyers,
+                CreatedAt = ci.Request!.CreatedAt,
+                AssignedTo = ci.IsTakenBy,
+                AssignedToName = ci.IsTakenByUser != null ? $"{ci.IsTakenByUser.Name} {ci.IsTakenByUser.LastName}" : null,
+                AssignedAt = ci.AssignedAt,
+                ViewedAt = ci.ViewedAt,
+                Status = ci.Status,
+                Description = ci.Description, // NotMapped - will be null unless populated
+                ValidateByExpert = ci.ValidateByExpert // NotMapped
+            }).ToList();
 
             return Ok(cartableItems);
         }

@@ -186,6 +186,23 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(50)]
         public string? WarehouseReceiptNumber { get; set; }
 
+        // نسخه‌ی رمزنگاری‌شده‌ی کد ملی/رمز تصدیق/شماره قبض انبار (AES-256-CBC، IV تصادفی) + هشِ
+        // deterministic (HMAC-SHA256) برای جستجوی دقیق روی داده‌ی رمزنگاری‌شده (blind index).
+        // برای رکوردهای جدید فقط این ستون‌ها پر می‌شن؛ ستون‌های بالا (plaintext) فقط برای
+        // رکوردهای قدیمی‌ترِ قبل از این تغییر مقدار دارن (fallback نمایش).
+        [StringLength(256)]
+        public string? NationalIdEnc { get; set; }
+        [StringLength(64)]
+        public string? NationalIdHash { get; set; }
+        [StringLength(256)]
+        public string? VerificationCodeEnc { get; set; }
+        [StringLength(64)]
+        public string? VerificationCodeHash { get; set; }
+        [StringLength(256)]
+        public string? WarehouseReceiptNumberEnc { get; set; }
+        [StringLength(64)]
+        public string? WarehouseReceiptNumberHash { get; set; }
+
         // کد پیگیری قابل‌جستجو و مناسب پیامک — مثلاً REQ00020198 (مشتق‌شده از RequestId، همیشه یکتا)
         [StringLength(30)]
         public string? TrackingCode { get; set; }
@@ -599,15 +616,25 @@ namespace IdentityManagementSystem.API.Models
         public int? CompanyId { get; set; }
         public Company? Company { get; set; }
 
-        [Required]
+        // دیگه Required نیست: برای رکوردهای جدید فقط ReceiptNumberEnc پر می‌شه، این ستون plaintext
+        // فقط برای رکوردهای قدیمی‌تر مقدار داره (fallback نمایش).
         [StringLength(50)]
-        public string ReceiptNumber { get; set; } = string.Empty;
+        public string? ReceiptNumber { get; set; }
 
         [StringLength(50)]
         public string? SerialNumber { get; set; }
 
         [StringLength(20)]
         public string? OwnerNationalId { get; set; }
+
+        [StringLength(256)]
+        public string? OwnerNationalIdEnc { get; set; }
+        [StringLength(64)]
+        public string? OwnerNationalIdHash { get; set; }
+        [StringLength(256)]
+        public string? ReceiptNumberEnc { get; set; }
+        [StringLength(64)]
+        public string? ReceiptNumberHash { get; set; }
 
         [StringLength(500)]
         public string? GoodsDescription { get; set; }

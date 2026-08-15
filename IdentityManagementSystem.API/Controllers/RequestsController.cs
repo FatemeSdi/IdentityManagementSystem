@@ -105,10 +105,16 @@ namespace IdentityManagementSystem.API.Controllers
 
             if (!string.IsNullOrWhiteSpace(search))
             {
+                // کد ملی/رمز تصدیق دیگه plaintext نیستن، پس substring search روشون کار نمی‌کنه —
+                // به‌جاش تطابق دقیق روی هشِ جستجو (blind index) انجام می‌شه. رکوردهای قدیمی‌تر که هنوز
+                // Enc/Hash ندارن با Contains روی ستون plaintext قدیمی همچنان قابل جستجو می‌مونن.
+                var searchHash = _encryptionHelper.ComputeSearchHash(search);
                 query = query.Where(r =>
+                    (r.NationalIdHash != null && r.NationalIdHash == searchHash) ||
                     (r.NationalId != null && r.NationalId.Contains(search)) ||
                     (r.MobileNumber != null && r.MobileNumber.Contains(search)) ||
                     (r.DocumentNumber != null && r.DocumentNumber.Contains(search)) ||
+                    (r.VerificationCodeHash != null && r.VerificationCodeHash == searchHash) ||
                     (r.VerificationCode != null && r.VerificationCode.Contains(search)) ||
                     (r.RequestCode != null && r.RequestCode.Contains(search)) ||
                     r.RequestId.ToString().Contains(search));
@@ -136,35 +142,40 @@ namespace IdentityManagementSystem.API.Controllers
 
             var totalCount = await query.CountAsync();
 
-            var items = await query
-                .Select(r => new RequestViewModel
-                {
-                    RequestId = r.RequestId,
-                    RequestCode = r.RequestCode,
-                    NationalId = r.NationalId,
-                    MobileNumber = r.MobileNumber,
-                    DocumentNumber = r.DocumentNumber,
-                    // اگر encrypted ذخیره شده باشد decrypt، در غیر این صورت همان مقدار
-                    VerificationCode = r.VerificationCode,
-                    WarehouseReceiptNumber = r.WarehouseReceiptNumber,
-                    TrackingCode = r.TrackingCode,
-                    IsMatch = r.IsMatch ?? false,
-                    IsExist = r.IsExist ?? false,
-                    IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,
-                    IsNationalIdInLawyers = r.IsNationalIdInLawyers ?? false,
-                    ValidateByExpert = r.ValidateByExpert,
-                    Description = r.Description,
-                    CreatedAt = r.CreatedAt,
-                    CreatedBy = r.CreatedBy,
-                    GroupId = r.GroupId,
-                    GroupTitle = r.Group != null ? r.Group.Title : null,
-                    AssignedTo = r.AssignedTo,
-                    AssignedToName = r.AssignedToUser != null ? (r.AssignedToUser.Name + " " + r.AssignedToUser.LastName) : null,
-                    AssignedAt = r.AssignedAt
-                })
+            // decrypt کردن با متد C# داخل .Select() قابل ترجمه به SQL نیست (EF exception می‌ده) —
+            // برای همین اول entity های خام رو با ToListAsync میاریم تو حافظه، بعد map به ViewModel
+            // (همراه با decrypt) رو این‌بار به‌صورت LINQ-to-Objects انجام می‌دیم.
+            var rawItems = await query
+                .Include(r => r.Group)
+                .Include(r => r.AssignedToUser)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
+
+            var items = rawItems.Select(r => new RequestViewModel
+            {
+                RequestId = r.RequestId,
+                RequestCode = r.RequestCode,
+                NationalId = _encryptionHelper.DecryptOrFallback(r.NationalIdEnc, r.NationalId),
+                MobileNumber = r.MobileNumber,
+                DocumentNumber = r.DocumentNumber,
+                VerificationCode = _encryptionHelper.DecryptOrFallback(r.VerificationCodeEnc, r.VerificationCode),
+                WarehouseReceiptNumber = _encryptionHelper.DecryptOrFallback(r.WarehouseReceiptNumberEnc, r.WarehouseReceiptNumber),
+                TrackingCode = r.TrackingCode,
+                IsMatch = r.IsMatch ?? false,
+                IsExist = r.IsExist ?? false,
+                IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,
+                IsNationalIdInLawyers = r.IsNationalIdInLawyers ?? false,
+                ValidateByExpert = r.ValidateByExpert,
+                Description = r.Description,
+                CreatedAt = r.CreatedAt,
+                CreatedBy = r.CreatedBy,
+                GroupId = r.GroupId,
+                GroupTitle = r.Group != null ? r.Group.Title : null,
+                AssignedTo = r.AssignedTo,
+                AssignedToName = r.AssignedToUser != null ? (r.AssignedToUser.Name + " " + r.AssignedToUser.LastName) : null,
+                AssignedAt = r.AssignedAt
+            }).ToList();
 
             return Ok(new PaginatedResponse<RequestViewModel>
             {
@@ -238,18 +249,19 @@ namespace IdentityManagementSystem.API.Controllers
                 return BadRequest(new { success = false, message = "شماره موبایل الزامی است." });
             }
 
-            var pendingRequests = await _context.Request
+            var rawPendingRequests = await _context.Request
                 // TrackingCode خالی یعنی رکورد قدیمی/ناقصه (قبل از این‌که تولید خودکار کد پیگیری همیشگی بشه) —
                 // بدون کد پیگیری، متقاضی هیچ راهی برای تشخیص این درخواست نداره، پس نشونش نمی‌دیم.
                 .Where(r => r.MobileNumber == mobileNumber.Trim() && r.ValidateByExpert == null && r.TrackingCode != null)
                 .OrderByDescending(r => r.CreatedAt)
-                .Select(r => new
-                {
-                    trackingCode = r.TrackingCode,
-                    warehouseReceiptNumber = r.WarehouseReceiptNumber,
-                    createdAt = r.CreatedAt
-                })
                 .ToListAsync();
+
+            var pendingRequests = rawPendingRequests.Select(r => new
+            {
+                trackingCode = r.TrackingCode,
+                warehouseReceiptNumber = _encryptionHelper.DecryptOrFallback(r.WarehouseReceiptNumberEnc, r.WarehouseReceiptNumber),
+                createdAt = r.CreatedAt
+            });
 
             return Ok(new { success = true, items = pendingRequests });
         }
@@ -432,19 +444,6 @@ namespace IdentityManagementSystem.API.Controllers
             return (fromUtc, toUtcExclusive);
         }
 
-        private string? TryDecrypt(string value)
-        {
-            try
-            {
-                return _encryptionHelper.Decrypt(value);
-            }
-            catch
-            {
-                // اگر plain text باشد همان را برگردان
-                return value;
-            }
-        }
-
         [HttpPost("CreateNewRequest")]
         [Authorize]
         public async Task<IActionResult> CreateNewRequest(NewRequestViewModel model)
@@ -459,10 +458,12 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 var newRequest = new Request
                 {
-                    NationalId = model.NationalId,
+                    NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
+                    NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
                     MobileNumber = model.MobileNumber,
                     DocumentNumber = model.DocumentNumber,
-                    VerificationCode = _encryptionHelper.Encrypt(model.VerificationCode), // ذخیره encrypted
+                    VerificationCodeEnc = _encryptionHelper.Encrypt(model.VerificationCode),
+                    VerificationCodeHash = _encryptionHelper.ComputeSearchHash(model.VerificationCode),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = User.Identity?.Name ?? "Unknown",
                     ValidateByExpert = null,
@@ -805,6 +806,104 @@ namespace IdentityManagementSystem.API.Controllers
                 await _actionLogger.Error(User, "UpdateValidationStatus", ex.Message);
                 return StatusCode(500, new { success = false, message = "⚠️ خطای سرور رخ داد." });
             }
+        }
+
+        /// <summary>
+        /// یک‌بار مصرف: رکوردهای قدیمی‌ترِ Request/WarehouseReceipt که فقط plaintext دارن رو رمزنگاری
+        /// می‌کنه (ستون‌های Enc/Hash رو پر می‌کنه). ستون plaintext قدیمی دست‌نخورده می‌مونه (fallback نمایش).
+        /// Idempotent: هر بار فقط رکوردهایی که هنوز Enc ندارن پردازش می‌شن، پس اجرای چندباره بی‌خطره
+        /// و می‌شه هرجا لازم شد (مثلاً بعد از وارد کردن داده‌ی جدید بدون Enc) دوباره صداش زد.
+        /// </summary>
+        [HttpPost("BackfillEncryption")]
+        [Authorize]
+        public async Task<IActionResult> BackfillEncryption()
+        {
+            if (!long.TryParse(User.FindFirst("UserId")?.Value, out long userId))
+                return Unauthorized(new { success = false, message = "کاربر شناسایی نشد." });
+
+            bool isAdmin = await _context.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == 3);
+            if (!isAdmin)
+                return StatusCode(403, new { success = false, message = "فقط ادمین مجاز به اجرای این عملیات است." });
+
+            const int batchSize = 200;
+            int requestsMigrated = 0;
+            int receiptsMigrated = 0;
+
+            while (true)
+            {
+                var batch = await _context.Request
+                    .Where(r =>
+                        (r.NationalId != null && r.NationalIdEnc == null) ||
+                        (r.VerificationCode != null && r.VerificationCodeEnc == null) ||
+                        (r.WarehouseReceiptNumber != null && r.WarehouseReceiptNumberEnc == null))
+                    .Take(batchSize)
+                    .ToListAsync();
+
+                if (batch.Count == 0)
+                    break;
+
+                foreach (var r in batch)
+                {
+                    if (!string.IsNullOrWhiteSpace(r.NationalId) && r.NationalIdEnc == null)
+                    {
+                        r.NationalIdEnc = _encryptionHelper.Encrypt(r.NationalId);
+                        r.NationalIdHash = _encryptionHelper.ComputeSearchHash(r.NationalId);
+                    }
+                    if (!string.IsNullOrWhiteSpace(r.VerificationCode) && r.VerificationCodeEnc == null)
+                    {
+                        r.VerificationCodeEnc = _encryptionHelper.Encrypt(r.VerificationCode);
+                        r.VerificationCodeHash = _encryptionHelper.ComputeSearchHash(r.VerificationCode);
+                    }
+                    if (!string.IsNullOrWhiteSpace(r.WarehouseReceiptNumber) && r.WarehouseReceiptNumberEnc == null)
+                    {
+                        r.WarehouseReceiptNumberEnc = _encryptionHelper.Encrypt(r.WarehouseReceiptNumber);
+                        r.WarehouseReceiptNumberHash = _encryptionHelper.ComputeSearchHash(r.WarehouseReceiptNumber);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                requestsMigrated += batch.Count;
+            }
+
+            while (true)
+            {
+                var batch = await _context.WarehouseReceipts
+                    .Where(w =>
+                        (w.OwnerNationalId != null && w.OwnerNationalIdEnc == null) ||
+                        (w.ReceiptNumber != null && w.ReceiptNumberEnc == null))
+                    .Take(batchSize)
+                    .ToListAsync();
+
+                if (batch.Count == 0)
+                    break;
+
+                foreach (var w in batch)
+                {
+                    if (!string.IsNullOrWhiteSpace(w.OwnerNationalId) && w.OwnerNationalIdEnc == null)
+                    {
+                        w.OwnerNationalIdEnc = _encryptionHelper.Encrypt(w.OwnerNationalId);
+                        w.OwnerNationalIdHash = _encryptionHelper.ComputeSearchHash(w.OwnerNationalId);
+                    }
+                    if (!string.IsNullOrWhiteSpace(w.ReceiptNumber) && w.ReceiptNumberEnc == null)
+                    {
+                        w.ReceiptNumberEnc = _encryptionHelper.Encrypt(w.ReceiptNumber);
+                        w.ReceiptNumberHash = _encryptionHelper.ComputeSearchHash(w.ReceiptNumber);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                receiptsMigrated += batch.Count;
+            }
+
+            await _actionLogger.Info(userId, "BackfillEncryption", $"RequestsMigrated={requestsMigrated}, ReceiptsMigrated={receiptsMigrated}");
+
+            return Ok(new
+            {
+                success = true,
+                message = "بک‌فیل رمزنگاری با موفقیت انجام شد.",
+                requestsMigrated,
+                receiptsMigrated
+            });
         }
     }
 

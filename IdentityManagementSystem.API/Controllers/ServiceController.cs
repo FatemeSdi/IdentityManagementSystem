@@ -144,11 +144,17 @@ namespace IdentityManagementSystem.API.Controllers
             var request = new Request
             {
                 RequestCode = requestCode,
-                NationalId = model.NationalId,
+                // کد ملی/رمز تصدیق/شماره قبض انبار دیگه plaintext ذخیره نمی‌شن — فقط نسخه‌ی
+                // رمزنگاری‌شده + هشِ جستجو. ستون‌های plaintext بالا برای رکوردهای جدید null می‌مونن
+                // (فقط رکوردهای قدیمی‌تر از این تغییر توشون مقدار دارن).
+                NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
+                NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
                 MobileNumber = model.MobileNumber,
                 DocumentNumber = model.DocumentNumber,
-                VerificationCode = model.VerificationCode,
-                WarehouseReceiptNumber = model.WarehouseReceiptNumber,
+                VerificationCodeEnc = _encryptionHelper.Encrypt(model.VerificationCode),
+                VerificationCodeHash = _encryptionHelper.ComputeSearchHash(model.VerificationCode),
+                WarehouseReceiptNumberEnc = _encryptionHelper.Encrypt(model.WarehouseReceiptNumber),
+                WarehouseReceiptNumberHash = _encryptionHelper.ComputeSearchHash(model.WarehouseReceiptNumber),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = createdBy,
                 GroupId = groupId,
@@ -889,13 +895,16 @@ namespace IdentityManagementSystem.API.Controllers
                     // یک ردیف به‌ازای هر قلم فاکتور (چون یک قبض انبار می‌تونه چند فاکتور/تخلیه داشته باشه)
                     foreach (var item in items)
                     {
+                        var itemReceiptNumber = string.IsNullOrWhiteSpace(item.ReceiptNumber) ? receiptNumber : item.ReceiptNumber;
                         _context.WarehouseReceipts.Add(new WarehouseReceipt
                         {
                             RequestId = requestId,
                             CompanyId = companyId,
-                            ReceiptNumber = string.IsNullOrWhiteSpace(item.ReceiptNumber) ? receiptNumber : item.ReceiptNumber,
+                            ReceiptNumberEnc = _encryptionHelper.Encrypt(itemReceiptNumber),
+                            ReceiptNumberHash = _encryptionHelper.ComputeSearchHash(itemReceiptNumber),
                             SerialNumber = item.InvoiceNumber,
-                            OwnerNationalId = item.GoodsOwnerNationalID,
+                            OwnerNationalIdEnc = _encryptionHelper.Encrypt(item.GoodsOwnerNationalID),
+                            OwnerNationalIdHash = _encryptionHelper.ComputeSearchHash(item.GoodsOwnerNationalID),
                             Quantity = item.Weight,
                             Unit = item.Weight.HasValue ? "kg" : null,
                             IssueDate = ParsePersianDateSafe(item.DischargeDate) ?? ParsePersianDateSafe(item.InvoiceDate),
@@ -913,7 +922,8 @@ namespace IdentityManagementSystem.API.Controllers
                     {
                         RequestId = requestId,
                         CompanyId = companyId,
-                        ReceiptNumber = receiptNumber,
+                        ReceiptNumberEnc = _encryptionHelper.Encrypt(receiptNumber),
+                        ReceiptNumberHash = _encryptionHelper.ComputeSearchHash(receiptNumber),
                         IsVerified = false,
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = createdBy
@@ -1381,17 +1391,20 @@ namespace IdentityManagementSystem.API.Controllers
                     return new JsonResult(new { success = false, message = "اطلاعاتی برای قبض انبار این درخواست یافت نشد." });
                 }
 
-                var receiptNumber = receipts.First().ReceiptNumber;
+                var receiptNumber = _encryptionHelper.DecryptOrFallback(receipts.First().ReceiptNumberEnc, receipts.First().ReceiptNumber);
                 var isVerified = receipts.Any(r => r.IsVerified == true);
 
                 var lines = new List<string>();
                 int i = 1;
                 foreach (var r in receipts)
                 {
+                    var rReceiptNumber = _encryptionHelper.DecryptOrFallback(r.ReceiptNumberEnc, r.ReceiptNumber);
+                    var rOwnerNationalId = _encryptionHelper.DecryptOrFallback(r.OwnerNationalIdEnc, r.OwnerNationalId);
+
                     lines.Add($"— قلم {i++} —");
-                    lines.Add($"شماره قبض انبار: {r.ReceiptNumber}");
+                    lines.Add($"شماره قبض انبار: {rReceiptNumber}");
                     if (!string.IsNullOrWhiteSpace(r.SerialNumber)) lines.Add($"شماره فاکتور: {r.SerialNumber}");
-                    if (!string.IsNullOrWhiteSpace(r.OwnerNationalId)) lines.Add($"کد ملی/اقتصادی صاحب کالا: {r.OwnerNationalId}");
+                    if (!string.IsNullOrWhiteSpace(rOwnerNationalId)) lines.Add($"کد ملی/اقتصادی صاحب کالا: {rOwnerNationalId}");
                     if (r.Quantity.HasValue) lines.Add($"وزن: {r.Quantity} {r.Unit}");
                     if (r.IssueDate.HasValue) lines.Add($"تاریخ تخلیه: {r.IssueDate:yyyy/MM/dd}");
                     lines.Add($"وضعیت: {(r.IsVerified == true ? "تایید شده" : "تایید نشده")}");

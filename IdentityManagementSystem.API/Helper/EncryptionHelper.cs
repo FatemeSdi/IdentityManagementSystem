@@ -91,6 +91,15 @@ namespace IdentityManagementSystem.API.Helpers
             }
         }
 
+        // ---------------- DECRYPT WITH FALLBACK ----------------
+        // برای فیلدهایی که تازه به رمزنگاری منتقل شدن: رکوردهای جدید فقط ستون Enc رو پر می‌کنن،
+        // رکوردهای قدیمی‌تر هنوز فقط ستون plaintext قدیمی رو دارن. این متد یکجا هر دو حالت رو
+        // پوشش می‌ده تا نمایش (مثلاً کارتابل کارشناس) هیچ‌وقت نشکنه.
+        public string? DecryptOrFallback(string? encryptedValue, string? plaintextFallback)
+        {
+            return !string.IsNullOrEmpty(encryptedValue) ? Decrypt(encryptedValue) : plaintextFallback;
+        }
+
         // ---------------- SEARCH HASH (Blind Index) ----------------
         // برای جستجو و uniqueness check روی داده‌های encrypted استفاده می‌شود.
         // برخلاف Encrypt، این تابع deterministic است (بدون IV تصادفی)
