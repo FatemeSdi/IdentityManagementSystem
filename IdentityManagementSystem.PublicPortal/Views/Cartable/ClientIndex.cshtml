@@ -261,7 +261,7 @@
                     }
                     else
                     {
-                        <div class="list-group">
+                        <div class="list-group" id="pendingRequestsList">
                             @foreach (var item in pendingRequests)
                             {
                                 <div class="list-group-item d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -274,14 +274,15 @@
                                 </div>
                             }
                         </div>
+                        <div id="pendingRequestsPagination"></div>
                     }
                 </div>
             }
         </div>
     </div>
 
-    <!-- کارت ایجاد درخواست جدید -->
-    <div class="card custom-card w-100">
+    <!-- کارت ایجاد درخواست جدید — پیش‌فرض مخفیه، با کلیک «قبض انبار» در دراپ‌داون خدمات هدر نمایش داده می‌شه -->
+    <div class="card custom-card w-100 d-none" id="newRequestSection">
         <div class="card-header">
             <div class="card-title mb-0">
                 <i class="ri-file-add-line me-1"></i>
@@ -486,7 +487,57 @@
 @section Scripts {
     <script src="~/assets/libs/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
+        // صفحه‌بندی سمت کلاینت برای فهرست درخواست‌های «در انتظار بررسی» — پنج‌تا پنج‌تا
+        // (داده‌ها از قبل کامل توسط سرور رندر شده‌اند؛ اینجا فقط نمایش/مخفی‌سازی مدیریت می‌شود)
+        function paginateList(listId, paginationHostId, pageSize) {
+            var list = document.getElementById(listId);
+            var host = document.getElementById(paginationHostId);
+            if (!list || !host) return;
+
+            var items = Array.prototype.slice.call(list.children);
+            if (items.length <= pageSize) return;
+
+            var pageCount = Math.ceil(items.length / pageSize);
+            var currentPage = 1;
+
+            function toPersianDigits(value) {
+                return value.toString().replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; });
+            }
+
+            function render() {
+                items.forEach(function (item, idx) {
+                    var page = Math.floor(idx / pageSize) + 1;
+                    item.style.display = page === currentPage ? '' : 'none';
+                });
+
+                var ul = document.createElement('ul');
+                ul.className = 'pagination justify-content-center mb-0';
+
+                for (var p = 1; p <= pageCount; p++) {
+                    var li = document.createElement('li');
+                    li.className = 'page-item' + (p === currentPage ? ' active' : '');
+                    var a = document.createElement('a');
+                    a.className = 'page-link';
+                    a.href = 'javascript:void(0);';
+                    a.textContent = toPersianDigits(p);
+                    (function (page) {
+                        a.addEventListener('click', function () { currentPage = page; render(); });
+                    })(p);
+                    li.appendChild(a);
+                    ul.appendChild(li);
+                }
+
+                host.innerHTML = '';
+                host.className = 'pagination-style-1 mt-3';
+                host.appendChild(ul);
+            }
+
+            render();
+        }
+
         $(document).ready(function () {
+            paginateList('pendingRequestsList', 'pendingRequestsPagination', 5);
+
             let otpVerified = false;
             let otpTimerInterval = null;
             let remainingSeconds = 0;

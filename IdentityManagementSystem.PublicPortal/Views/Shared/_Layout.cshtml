@@ -18,46 +18,55 @@
             --primary-rgb: 27, 66, 117;
         }
 
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .footer {
+            margin-top: auto;
+        }
+
         .small, small {
             font-size: 0.8125rem;
+        }
+
+        /* هدر ساده و خودکفا — این پروژه سایدبار نداره و کلاس‌های .app-header/.main-header-container
+           یزن برای شل ادمین با ارتفاع ثابت طراحی شدن؛ برای هدر دو-خطی این پروژه مناسب نیستن
+           (باعث شکستن دکمه‌ها به خط بعد می‌شدن)، پس هدر مستقل با ارتفاع خودکار ساخته شده. */
+        .portal-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #fff;
+            border-bottom: 1px solid var(--default-border, #e9edf1);
+            box-shadow: 0 4px 16px rgba(118, 200, 254, .03);
         }
     </style>
 </head>
 <body>
-    <header class="app-header">
-        <div class="main-header-container container-fluid px-0">
-            <div class="header-content-left ps-3 ps-lg-4">
-                <div class="header-element">
-                    <a href="@Url.Action("ClientIndex", "Cartable")" class="d-flex align-items-center gap-2 text-decoration-none">
-                        <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" style="height:44px;width:auto;" onerror="this.style.display='none'" />
-                        <span>
-                            <span class="d-block fs-15 fw-bold text-default">سازمان بنادر و دریانوردی</span>
-                            <span class="d-none d-sm-block fs-13 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
-                        </span>
-                    </a>
-                </div>
-            </div>
-            <ul class="header-content-right list-unstyled d-flex align-items-center gap-1 mb-0 pe-3 pe-lg-4">
-                <li class="header-element">
-                    <div class="dropdown">
-                        <a href="javascript:void(0);" class="btn btn-sm btn-primary-light dropdown-toggle" data-bs-toggle="dropdown">
-                            <i class="ri-apps-2-line"></i><span class="d-none d-sm-inline"> خدمات</span>
+    <header class="portal-header">
+        <div class="container-fluid px-0 d-flex align-items-center justify-content-between flex-wrap">
+            <a href="@Url.Action("ClientIndex", "Cartable")" class="d-flex align-items-center gap-2 text-decoration-none py-2 ps-3 ps-lg-4">
+                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" style="height:44px;width:auto;" onerror="this.style.display='none'" />
+                <span>
+                    <span class="d-block fs-15 fw-bold text-default">سازمان بنادر و دریانوردی</span>
+                    <span class="d-none d-sm-block fs-13 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
+                </span>
+            </a>
+            <div class="dropdown py-2 pe-3 pe-lg-4">
+                <a href="javascript:void(0);" class="btn btn-sm btn-primary-light dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="ri-apps-2-line"></i><span class="d-none d-sm-inline"> خدمات</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item js-show-new-request" href="javascript:void(0);">
+                            <i class="ri-archive-line me-2"></i>قبض انبار
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a class="dropdown-item" href="@Url.Action("ClientIndex", "Cartable")#trackSection">
-                                    <i class="ri-archive-line me-2"></i>قبض انبار
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
-                <li class="header-element">
-                    <a href="#trackSection" class="btn btn-sm btn-primary-light">
-                        <i class="ri-search-eye-line"></i><span class="d-none d-sm-inline"> پیگیری درخواست</span>
-                    </a>
-                </li>
-            </ul>
+                    </li>
+                </ul>
+            </div>
         </div>
     </header>
 
@@ -141,6 +150,17 @@
             if (yearEl) {
                 yearEl.textContent = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
             }
+
+            // نمایش بخش «ثبت درخواست جدید» با کلیک روی «قبض انبار» در دراپ‌داون خدمات
+            // (این بخش با d-none پیش‌فرض مخفیه — رجوع کن به ClientIndex.cshtml)
+            document.querySelectorAll('.js-show-new-request').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    var section = document.getElementById('newRequestSection');
+                    if (!section) return;
+                    section.classList.remove('d-none');
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            });
         });
     </script>
 
