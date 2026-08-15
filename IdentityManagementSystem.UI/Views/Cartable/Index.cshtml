@@ -38,61 +38,106 @@
         white-space: nowrap;
         vertical-align: middle;
     }
+
+    /* اطمینان از باکس‌دار بودن ظاهر ویجت Choices.js و اینپوت‌های تقویم فارسی روی این صفحه
+       (مستقل از اینکه CSS کتابخونه درست لود شده باشه یا نه) — هم‌راستا با ظاهر form-control */
+    #cartableFilterForm .choices {
+        margin-bottom: 0;
+    }
+
+        #cartableFilterForm .choices .choices__inner {
+            background-color: var(--form-control-bg, #fff);
+            border: 1px solid var(--input-border, #e2e6f1);
+            border-radius: 0.25rem;
+            min-height: calc(1.7em + 0.75rem + 2px);
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            display: flex;
+            align-items: center;
+        }
+
+        #cartableFilterForm .choices.is-open .choices__inner {
+            border-color: rgb(var(--primary-rgb));
+        }
+
+    #cartableFilterForm .jalali-date-input {
+        background-color: var(--form-control-bg, #fff) !important;
+    }
 </style>
 
 <!-- جستجو و فیلتر -->
-<div class="row mb-1">
-    <div class="col-12">
-        <form asp-action="Index" method="get" id="cartableFilterForm" class="d-flex align-items-center gap-2 flex-wrap">
-            <input type="text"
-                   class="form-control"
-                   name="search"
-                   value="@currentSearch"
-                   placeholder="جستجو..."
-                   style="max-width: 280px;" />
+<div class="card custom-card mb-3">
+    <div class="card-body pb-2">
+        <form asp-action="Index" method="get" id="cartableFilterForm" class="row gy-3 align-items-end">
+            <div class="col-lg-3 col-md-6">
+                <label for="cartableSearch" class="form-label text-default fs-13">جستجو</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="ri-search-line"></i></span>
+                    <input type="text"
+                           id="cartableSearch"
+                           class="form-control"
+                           name="search"
+                           value="@currentSearch"
+                           placeholder="شماره درخواست، کد ملی، شماره همراه..." />
+                </div>
+            </div>
 
-            <select name="filterStatus" id="filterStatus" class="form-select" style="max-width: 200px;">
-                <option value="">همه درخواست‌ها</option>
-                <option value="approved" selected="@(currentFilter == "approved")">تایید شده</option>
-                <option value="rejected" selected="@(currentFilter == "rejected")">رد شده</option>
-                <option value="pending" selected="@(currentFilter == "pending")">در انتظار بررسی</option>
-            </select>
+            <div class="col-lg-3 col-md-6">
+                <label for="filterStatus" class="form-label text-default fs-13">وضعیت</label>
+                <select name="filterStatus" id="filterStatus" class="form-select">
+                    <option value="">همه درخواست‌ها</option>
+                    <option value="approved" selected="@(currentFilter == "approved")">تایید شده</option>
+                    <option value="rejected" selected="@(currentFilter == "rejected")">رد شده</option>
+                    <option value="pending" selected="@(currentFilter == "pending")">در انتظار بررسی</option>
+                </select>
+            </div>
 
-            <input type="text"
-                   id="fromDateDisplay"
-                   class="form-control jalali-date-input"
-                   placeholder="از تاریخ"
-                   value="@fromDatePersianDisplay"
-                   readonly
-                   style="max-width: 140px;" />
-            <input type="text"
-                   id="toDateDisplay"
-                   class="form-control jalali-date-input"
-                   placeholder="تا تاریخ"
-                   value="@toDatePersianDisplay"
-                   readonly
-                   style="max-width: 140px;" />
+            <div class="col-lg-2 col-md-6">
+                <label for="fromDateDisplay" class="form-label text-default fs-13">از تاریخ</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="ri-calendar-line"></i></span>
+                    <input type="text"
+                           id="fromDateDisplay"
+                           class="form-control jalali-date-input"
+                           placeholder="از تاریخ"
+                           value="@fromDatePersianDisplay"
+                           readonly />
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-6">
+                <label for="toDateDisplay" class="form-label text-default fs-13">تا تاریخ</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="ri-calendar-line"></i></span>
+                    <input type="text"
+                           id="toDateDisplay"
+                           class="form-control jalali-date-input"
+                           placeholder="تا تاریخ"
+                           value="@toDatePersianDisplay"
+                           readonly />
+                </div>
+            </div>
+
             <input type="hidden" name="fromDate" id="fromDateHidden" value="@fromDateGregorian" />
             <input type="hidden" name="toDate" id="toDateHidden" value="@toDateGregorian" />
 
-            <button type="submit" class="btn btn-primary">
-                <i class="ri-search-line"></i>
-            </button>
+            <div class="col-lg-2 col-md-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="ri-search-line me-1"></i> اعمال فیلتر
+                </button>
 
-            @if (hasCustomRange)
-            {
-                <a href="@Url.Action("Index", new { search = currentSearch, filterStatus = currentFilter })" class="btn btn-outline-secondary btn-sm">
-                    <i class="ri-calendar-check-line me-1"></i> امروز
-                </a>
-            }
+                @if (hasCustomRange)
+                {
+                    <a href="@Url.Action("Index", new { search = currentSearch, filterStatus = currentFilter })" class="btn btn-outline-secondary" title="بازگشت به امروز">
+                        <i class="ri-calendar-check-line"></i>
+                    </a>
+                }
+            </div>
         </form>
-    </div>
-</div>
-<div class="row mb-4">
-    <div class="col-12">
-        <small class="text-muted">
+
+        <small class="text-muted d-block mt-2">
             <i class="ri-information-line"></i>
-            @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده." : "بدون انتخاب بازه، فقط درخواست‌های امروز نمایش داده می‌شود .")
+            @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده." : "بدون انتخاب بازه، فقط درخواست‌های امروز نمایش داده می‌شود.")
         </small>
     </div>
 </div>
