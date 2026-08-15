@@ -1,0 +1,29 @@
+﻿@font-face {
+    font-family: 'FarNazanin';
+    src: url('/fonts/Far_Nazanin.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+.toast-success {
+    background-color: #2b7a4b !important;
+    border-color: #a8e6cf !important;
+}
+
+.toast-error {
+    background-color: #a33d5b !important;
+    border-color: #ffb3c6 !important;
+}
+
+body {
+    direction: rtl;
+    text-align: right;
+    overflow-x: hidden;
+}
+
+.left-btn {
+    margin-right: auto;
+    float: left;
+    position: absolute;
+    left: 2%;
+}
