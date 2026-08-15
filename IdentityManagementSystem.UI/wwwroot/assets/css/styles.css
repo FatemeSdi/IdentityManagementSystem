@@ -1,6 +1,4 @@
 
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Lobster&display=swap");
 /*------------------------------------------------------------------
 
 ------------------------------------------------------------------*/
@@ -23,7 +21,7 @@ pagination
 popovers
 progress
 tables
-toast
+toast 
 tooltips
 authentication
 custom
@@ -58,82 +56,83 @@ typography
 */
 /*Plus Jakarta*/
 :root {
-  --body-bg-rgb: 242, 244, 249;
-  --primary-rgb: 86, 184, 183;
-  --secondary-rgb: 127, 103, 257;
-  --warning-rgb: 255, 169, 9;
-  --info-rgb: 15, 188, 249;
-  --success-rgb: 83, 196, 5;
-  --danger-rgb: 253, 73, 99;
-  --light-rgb: 246, 249, 249;
-  --dark-rgb: 10, 10, 10;
-  --orange-rgb: 254, 124, 88;
-  --pink-rgb: 254, 84, 155;
-  --teal-rgb: 0, 216, 216;
-  --purple-rgb: 123, 118, 254;
-  --green-rgb: 1, 239, 140;
-  --default-body-bg-color: rgb(var(--body-bg-rgb));
-  --primary-color: rgb(var(--primary-rgb));
-  --primary-border: rgb(var(--primary-rgb));
-  --primary01: rgba(var(--primary-rgb), 0.1);
-  --primary02: rgba(var(--primary-rgb), 0.2);
-  --primary03: rgba(var(--primary-rgb), 0.3);
-  --primary04: rgba(var(--primary-rgb), 0.4);
-  --primary05: rgba(var(--primary-rgb), 0.5);
-  --primary06: rgba(var(--primary-rgb), 0.6);
-  --primary07: rgba(var(--primary-rgb), 0.7);
-  --primary08: rgba(var(--primary-rgb), 0.8);
-  --primary09: rgba(var(--primary-rgb), 0.9);
-  --primary005: rgba(var(--primary-rgb), 0.05);
-  --default-font-family: IRANSans;
-  --default-font-weight: 400;
-  --default-text-color: #010101;
-  --default-border: #eeedf3;
-  --default-background: #f9fafb;
-  --menu-bg: #fff;
-  --menu-prime-color: #61748f;
-  --menu-border-color: #e2e5e7;
-  --header-bg: #fff;
-  --header-prime-color: #61748f;
-  --header-border-color: #e2e5e7;
-  --custom-white: #fff;
-  --custom-black: #000;
-  --bootstrap-card-border: #e2e5e7;
-  --list-hover-focus-bg: #f5f6f7;
-  --text-muted: #8d9eb5;
-  --input-border: #e2e6f1;
-  --form-control-bg: #ffffff;
-  --bs-link-color-rgb: var(--default-text-color);
-  /* Gray set */
-  --gray-1: #f9fafb;
-  --gray-2: #f2f4f5;
-  --gray-3: #e6eaeb;
-  --gray-4: #dbdfe1;
-  --gray-5: #949eb7;
-  --gray-6: #7987a1;
-  --gray-7: #4d5875;
-  --gray-8: #383853;
-  --gray-9: #323251;
-  /* White set */
-  --white-1: rgba(255, 255, 255, 0.1);
-  --white-2: rgba(255, 255, 255, 0.2);
-  --white-3: rgba(255, 255, 255, 0.3);
-  --white-4: rgba(255, 255, 255, 0.4);
-  --white-5: rgba(255, 255, 255, 0.5);
-  --white-6: rgba(255, 255, 255, 0.6);
-  --white-7: rgba(255, 255, 255, 0.7);
-  --white-8: rgba(255, 255, 255, 0.8);
-  --white-9: rgba(255, 255, 255, 0.9);
-  /* Black set */
-  --black-1: rgba(0, 0, 0, 0.1);
-  --black-2: rgba(0, 0, 0, 0.2);
-  --black-3: rgba(0, 0, 0, 0.3);
-  --black-4: rgba(0, 0, 0, 0.4);
-  --black-5: rgba(0, 0, 0, 0.5);
-  --black-6: rgba(0, 0, 0, 0.6);
-  --black-7: rgba(0, 0, 0, 0.7);
-  --black-8: rgba(0, 0, 0, 0.8);
-  --black-9: rgba(0, 0, 0, 0.9);
+    --body-bg-rgb: 242, 244, 249;
+    --primary-rgb: 2, 76, 147;
+    --secondary-rgb: 127, 103, 257;
+    --warning-rgb: 255, 169, 9;
+    --info-rgb: 15, 188, 249;
+    --success-rgb: 83, 196, 5;
+    --danger-rgb: 253, 73, 99;
+    --light-rgb: 246, 249, 249;
+    --dark-rgb: 10, 10, 10;
+    --orange-rgb: 254, 124, 88;
+    --pink-rgb: 254, 84, 155;
+    --teal-rgb: 0, 216, 216;
+    --purple-rgb: 123, 118, 254;
+    --green-rgb: 1, 239, 140;
+    --default-body-bg-color: rgb(var(--body-bg-rgb));
+    --primary-color: rgb(var(--primary-rgb));
+    --primary-border: rgb(var(--primary-rgb));
+    --primary01: rgba(var(--primary-rgb), 0.1);
+    --primary02: rgba(var(--primary-rgb), 0.2);
+    --primary03: rgba(var(--primary-rgb), 0.3);
+    --primary04: rgba(var(--primary-rgb), 0.4);
+    --primary05: rgba(var(--primary-rgb), 0.5);
+    --primary06: rgba(var(--primary-rgb), 0.6);
+    --primary07: rgba(var(--primary-rgb), 0.7);
+    --primary08: rgba(var(--primary-rgb), 0.8);
+    --primary09: rgba(var(--primary-rgb), 0.9);
+    --primary005: rgba(var(--primary-rgb), 0.05);
+    --default-font-family: Vazir, IRANSans, Tahoma, sans-serif;
+    --default-font-weight: 400;
+    --default-font-size: 25px;
+    --default-text-color: #010101;
+    --default-border: #eeedf3;
+    --default-background: #f9fafb;
+    --menu-bg: #fff;
+    --menu-prime-color: #61748f;
+    --menu-border-color: #e2e5e7;
+    --header-bg: #fff;
+    --header-prime-color: #61748f;
+    --header-border-color: #e2e5e7;
+    --custom-white: #fff;
+    --custom-black: #000;
+    --bootstrap-card-border: #e2e5e7;
+    --list-hover-focus-bg: #f5f6f7;
+    --text-muted: #8d9eb5;
+    --input-border: #e2e6f1;
+    --form-control-bg: #ffffff;
+    --bs-link-color-rgb: var(--default-text-color);
+    /* Gray set */
+    --gray-1: #f9fafb;
+    --gray-2: #f2f4f5;
+    --gray-3: #e6eaeb;
+    --gray-4: #dbdfe1;
+    --gray-5: #949eb7;
+    --gray-6: #7987a1;
+    --gray-7: #4d5875;
+    --gray-8: #383853;
+    --gray-9: #323251;
+    /* White set */
+    --white-1: rgba(255, 255, 255, 0.1);
+    --white-2: rgba(255, 255, 255, 0.2);
+    --white-3: rgba(255, 255, 255, 0.3);
+    --white-4: rgba(255, 255, 255, 0.4);
+    --white-5: rgba(255, 255, 255, 0.5);
+    --white-6: rgba(255, 255, 255, 0.6);
+    --white-7: rgba(255, 255, 255, 0.7);
+    --white-8: rgba(255, 255, 255, 0.8);
+    --white-9: rgba(255, 255, 255, 0.9);
+    /* Black set */
+    --black-1: rgba(0, 0, 0, 0.1);
+    --black-2: rgba(0, 0, 0, 0.2);
+    --black-3: rgba(0, 0, 0, 0.3);
+    --black-4: rgba(0, 0, 0, 0.4);
+    --black-5: rgba(0, 0, 0, 0.5);
+    --black-6: rgba(0, 0, 0, 0.6);
+    --black-7: rgba(0, 0, 0, 0.7);
+    --black-8: rgba(0, 0, 0, 0.8);
+    --black-9: rgba(0, 0, 0, 0.9);
 }
 /*Font Family*/
 /*Font Size*/
@@ -744,9 +743,9 @@ typography
 [data-menu-styles=dark] .app-sidebar .side-menu__item:hover {
   color: #fff;
 }
-[data-menu-styles=dark][data-theme-mode=light] {
-  --menu-bg: #3b497e;
-}
+    [data-menu-styles=dark][data-theme-mode=light] {
+        --menu-bg: #213685;
+    }
 [data-menu-styles=dark][data-theme-mode=light][data-bg-img=bgimg1] {
   --menu-bg: url(../images/menu-bg-images/bg-img1.jpg);
 }
@@ -777,8 +776,8 @@ typography
   }
 }
 [data-menu-styles=dark][data-theme-mode=light] {
-  --menu-bg: #3b497e;
-  --menu-prime-color: #abb8e6;
+    --menu-bg: #1a3081;
+    --menu-prime-color: #abb8e6;
 }
 [data-menu-styles=dark][data-theme-mode=light] .main-menu > .slide > .side-menu__item:hover {
   background-color: rgba(255, 255, 255, 0.1);

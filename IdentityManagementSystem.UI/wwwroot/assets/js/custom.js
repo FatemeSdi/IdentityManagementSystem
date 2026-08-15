@@ -400,51 +400,51 @@ if (document.querySelector("#switcher-canvas")) {
   /* back to top */
 
   /* header dropdowns scroll */
-  var myHeadernotification = document.getElementById("header-notification-scroll");
-  new SimpleBar(myHeadernotification, { autoHide: true });
+  //var myHeadernotification = document.getElementById("header-notification-scroll");
+  //new SimpleBar(myHeadernotification, { autoHide: true });
 
-  var myHeadernotification = document.getElementById("header-notification-scroll1");
-  new SimpleBar(myHeadernotification, { autoHide: true });
+  //var myHeadernotification = document.getElementById("header-notification-scroll1");
+  //new SimpleBar(myHeadernotification, { autoHide: true });
 
-  var myHeadernotification = document.getElementById("header-notification-scroll2");
-  new SimpleBar(myHeadernotification, { autoHide: true });
+  //var myHeadernotification = document.getElementById("header-notification-scroll2");
+  //new SimpleBar(myHeadernotification, { autoHide: true });
 
-  var myHeadernotification = document.getElementById("header-notification-scroll3");
-  new SimpleBar(myHeadernotification, { autoHide: true });
+  //var myHeadernotification = document.getElementById("header-notification-scroll3");
+  //new SimpleBar(myHeadernotification, { autoHide: true });
 
-  var myHeaderCart = document.getElementById("header-cart-items-scroll");
-  new SimpleBar(myHeaderCart, { autoHide: true });
+  //var myHeaderCart = document.getElementById("header-cart-items-scroll");
+  //new SimpleBar(myHeaderCart, { autoHide: true });
   /* header dropdowns scroll */
 
-  const autoCompleteJS = new autoComplete({
-    selector: "#header-search",
-    data: {
-      src: [
-        "What is the meaning of life?",
-        "How does gravity work?",
-        "Why is the sky blue?",
-        "What is the capital of France?",
-        "Who painted the Mona Lisa?",
-        "What is the speed of light?",
-        "Why do we dream?",
-        "How do birds fly?",
-        "What is the largest mammal?",
-        "Why do leaves change color in the fall?"
-      ],
-      cache: true,
-    },
-    resultItem: {
-      highlight: true
-    },
-    events: {
-      input: {
-        selection: (event) => {
-          const selection = event.detail.selection.value;
-          autoCompleteJS.input.value = selection;
-        }
-      }
-    }
-  });
+  //const autoCompleteJS = new autoComplete({
+  //  selector: "#header-search",
+  //  data: {
+  //    src: [
+  //      "What is the meaning of life?",
+  //      "How does gravity work?",
+  //      "Why is the sky blue?",
+  //      "What is the capital of France?",
+  //      "Who painted the Mona Lisa?",
+  //      "What is the speed of light?",
+  //      "Why do we dream?",
+  //      "How do birds fly?",
+  //      "What is the largest mammal?",
+  //      "Why do leaves change color in the fall?"
+  //    ],
+  //    cache: true,
+  //  },
+  //  resultItem: {
+  //    highlight: true
+  //  },
+  //  events: {
+  //    input: {
+  //      selection: (event) => {
+  //        const selection = event.detail.selection.value;
+  //        autoCompleteJS.input.value = selection;
+  //      }
+  //    }
+  //  }
+  //});
 })();
 
 /* full screen */

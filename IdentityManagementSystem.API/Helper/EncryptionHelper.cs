@@ -127,6 +127,30 @@ namespace IdentityManagementSystem.API.Helpers
                 .Replace(" ", ""); // برای کد ملی/شماره سند که نباید فاصله معنادار داشته باشند
         }
 
+        // ---------------- SIGN / VERIFY PAYLOAD (stateless tokens, e.g. password-reset) ----------------
+        // برای صدور توکن‌های کوتاه‌عمر بدون نیاز به ذخیره‌سازی جداگانه در DB (مثلاً resetToken بازیابی رمز عبور)
+        public string SignPayload(string payload)
+        {
+            using var hmac = new HMACSHA256(_hmacKey);
+            byte[] bytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            return Convert.ToHexString(bytes).ToLower();
+        }
+
+        public bool VerifyPayload(string payload, string signature)
+        {
+            if (string.IsNullOrEmpty(signature))
+                return false;
+
+            var expected = SignPayload(payload);
+            var expectedBytes = Encoding.UTF8.GetBytes(expected);
+            var actualBytes = Encoding.UTF8.GetBytes(signature.ToLower());
+
+            if (expectedBytes.Length != actualBytes.Length)
+                return false;
+
+            return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+        }
+
         // ---------------- SAFE CHECK ----------------
         private bool IsBase64(string input)
         {

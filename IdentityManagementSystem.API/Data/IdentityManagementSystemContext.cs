@@ -33,6 +33,7 @@ namespace IdentityManagementSystem.API.Data
         public DbSet<Company> Companies { get; set; }
         public DbSet<CartableRole> CartableRoles { get; set; }
         public DbSet<RequestType> RequestTypes { get; set; }
+        public DbSet<LoginOtp> LoginOtps { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -61,6 +62,7 @@ namespace IdentityManagementSystem.API.Data
             modelBuilder.Entity<Company>().ToTable("Company", "Define");
             modelBuilder.Entity<CartableRole>().ToTable("CartableRoles", "WF");
             modelBuilder.Entity<RequestType>().ToTable("RequestType", "Define");
+            modelBuilder.Entity<LoginOtp>().ToTable("LoginOtp", "Sec");
 
             // ========== User ==========
             modelBuilder.Entity<User>(entity =>
@@ -324,6 +326,18 @@ namespace IdentityManagementSystem.API.Data
                       .WithMany()
                       .HasForeignKey(wr => wr.CompanyId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ========== LoginOtp ==========
+            modelBuilder.Entity<LoginOtp>(entity =>
+            {
+                entity.HasKey(o => o.OtpId);
+                entity.HasIndex(o => new { o.UserId, o.Purpose });
+
+                entity.HasOne(o => o.User)
+                      .WithMany()
+                      .HasForeignKey(o => o.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ========== RefreshToken ==========

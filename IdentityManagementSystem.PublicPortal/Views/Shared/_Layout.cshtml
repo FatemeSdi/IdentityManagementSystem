@@ -14,287 +14,90 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
     <style>
-        @@font-face {
-            font-family: 'Vazirmatn';
-            src: url('/fonts/Vazir/Vazirmatn-Regular.woff2') format('woff2');
-            font-weight: 400;
-            font-style: normal;
-            font-display: swap;
-        }
-
-        @@font-face {
-            font-family: 'Vazirmatn';
-            src: url('/fonts/Vazir/Vazirmatn-Medium.woff2') format('woff2');
-            font-weight: 500;
-            font-style: normal;
-            font-display: swap;
-        }
-
-        @@font-face {
-            font-family: 'Vazirmatn';
-            src: url('/fonts/Vazir/Vazirmatn-SemiBold.woff2') format('woff2');
-            font-weight: 600;
-            font-style: normal;
-            font-display: swap;
-        }
-
-        @@font-face {
-            font-family: 'Vazirmatn';
-            src: url('/fonts/Vazir/Vazirmatn-Bold.woff2') format('woff2');
-            font-weight: 700;
-            font-style: normal;
-            font-display: swap;
-        }
-
         :root {
-            --portal-navy: #14335e;
-            --portal-navy-2: #1b4275;
-            --portal-navy-light: #2f5a9c;
-            --portal-gold: #b78a34;
-            --portal-bg: #f2f5f9;
-        }
-
-        * {
-            font-family: 'Vazirmatn', 'FarNazanin', Tahoma, sans-serif;
-        }
-
-        html, body {
-            background: var(--portal-bg);
-            min-height: 100vh;
+            --primary-rgb: 27, 66, 117;
         }
 
         body {
-            direction: rtl;
-            text-align: right;
-            overflow-x: hidden;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        /* ===================== هدر ===================== */
-        .portal-topbar {
-            background: linear-gradient(120deg, var(--portal-navy), var(--portal-navy-light));
-            padding: 14px 0;
-        }
-
-        .portal-topbar .container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .portal-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-            .portal-brand img {
-                height: 44px;
-                width: auto;
-                flex-shrink: 0;
-            }
-
-        .portal-brand-text h1 {
-            color: #fff;
-            font-size: 16px;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .portal-brand-text p {
-            color: rgba(255, 255, 255, .72);
-            font-size: 12px;
-            margin: 2px 0 0;
-        }
-
-        .portal-nav {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-            .portal-nav a {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                color: rgba(255, 255, 255, .85);
-                text-decoration: none;
-                font-size: 13px;
-                font-weight: 500;
-                padding: 8px 14px;
-                border-radius: 8px;
-                transition: background-color .15s ease, color .15s ease;
-            }
-
-                .portal-nav a:hover {
-                    background: rgba(255, 255, 255, .12);
-                    color: #fff;
-                }
-
-        /* ===================== فوتر ===================== */
-        .portal-footer {
+        .footer {
             margin-top: auto;
-            background: #fff;
-            border-top: 1px solid #e6e9ef;
-            padding: 22px 0;
-        }
-
-        .portal-footer .container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .portal-footer p {
-            margin: 0;
-            font-size: 12.5px;
-            color: #7c8798;
-        }
-
-        .portal-footer-links {
-            display: flex;
-            gap: 18px;
-            flex-wrap: wrap;
-        }
-
-            .portal-footer-links a {
-                font-size: 12.5px;
-                color: #556077;
-                text-decoration: none;
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-            }
-
-                .portal-footer-links a:hover {
-                    color: var(--portal-navy-2);
-                }
-
-        /* ===================== عناصر مشترک ===================== */
-        .card.custom-card {
-            border: 1px solid #eef1f5;
-            border-radius: 16px;
-            box-shadow: 0 6px 24px rgba(20, 51, 94, 0.06);
-        }
-
-        .card.custom-card .card-header {
-            border-block-end: 1px solid #eef1f5 !important;
-            position: relative;
-            background: transparent;
-        }
-
-            .card.custom-card .card-header::after {
-                content: "";
-                position: absolute;
-                inset-inline-start: 1.25rem;
-                bottom: -1px;
-                width: 46px;
-                height: 3px;
-                background: linear-gradient(90deg, var(--portal-gold), var(--portal-navy-2));
-                border-radius: 3px;
-            }
-
-            .card.custom-card .card-header .card-title {
-                color: var(--portal-navy);
-                font-weight: 700;
-            }
-
-        .modal-header {
-            background: linear-gradient(135deg, var(--portal-navy), var(--portal-navy-light));
-            border-block-end: none;
-        }
-
-            .modal-header .modal-title {
-                color: #fff;
-            }
-
-            .modal-header .btn-close {
-                filter: invert(1);
-                opacity: .8;
-            }
-
-        .btn-primary {
-            background-color: var(--portal-navy-2) !important;
-            border-color: var(--portal-navy-2) !important;
-        }
-
-            .btn-primary:hover, .btn-primary:focus {
-                background-color: var(--portal-navy) !important;
-                border-color: var(--portal-navy) !important;
-            }
-
-        .btn-outline-primary {
-            color: var(--portal-navy-2);
-            border-color: var(--portal-navy-2);
-        }
-
-            .btn-outline-primary:hover {
-                background-color: var(--portal-navy-2);
-                border-color: var(--portal-navy-2);
-            }
-
-        .text-primary {
-            color: var(--portal-navy-2) !important;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-        }
-
-            .form-control:focus, .form-select:focus {
-                border-color: var(--portal-navy-2) !important;
-                box-shadow: 0 0 0 3px rgba(27, 66, 117, 0.12) !important;
-            }
-
-        @@media (max-width: 576px) {
-            .portal-brand-text p {
-                display: none;
-            }
-
-            .portal-nav a span {
-                display: none;
-            }
-
-            .portal-nav a {
-                padding: 8px;
-            }
         }
     </style>
 </head>
 <body>
-    <header class="portal-topbar">
-        <div class="container">
-            <a href="@Url.Action("ClientIndex", "Cartable")" class="portal-brand text-decoration-none">
-                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" onerror="this.style.display='none'" />
-                <div class="portal-brand-text">
-                    <h1>سازمان بنادر و دریانوردی</h1>
-                    <p>سامانه احراز اصالت سند و قبض انبار</p>
-                </div>
+    <header class="app-header sticky-top">
+        <div class="container d-flex align-items-center justify-content-between flex-wrap gap-2 py-2">
+            <a href="@Url.Action("ClientIndex", "Cartable")" class="d-flex align-items-center gap-2 text-decoration-none">
+                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="سازمان بنادر و دریانوردی" style="height:44px;width:auto;" onerror="this.style.display='none'" />
+                <span>
+                    <span class="d-block fs-15 fw-bold text-default">سازمان بنادر و دریانوردی</span>
+                    <span class="d-none d-sm-block fs-12 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
+                </span>
             </a>
-            <nav class="portal-nav">
-                <a href="@Url.Action("ClientIndex", "Cartable")"><i class="ri-home-5-line"></i><span>صفحه اصلی</span></a>
-                <a href="#trackSection"><i class="ri-search-eye-line"></i><span>پیگیری درخواست</span></a>
+            <nav class="d-flex align-items-center gap-1">
+                <a href="@Url.Action("ClientIndex", "Cartable")" class="btn btn-sm btn-primary-light">
+                    <i class="ri-home-5-line"></i><span class="d-none d-sm-inline"> صفحه اصلی</span>
+                </a>
+                <a href="#trackSection" class="btn btn-sm btn-primary-light">
+                    <i class="ri-search-eye-line"></i><span class="d-none d-sm-inline"> پیگیری درخواست</span>
+                </a>
             </nav>
         </div>
     </header>
 
     @RenderBody()
 
-    <footer class="portal-footer">
-        <div class="container">
-            <p>کلیه حقوق این سامانه متعلق به سازمان بنادر و دریانوردی می‌باشد.</p>
-            <div class="portal-footer-links">
-                <a href="#"><i class="ri-phone-line"></i>تماس با ما</a>
-                <a href="#"><i class="ri-question-line"></i>سوالات متداول</a>
-                <a href="#"><i class="ri-book-open-line"></i>راهنما</a>
+    <footer class="footer py-3 border-top">
+        <div class="container d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <p class="mb-0 fs-12 text-muted">کلیه حقوق این سامانه متعلق به سازمان بنادر و دریانوردی می‌باشد.</p>
+            <div class="d-flex gap-3">
+                <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="fs-12 text-muted text-decoration-none">
+                    <i class="ri-phone-line me-1"></i>تماس با ما
+                </a>
+                <a href="#" class="fs-12 text-muted text-decoration-none"><i class="ri-question-line me-1"></i>سوالات متداول</a>
+                <a href="#" class="fs-12 text-muted text-decoration-none"><i class="ri-book-open-line me-1"></i>راهنما</a>
             </div>
         </div>
     </footer>
+
+    <div class="modal fade" id="supportModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title"><i class="ri-headphone-line me-2"></i>پشتیبانی</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-phone-line"></i></span>
+                        <div>
+                            <div class="fs-12 text-muted">فاوا — نرم‌افزار (ساعات اداری)</div>
+                            <div class="fw-semibold" style="direction:ltr;text-align:right;">۰۹۹۴۰۶۵۷۷۵۳ — فاطمه صادقی</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-phone-line"></i></span>
+                        <div>
+                            <div class="fs-12 text-muted">داخلی</div>
+                            <div class="fw-semibold" style="direction:ltr;text-align:right;">۴۶۴۷</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-mail-line"></i></span>
+                        <div>
+                            <div class="fs-12 text-muted">ایمیل</div>
+                            <div class="fw-semibold">sdi10fateme@@gmail.com</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="~/assets/js/jquery.min.js"></script>
     <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>

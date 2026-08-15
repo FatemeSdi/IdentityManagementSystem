@@ -15,7 +15,7 @@
     }
 
     .hero-section h2 {
-        color: var(--portal-navy);
+        color: var(--primary-color);
         font-weight: 700;
         font-size: 28px;
         margin-bottom: 10px;
@@ -25,42 +25,6 @@
         color: #4d5b72;
         font-size: 14.5px;
         margin-bottom: 22px;
-    }
-
-    .hero-feature {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background: #fff;
-        border-radius: 12px;
-        padding: 12px 14px;
-        box-shadow: 0 4px 14px rgba(20, 51, 94, 0.06);
-        height: 100%;
-    }
-
-    .hero-feature .hf-icon {
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 19px;
-        color: #fff;
-        background: linear-gradient(135deg, var(--portal-navy-2), var(--portal-navy-light));
-    }
-
-    .hero-feature .hf-text b {
-        display: block;
-        font-size: 12.5px;
-        color: var(--portal-navy);
-        font-weight: 700;
-    }
-
-    .hero-feature .hf-text span {
-        font-size: 11px;
-        color: #7c8798;
     }
 
     .hero-illustration {
@@ -127,13 +91,13 @@
     }
 
     .step-item.active .step-circle {
-        border-color: var(--portal-navy-2);
-        background: var(--portal-navy-2);
+        border-color: var(--primary-color);
+        background: var(--primary-color);
         color: #fff;
     }
 
     .step-item.active .step-label {
-        color: var(--portal-navy);
+        color: var(--primary-color);
     }
 
     .step-item.completed .step-circle {
@@ -161,18 +125,6 @@
         margin-top: 22px;
     }
 
-    .notice-box {
-        background: #fff8e6;
-        border: 1px solid #f2e2b3;
-        border-radius: 12px;
-        padding: 12px 16px;
-        font-size: 12.5px;
-        color: #8a6d1f;
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-    }
-
     @@media (max-width: 991px) {
         .hero-illustration {
             max-width: 260px;
@@ -189,30 +141,21 @@
                 <p class="lead">ثبت و پیگیری درخواست مجوز بارگیری از کانتینرها در محوطه‌های اسکله</p>
 
                 <div class="row g-3">
-                    <div class="col-4">
-                        <div class="hero-feature">
-                            <div class="hf-icon"><i class="ri-shield-check-line"></i></div>
-                            <div class="hf-text">
-                                <b>احراز صریح و امن</b>
-                                <span>امنیت کامل اطلاعات شما</span>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm h-100">
+                            <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-shield-check-line"></i></span>
+                            <div>
+                                <b class="d-block fs-12 fw-bold text-default">احراز صریح و امن</b>
+                                <span class="fs-11 text-muted">امنیت کامل اطلاعات شما</span>
                             </div>
                         </div>
                     </div>
-                    <div class="col-4">
-                        <div class="hero-feature">
-                            <div class="hf-icon"><i class="ri-time-line"></i></div>
-                            <div class="hf-text">
-                                <b>پاسخگویی آنلاین</b>
-                                <span>نتیجه استعلام در کمترین زمان</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="hero-feature">
-                            <div class="hf-icon"><i class="ri-file-list-3-line"></i></div>
-                            <div class="hf-text">
-                                <b>پیگیری آسان</b>
-                                <span>با کد پیگیری، وضعیت را ببینید</span>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center gap-2 bg-white rounded p-2 shadow-sm h-100">
+                            <span class="avatar avatar-rounded bg-primary-transparent"><i class="ri-file-list-3-line"></i></span>
+                            <div>
+                                <b class="d-block fs-12 fw-bold text-default">پیگیری آسان</b>
+                                <span class="fs-11 text-muted">با کد پیگیری، وضعیت را ببینید</span>
                             </div>
                         </div>
                     </div>
@@ -245,7 +188,7 @@
 
 <div class="container portal-main" id="trackSection">
     <!-- پیگیری درخواست با کد پیگیری + شماره موبایل (بدون نیاز به لاگین) -->
-    <div class="card custom-card mb-3 w-100" style="max-width: 100%;">
+    <div class="card custom-card mb-3 w-100">
         <div class="card-header">
             <div class="card-title mb-0">
                 <i class="ri-search-eye-line me-1"></i>
@@ -320,7 +263,7 @@
     </div>
 
     <!-- کارت ایجاد درخواست جدید -->
-    <div class="card custom-card w-100" style="max-width: 100%;">
+    <div class="card custom-card w-100">
         <div class="card-header">
             <div class="card-title mb-0">
                 <i class="ri-file-add-line me-1"></i>
@@ -486,7 +429,7 @@
                         </div>
                     </div>
 
-                    <div class="notice-box mt-4">
+                    <div class="alert alert-warning d-flex align-items-start gap-2 mt-4" role="alert">
                         <i class="ri-error-warning-line mt-1"></i>
                         <div>لطفا اطلاعات را به‌صورت صحیح وارد کنید. در صورت مغایرت اطلاعات، درخواست شما رد خواهد شد.</div>
                     </div>

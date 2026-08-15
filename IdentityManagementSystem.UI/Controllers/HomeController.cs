@@ -36,8 +36,8 @@ namespace IdentityManagementSystem.UI.Controllers
         {
             if (!ModelState.IsValid)
             {
-                ViewBag.ErrorMessage = "لطفاً همه فیلدها را وارد کنید.";
-                return View(model);
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                return Json(new { success = false, message = string.Join(" | ", errors) });
             }
 
             try
@@ -64,25 +64,75 @@ namespace IdentityManagementSystem.UI.Controllers
                         HttpContext.Session.SetString("Username", loginResponse.Username ?? "");
                         HttpContext.Session.SetInt32("RoleId", loginResponse.Role?.RoleId ?? 0);
 
-                        return RedirectToAction("Index", "Cartable");
+                        return Json(new { success = true, redirectUrl = Url.Action("Index", "Cartable") });
                     }
-                    else
-                    {
-                        ViewBag.ErrorMessage = "خطا: توکن دریافت نشد.";
-                        return View(model);
-                    }
+
+                    return Json(new { success = false, message = "خطا: توکن دریافت نشد." });
                 }
                 else
                 {
-                    var error = await response.Content.ReadAsStringAsync();
-                    ViewBag.ErrorMessage = "خطا در ورود: " + error;
-                    return View(model);
+                    return Json(new { success = false, message = "نام کاربری یا رمز عبور اشتباه است." });
                 }
             }
             catch (Exception ex)
             {
-                ViewBag.ErrorMessage = "خطا در ارتباط با سرور: " + ex.Message;
-                return View(model);
+                return Json(new { success = false, message = "خطا در ارتباط با سرور: " + ex.Message });
+            }
+        }
+        #endregion
+
+        #region ForgotPassword
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            return View(new ForgotPasswordStartViewModel());
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> StartForgotPassword(ForgotPasswordIdentityRequest model)
+        {
+            try
+            {
+                var response = await _client.PostAsJsonAsync("auth/forgot-password/start", model);
+                var content = await response.Content.ReadAsStringAsync();
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "خطا در ارتباط با سرور: " + ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> VerifyForgotPasswordCode(ForgotPasswordVerifyRequest model)
+        {
+            try
+            {
+                var response = await _client.PostAsJsonAsync("auth/forgot-password/verify", model);
+                var content = await response.Content.ReadAsStringAsync();
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "خطا در ارتباط با سرور: " + ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetForgotPassword(ForgotPasswordResetRequest model)
+        {
+            try
+            {
+                var response = await _client.PostAsJsonAsync("auth/forgot-password/reset", model);
+                var content = await response.Content.ReadAsStringAsync();
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "خطا در ارتباط با سرور: " + ex.Message });
             }
         }
         #endregion

@@ -54,7 +54,7 @@
     .login-card {
         display: flex;
         width: 960px;
-        min-height: 450px;
+        height: 450px;
         max-width: 100%;
         background: #fff;
         border-radius: 20px;
@@ -119,20 +119,128 @@
 
     .btn-primary {
         height: 48px;
-        border: none !important;
+        border: none;
         border-radius: 10px;
         font-weight: 600;
-        background: #244b8b !important;
+        background: #244b8b;
     }
 
         .btn-primary:hover {
-            background: #1a3a6e !important;
+            background: #1a3a6e;
+        }
+
+    .support-btn {
+        background: rgba(255,255,255,.15);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.3);
+        border-radius: 50px;
+        padding: 10px 18px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+    }
+
+        .support-btn:hover {
+            background: rgba(255,255,255,.25);
+            color: #fff;
+        }
+
+    .support-number-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border-radius: 10px;
+        margin-bottom: 8px;
+    }
+
+        .support-number-item i {
+            color: #244b8b;
+            font-size: 18px;
+        }
+
+        .support-number-item .number {
+            font-weight: 600;
+            direction: ltr;
+            font-size: 13px;
+        }
+
+        .support-number-item .label {
+            color: #64748b;
+            font-size: 12px;
         }
 
     .authentication-barrier p {
         font-size: 12px;
         color: #94a3b8;
     }
+
+    #supportModal .modal-content {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 16px 48px rgba(36, 75, 139, 0.18);
+    }
+
+    #supportModal .modal-header {
+        background: linear-gradient(135deg, #244b8b, #3a6bb5);
+        color: #fff;
+        border: none;
+        padding: 20px 24px;
+        margin-bottom: 0;
+    }
+
+    #supportModal .modal-title {
+        color: #fff;
+        font-size: 17px;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    #supportModal .btn-close {
+        filter: invert(1);
+        opacity: .8;
+    }
+
+    #supportModal .modal-body {
+        padding: 24px;
+        background: #f8fafc;
+    }
+
+    #supportModal .support-number-item {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        transition: .2s;
+    }
+
+        #supportModal .support-number-item:hover {
+            border-color: #244b8b;
+            box-shadow: 0 4px 12px rgba(36, 75, 139, 0.08);
+        }
+
+        #supportModal .support-number-item i {
+            color: #244b8b;
+            font-size: 20px;
+            width: 28px;
+            text-align: center;
+        }
+
+        #supportModal .support-number-item .label {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        #supportModal .support-number-item .number {
+            font-weight: 600;
+            color: #0b2540;
+            font-size: 14px;
+            direction: ltr;
+        }
 
     @@media (max-width: 991px) {
         .login-card {
@@ -154,7 +262,7 @@
 <div class="login-container">
     <div class="official-header">
         <span class="badge-line"></span>
-        <h6>سامانه مدیریت هویت</h6>
+        <h6>سامانه احراز اصالت سند و قبض انبار</h6>
         <span class="badge-line"></span>
     </div>
 
@@ -164,25 +272,27 @@
             {
                 <div class="alert alert-danger py-2">@ViewBag.ErrorMessage</div>
             }
-            <form id="loginForm" asp-action="LoginPage" method="post" autocomplete="off">
+            <form id="loginForm" method="post" autocomplete="off" asp-action="LoginPage">
+                @Html.AntiForgeryToken()
                 <div asp-validation-summary="ModelOnly" class="text-danger d-none"></div>
 
                 <div class="form-group mb-3">
-                    <label class="form-label text-default" asp-for="Username"></label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="ri-user-line text-muted"></i></span>
-                        <input asp-for="Username" class="form-control" placeholder="نام کاربری را وارد کنید" autocomplete="username" required />
+                    <div class="input-group mt-3">
+                        <span class="input-group-text"><i class="ti ti-user text-muted"></i></span>
+                        <input asp-for="Username" class="form-control" placeholder="نام کاربری" autocomplete="username" required />
                     </div>
                     <span asp-validation-for="Username" class="text-danger d-block mt-1"></span>
                 </div>
 
                 <div class="form-group mb-3">
-                    <label class="form-label text-default" asp-for="Password"></label>
                     <div class="input-group" id="Password-toggle">
-                        <span class="input-group-text"><i class="ri-lock-2-line text-muted"></i></span>
-                        <input asp-for="Password" type="password" id="login-password" class="form-control" placeholder="رمز عبور" autocomplete="current-password" required />
+                        <span class="input-group-text"><i class="ti ti-lock text-muted"></i></span>
+                        <input asp-for="Password" type="password" class="form-control" placeholder="رمز عبور" autocomplete="current-password" required />
                     </div>
                     <span asp-validation-for="Password" class="text-danger d-block mt-1"></span>
+                    <a class="float-end link-danger fw-medium fs-12 mt-1" asp-action="ForgotPassword">
+                        رمز عبور را فراموش کرده‌اید؟
+                    </a>
                 </div>
 
                 <div id="securitySection" class="form-group text-start mt-2" style="direction:rtl;">
@@ -191,10 +301,10 @@
                                  asp-captcha-generator-language="English"
                                  asp-captcha-generator-display-mode="ShowDigits"
                                  asp-use-relative-urls="true"
-                                 asp-placeholder="کد امنیتی را وارد کنید"
+                                 asp-placeholder="کد امنیتی"
                                  asp-text-box-class="form-control captchaInput text-start"
-                                 asp-validation-error-message="کد امنیتی اشتباه است. لطفاً کد جدید را وارد کنید."
-                                 asp-too-many-requests-error-message="درخواست‌های زیاد! لطفاً یک دقیقه صبر کنید!"
+                                 asp-validation-error-message="کد امنیتی اشتباه است"
+                                 asp-too-many-requests-error-message="درخواست‌های زیاد! یک دقیقه صبر کنید"
                                  asp-font-name="Tahoma"
                                  asp-font-size="28"
                                  asp-fore-color="#333"
@@ -202,7 +312,12 @@
                                  asp-text-box-template="<div class='form-group'>{0}</div>"
                                  asp-validation-message-class="text-danger"
                                  asp-show-refresh-button="true"
-                                 asp-refresh-button-class="ri-refresh-line btn captcha-refresh" />
+                                 asp-refresh-button-class="ti ti-refresh btn captcha-refresh" />
+                </div>
+
+                <div class="form-check mt-3 mb-0">
+                    <input class="form-check-input" id="defaultCheck1" type="checkbox">
+                    <label class="form-check-label fs-13" for="defaultCheck1">مرا به خاطر بسپار</label>
                 </div>
 
                 <div class="form-group mt-3">
@@ -214,42 +329,101 @@
             </form>
 
             <div class="text-center mt-4 authentication-barrier">
-                <p class="mb-0"><i class="ri-shield-check-line me-1"></i>امنیت اطلاعات شما برای ما اهمیت دارد — تمامی فعالیت‌ها ثبت می‌شود</p>
+                <p class="mb-0"><i class="ti ti-shield-check me-1"></i>امنیت اطلاعات شما برای ما اهمیت دارد — تمامی فعالیت‌ها ثبت می‌شود</p>
             </div>
         </div>
 
         <div class="login-left">
             <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" />
-            <div class="login-title">سامانه مدیریت هویت<br>ورود کاربران</div>
+            <div class="login-title">اداره کل بنادر و دریانوردی<br>استان هرمزگان</div>
+            <button class="support-btn" data-bs-toggle="modal" data-bs-target="#supportModal">
+                <i class="ti ti-headset"></i><span>پشتیبانی</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="supportModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius:16px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-semibold"><i class="ti ti-headset me-2"></i>پشتیبانی</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <div class="support-number-item">
+                    <i class="ti ti-phone"></i>
+                    <div>
+                        <div class="label">فاوا — نرم‌افزار (ساعات اداری)</div>
+                        <div class="number">۰۹۹۴۰۶۵۷۷۵۳ — فاطمه صادقی</div>
+                    </div>
+                </div>
+                <div class="support-number-item">
+                    <i class="ti ti-phone"></i>
+                    <div>
+                        <div class="label">داخلی</div>
+                        <div class="number">۴۶۴۷</div>
+                    </div>
+                </div>
+                <div class="support-number-item">
+                    <i class="ti ti-mail"></i>
+                    <div>
+                        <div class="label">ایمیل</div>
+                        <div class="number">sdi10fateme@@gmail.com</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-
     <script>
+        function showToast(msg, isSuccess) {
+            Toastify({
+                text: msg, duration: 3000, gravity: "top", position: "left",
+                style: { background: isSuccess ? "#22c55e" : "#ef4444" }
+            }).showToast();
+        }
+        $('#loginForm').submit(function (e) {
+            e.preventDefault();
+            const btn = $("#loginBtn"), spinner = $("#loginSpinner"), text = $("#loginText");
+            btn.prop("disabled", true); spinner.removeClass("d-none"); text.text("در حال ورود...");
+            $.ajax({
+                url: '@Url.Action("LoginPage", "Home")', type: 'POST', data: $(this).serialize(),
+                success: function (res) {
+                    if (res.success) { text.text("ورود موفق"); window.location.href = res.redirectUrl; }
+                    else {
+                        spinner.addClass("d-none"); text.text("ورود"); btn.prop("disabled", false);
+                        showToast(res.message || "خطا در ورود", false);
+                        $('.captcha-refresh').click(); $('.captchaInput').val('');
+                    }
+                },
+                error: function () {
+                    spinner.addClass("d-none"); text.text("ورود"); btn.prop("disabled", false);
+                    showToast("خطای سرور", false);
+                    $('.captcha-refresh').click(); $('.captchaInput').val('');
+                }
+            });
+        });
         @if (TempData["SuccessLogoutMessage"] != null)
         {
-                @:showToast('@TempData["SuccessLogoutMessage"]', "success");
+                @:showToast(@Html.Raw(Json.Serialize(TempData["SuccessLogoutMessage"])), true);
         }
-
         const jwtToken = '@ViewBag.JwtToken';
         if (jwtToken) {
             localStorage.setItem('jwtToken', jwtToken);
             window.location.href = '/Cartable/Index';
         }
-
         document.addEventListener('DOMContentLoaded', function () {
             const shown = new Set();
             document.querySelectorAll('.field-validation-error, .validation-summary-errors').forEach(el => {
                 const m = el.textContent.trim();
-                if (m && !shown.has(m)) { shown.add(m); showToast(m, "error"); }
+                if (m && !shown.has(m)) { shown.add(m); showToast(m, false); }
             });
-
-            if ('@(!string.IsNullOrEmpty(ViewBag.ErrorMessage) ? ViewBag.ErrorMessage : "")' !== '') {
-                showToast('@ViewBag.ErrorMessage', "error");
-            }
+            if ('@(!string.IsNullOrEmpty(ViewBag.ErrorMessage) ? ViewBag.ErrorMessage : "")' !== '')
+                showToast('@ViewBag.ErrorMessage', false);
 
             const toggle = document.getElementById('Password-toggle');
             if (toggle) {
@@ -257,8 +431,8 @@
                 toggle.addEventListener('click', e => {
                     if (e.target.closest('span.input-group-text')) {
                         input.type = input.type === 'password' ? 'text' : 'password';
-                        icon.classList.toggle('ri-lock-2-line');
-                        icon.classList.toggle('ri-eye-line');
+                        icon.classList.toggle('ti-lock');
+                        icon.classList.toggle('ti-eye');
                     }
                 });
             }

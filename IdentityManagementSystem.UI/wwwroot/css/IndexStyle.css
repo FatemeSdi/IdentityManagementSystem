@@ -196,95 +196,13 @@
     }
 
 .btn-primary {
-    background-color: #244b8b !important;
-    border-color: #244b8b !important;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
 }
 
-    .btn-primary:hover,
-    .btn-primary:focus {
-        background-color: #1a3a6e !important;
-        border-color: #1a3a6e !important;
-    }
-
-.btn-outline-primary {
-    color: #244b8b;
-    border-color: #244b8b;
-}
-
-    .btn-outline-primary:hover,
-    .btn-outline-primary:active,
-    .btn-outline-primary:focus {
-        color: #fff;
-        background-color: #244b8b;
-        border-color: #244b8b;
-    }
-
-.text-primary {
-    color: #244b8b !important;
-}
-
-.form-control:focus,
-.form-select:focus {
-    border-color: #244b8b !important;
-    box-shadow: 0 0 0 3px rgba(36, 75, 139, 0.12) !important;
-}
-
-/* ==== هماهنگی رنگ کارت‌ها و جدول با صفحه ورود ==== */
-.card.custom-card {
-    border-radius: 14px;
-    box-shadow: 0 4px 20px rgba(36, 75, 139, 0.08);
-}
-
-.card.custom-card .card-header {
-    border-block-end: 1px solid #eef1f5 !important;
-    position: relative;
-}
-
-    .card.custom-card .card-header::after {
-        content: "";
-        position: absolute;
-        inset-inline-start: 1rem;
-        bottom: -1px;
-        width: 46px;
-        height: 3px;
-        background: linear-gradient(90deg, #b78a34, #244b8b);
-        border-radius: 3px;
-    }
-
-    .card.custom-card .card-header .card-title {
-        color: #0b2540;
-        font-weight: 700;
-    }
-
-#cartableTable thead th,
-#applicantTable thead th {
-    background-color: #244b8b;
-    color: #fff;
-    font-weight: 600;
-    border-color: #244b8b;
-}
-
-.page-item.active .page-link {
-    background-color: #244b8b !important;
-    border-color: #244b8b !important;
-}
-
-.page-link:hover {
-    color: #244b8b !important;
-}
-
-.modal-header {
-    background: linear-gradient(135deg, #244b8b, #3a6bb5);
-    border-block-end: none;
-}
-
-    .modal-header .modal-title {
-        color: #fff;
-    }
-
-    .modal-header .btn-close {
-        filter: invert(1);
-        opacity: .8;
+    .btn-primary:hover {
+        background-color: #0b5ed7;
+        border-color: #0a58ca;
     }
 
 .text-muted {

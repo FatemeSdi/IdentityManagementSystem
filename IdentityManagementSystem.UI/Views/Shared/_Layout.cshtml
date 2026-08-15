@@ -1,15 +1,48 @@
-﻿<!DOCTYPE html>
-<html lang="fa" dir="rtl">
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+
+    bool IsActive(string controller, params string[] actions) =>
+        string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase) &&
+        actions.Any(a => string.Equals(currentAction, a, StringComparison.OrdinalIgnoreCase));
+
+    string SlideClass(string controller, params string[] actions) =>
+        "slide" + (IsActive(controller, actions) ? " active" : "");
+
+    string ItemClass(string controller, params string[] actions) =>
+        "side-menu__item" + (IsActive(controller, actions) ? " active" : "");
+
+    var userRole = Context.Session.GetString("UserRole");
+    var userRoleId = Context.Session.GetString("UserRoleId");
+    var isAdmin = (userRole == "ادمین" || userRoleId == "3");
+}
+<!DOCTYPE html>
+<html dir="rtl" data-header-styles="light" data-menu-styles="light" data-nav-layout="vertical" data-theme-mode="light" data-toggled="close" data-vertical-style="overlay" lang="fa">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - ServiceUIPMO</title>
 
     <!-- Favicon -->
-    <link rel="icon" href="~/assets/images/brand-logos/logo-pmo.png" type="image/x-icon" />
+    <link rel="icon" href="~/assets/images/brand-logos/favicon.ico" type="image/x-icon" />
+
+    <!-- Main Theme Js (باید قبل از CSS لود شود تا از فلش استایل جلوگیری شود) -->
+    <script src="~/assets/js/main.js"></script>
+    <script>
+        // این برنامه فعلاً فقط از حالت روشن یزن پشتیبانی می‌کند؛ اگر تنظیمات
+        // تیره‌ای در localStorage از یک نسخه قبلی/دموی یزن باقی مانده باشد،
+        // همین‌جا خنثی می‌شود.
+        (function () {
+            var html = document.querySelector('html');
+            html.setAttribute('data-theme-mode', 'light');
+            html.setAttribute('data-header-styles', 'light');
+            html.setAttribute('data-menu-styles', 'light');
+            html.setAttribute('data-nav-layout', 'vertical');
+        })();
+    </script>
 
     <!-- Bootstrap RTL -->
-    <link href="~/assets/libs/bootstrap/css/bootstrap.rtl.min.css" rel="stylesheet" />
+    <link href="~/assets/libs/bootstrap/css/bootstrap.rtl.min.css" id="style" rel="stylesheet" />
 
     <!-- Main Styles -->
     <link href="~/assets/css/styles.css" rel="stylesheet" />
@@ -33,49 +66,104 @@
         <img src="~/assets/images/loader.svg" class="loader-img" alt="Loader" onerror="this.parentElement.style.display='none'">
     </div>
 
+    <!-- SIDEBAR -->
+    <aside class="app-sidebar" id="sidebar">
+        <div class="main-sidebar-header">
+            <a asp-controller="Cartable" asp-action="Index" class="header-logo d-flex align-items-center gap-2">
+                <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" style="height:40px;">
+                <span class="fw-bold" style="color:#0b2540;font-size:13px;line-height:1.3;">سامانه احراز اصالت سند<br>و قبض انبار</span>
+            </a>
+        </div>
+        <div class="main-sidebar" id="sidebar-scroll">
+            <nav class="main-menu-container nav nav-pills flex-column sub-open">
+                <ul class="main-menu">
+                    <li class="slide__category"><span class="category-name">منوی اصلی</span></li>
+
+                    <li class="@SlideClass("Cartable", "Index")">
+                        <a asp-controller="Cartable" asp-action="Index" class="@ItemClass("Cartable", "Index")">
+                            <i class="ti ti-inbox side-menu__icon"></i>
+                            <span class="side-menu__label">کارتابل</span>
+                        </a>
+                    </li>
+                    <li class="@SlideClass("Cartable", "Shahkar")">
+                        <a asp-controller="Cartable" asp-action="Shahkar" class="@ItemClass("Cartable", "Shahkar")">
+                            <i class="ti ti-fingerprint side-menu__icon"></i>
+                            <span class="side-menu__label">احراز شاهکار</span>
+                        </a>
+                    </li>
+                    <li class="@SlideClass("Cartable", "VerifyDocument")">
+                        <a asp-controller="Cartable" asp-action="VerifyDocument" class="@ItemClass("Cartable", "VerifyDocument")">
+                            <i class="ti ti-file-check side-menu__icon"></i>
+                            <span class="side-menu__label">راستی‌آزمایی سند</span>
+                        </a>
+                    </li>
+                    <li class="@SlideClass("Reports", "Index")">
+                        <a asp-controller="Reports" asp-action="Index" class="@ItemClass("Reports", "Index")">
+                            <i class="ti ti-chart-bar side-menu__icon"></i>
+                            <span class="side-menu__label">گزارش‌ها</span>
+                        </a>
+                    </li>
+
+                    @if (isAdmin)
+                    {
+                        <li class="slide__category"><span class="category-name">مدیریت</span></li>
+                        <li class="@SlideClass("Home", "Users")">
+                            <a asp-controller="Home" asp-action="Users" class="@ItemClass("Home", "Users")">
+                                <i class="ti ti-users side-menu__icon"></i>
+                                <span class="side-menu__label">مدیریت کاربران</span>
+                            </a>
+                        </li>
+                    }
+
+                    <li class="slide__category"><span class="category-name">حساب کاربری</span></li>
+                    <li class="@SlideClass("Home", "EditProfile")">
+                        <a asp-controller="Home" asp-action="EditProfile" class="@ItemClass("Home", "EditProfile")">
+                            <i class="ti ti-user-circle side-menu__icon"></i>
+                            <span class="side-menu__label">پروفایل</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </aside>
+
     <!-- PAGE -->
     <div class="page">
         <div class="page-main">
 
             <!-- HEADER -->
             <header class="app-header">
-                <div class="header-container d-flex align-items-center justify-content-between px-3 py-2">
-                    <div class="header-left">
-                        <a class="logo-horizontal d-flex align-items-center gap-2" asp-controller="Cartable" asp-action="Index">
-                            <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" style="height: 56px;">
-                            <span style="color:#0b2540; font-weight:700; font-size:17px; line-height:1.3;">
-                                سامانه احراز اصالت سند و قبض انبار
-                            </span>
-                        </a>
+                <div class="main-header-container container-fluid">
+                    <div class="header-content-left d-flex align-items-center gap-2">
+                        <div class="header-element">
+                            <a aria-label="نمایش/پنهان‌سازی منو" class="sidemenu-toggle animated-arrow header-link" href="javascript:void(0);" data-bs-toggle="sidebar">
+                                <i class="ti ti-menu-2 fs-20"></i>
+                            </a>
+                        </div>
                     </div>
 
-                    <div class="header-right d-flex align-items-center gap-3">
-                        @{
-                            var userRole = Context.Session.GetString("UserRole");
-                            var userRoleId = Context.Session.GetString("UserRoleId");
-                            var isAdmin = (userRole == "ادمین" || userRoleId == "3");
-                        }
+                    <div class="header-content-right d-flex align-items-center gap-3">
                         @if (isAdmin)
                         {
                             <a class="btn btn-outline-primary btn-sm" asp-controller="Home" asp-action="Users">
-                                <i class="ri-team-line"></i>
+                                <i class="ti ti-users"></i>
                                 <span class="d-none d-md-inline">مدیریت کاربران</span>
                             </a>
                         }
 
                         <a href="javascript:void(0)" id="fullScreenBtn" class="text-dark fs-18" title="تمام صفحه">
-                            <i class="ri-fullscreen-line" id="fullScreenIcon"></i>
+                            <i class="ti ti-maximize" id="fullScreenIcon"></i>
                         </a>
 
                         <div class="dropdown">
                             <a href="javascript:void(0)" class="d-flex align-items-center justify-content-center rounded-circle"
                                style="width:36px;height:36px;background:#eef1f5;color:#244b8b;" data-bs-toggle="dropdown">
-                                <i class="ri-user-3-line fs-16"></i>
+                                <i class="ti ti-user fs-16"></i>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li>
                                     <a class="dropdown-item" asp-controller="Home" asp-action="EditProfile">
-                                        <i class="ri-user-line me-2"></i> پروفایل
+                                        <i class="ti ti-user-circle me-2"></i> پروفایل
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
@@ -84,7 +172,7 @@
                                         @Html.AntiForgeryToken()
                                     </form>
                                     <a class="dropdown-item" href="javascript:void(0);" onclick="document.getElementById('logout-form').submit();">
-                                        <i class="ri-logout-box-r-line me-2"></i> خروج
+                                        <i class="ti ti-logout-2 me-2"></i> خروج
                                     </a>
                                 </li>
                             </ul>
@@ -115,6 +203,8 @@
         </div>
     </div>
 
+    <div id="responsive-overlay"></div>
+
     <!-- ==================== SCRIPTS ==================== -->
     <!-- jQuery اول از همه -->
     <script src="~/assets/js/jquery.min.js"></script>
@@ -125,8 +215,8 @@
     <!-- Toastr (باید قبل از کدهای خودمون لود بشه) -->
     <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
 
-    <!-- اگر flatpickr لازم داری (برای جلوگیری از خطای custom.js) -->
-    <!-- <script src="~/assets/libs/flatpickr/flatpickr.min.js"></script> -->
+    <!-- منوی سایدبار یزن (باز/بسته کردن، زیرمنوها، اورلی موبایل) -->
+    <script src="~/assets/js/defaultmenu.min.js"></script>
 
     <script>
         // مخفی کردن لودر به محض آماده شدن صفحه
@@ -162,11 +252,11 @@
                 fullScreenBtn.addEventListener('click', function () {
                     if (!document.fullscreenElement) {
                         document.documentElement.requestFullscreen()
-                            .then(() => fullScreenIcon.className = 'ri-fullscreen-exit-line')
+                            .then(() => fullScreenIcon.className = 'ti ti-minimize')
                             .catch(console.error);
                     } else {
                         document.exitFullscreen()
-                            .then(() => fullScreenIcon.className = 'ri-fullscreen-line');
+                            .then(() => fullScreenIcon.className = 'ti ti-maximize');
                     }
                 });
             }
