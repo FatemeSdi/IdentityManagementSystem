@@ -2,24 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "identity-api",
+      "name": "PublicPortal",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.API/IdentityManagementSystem.API.csproj", "--urls", "http://localhost:5066"],
-      "port": 5066
-    },
-    {
-      "name": "identity-ui",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.UI/IdentityManagementSystem.UI.csproj"],
-      "port": 5031,
-      "autoPort": true
-    },
-    {
-      "name": "identity-public-portal",
-      "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.PublicPortal/IdentityManagementSystem.PublicPortal.csproj"],
-      "port": 5169,
-      "autoPort": true
+      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.PublicPortal", "--urls", "http://localhost:5169"],
+      "port": 5169
     }
   ]
 }

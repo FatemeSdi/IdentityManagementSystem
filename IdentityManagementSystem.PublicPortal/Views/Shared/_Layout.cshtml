@@ -55,17 +55,15 @@
                     <span class="d-none d-sm-block fs-13 text-muted">سامانه احراز اصالت سند و قبض انبار</span>
                 </span>
             </a>
-            <div class="dropdown py-2 pe-3 pe-lg-4">
-                <a href="javascript:void(0);" class="btn btn-sm btn-primary-light dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="ri-apps-2-line"></i><span class="d-none d-sm-inline"> خدمات</span>
+            <!-- میانبر بالای هدر — بسته به بخشی که کاربر توش هست (پیگیری/ثبت درخواست)، یکیش رو
+                 ClientIndex.cshtml نمایش می‌ده تا بشه بدون برگشتن به صفحه‌ی اصلی به بخش مقابل رفت -->
+            <div class="py-2 pe-3 pe-lg-4" id="headerActionSlot">
+                <a href="javascript:void(0);" id="headerBtnTrack" class="btn btn-sm btn-primary-light d-none">
+                    <i class="ri-search-eye-line"></i><span class="d-none d-sm-inline"> پیگیری درخواست</span>
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li>
-                        <a class="dropdown-item js-show-new-request" href="javascript:void(0);">
-                            <i class="ri-archive-line me-2"></i>ثبت قبض انبار
-                        </a>
-                    </li>
-                </ul>
+                <a href="javascript:void(0);" id="headerBtnNewRequest" class="btn btn-sm btn-primary-light d-none">
+                    <i class="ri-file-add-line"></i><span class="d-none d-sm-inline"> ثبت درخواست جدید</span>
+                </a>
             </div>
         </div>
     </header>
@@ -151,16 +149,24 @@
                 yearEl.textContent = new Date().toLocaleDateString('fa-IR', { year: 'numeric' });
             }
 
-            // نمایش بخش «ثبت درخواست جدید» با کلیک روی «قبض انبار» در دراپ‌داون خدمات
-            // (این بخش با d-none پیش‌فرض مخفیه — رجوع کن به ClientIndex.cshtml)
-            document.querySelectorAll('.js-show-new-request').forEach(function (link) {
-                link.addEventListener('click', function () {
-                    var section = document.getElementById('newRequestSection');
-                    if (!section) return;
-                    section.classList.remove('d-none');
-                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // میانبر بالای هدر «پیگیری درخواست» — فقط وقتی تو بخش ثبت درخواستیم نشونش می‌دیم (رجوع کن به ClientIndex.cshtml)
+            var headerBtnTrack = document.getElementById('headerBtnTrack');
+            if (headerBtnTrack) {
+                headerBtnTrack.addEventListener('click', function () {
+                    if (typeof window.showTrackSection === 'function') {
+                        window.showTrackSection();
+                    }
                 });
-            });
+            }
+            // میانبر بالای هدر «ثبت درخواست جدید» — فعلاً چون فقط یک نوع درخواست هست، مستقیم فرم رو نشون می‌ده
+            var headerBtnNewRequest = document.getElementById('headerBtnNewRequest');
+            if (headerBtnNewRequest) {
+                headerBtnNewRequest.addEventListener('click', function () {
+                    if (typeof window.showNewRequestSection === 'function') {
+                        window.showNewRequestSection();
+                    }
+                });
+            }
         });
     </script>
 

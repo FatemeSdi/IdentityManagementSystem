@@ -504,6 +504,7 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
     {
         public string? TrackingCode { get; set; }
         public string? WarehouseReceiptNumber { get; set; }
+        public string? CompanyName { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
