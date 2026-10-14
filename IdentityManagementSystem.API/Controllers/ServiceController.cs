@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
 using IdentityManagementSystem.API.Data;
+using IdentityManagementSystem.API.Helpers;
 using IdentityManagementSystem.API.Models;
 using System.Text;
 using System.Text.Json;
@@ -126,34 +127,32 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "برای این شرکت گروه کارشناسی تعریف نشده است." });
             }
 
-            // اگه فراخوانی از سمت متقاضی (anonymous، از طریق حساب سرویسی public-portal-service با RoleId=2) بوده،
-            // CreatedBy باید شماره موبایل خودِ متقاضی باشه، نه یوزرنیم حساب سرویسی مشترک. برای کارشناس/متصدی
-            // لاگین‌کرده (RoleId != 2) همون یوزرنیم خودشه.
-            var callerRoleId = User.FindFirst("RoleId")?.Value;
-            var createdBy = callerRoleId == "2"
-                ? model.MobileNumber
-                : (User.Identity?.Name ?? "Unknown");
+            // CreatedBy یوزرنیم فراخوان‌کننده‌ست (برای متقاضی پورتال: حساب سرویسی public-portal-service).
+            // شماره موبایل عمداً اینجا نمیاد — Define.Request هیچ داده‌ی حساسی نگه نمی‌داره.
+            var createdBy = User.Identity?.Name ?? "Unknown";
 
             var requestCode = GenerateRequestId();
             var request = new Request
             {
                 RequestCode = requestCode,
-                // کد ملی/رمز تصدیق/شماره قبض انبار دیگه plaintext ذخیره نمی‌شن — فقط نسخه‌ی
-                // رمزنگاری‌شده + هشِ جستجو. ستون‌های plaintext بالا برای رکوردهای جدید null می‌مونن
-                // (فقط رکوردهای قدیمی‌تر از این تغییر توشون مقدار دارن).
-                NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
-                NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
-                MobileNumber = model.MobileNumber,
-                DocumentNumber = model.DocumentNumber,
-                VerificationCodeEnc = _encryptionHelper.Encrypt(model.VerificationCode),
-                VerificationCodeHash = _encryptionHelper.ComputeSearchHash(model.VerificationCode),
-                WarehouseReceiptNumberEnc = _encryptionHelper.Encrypt(model.WarehouseReceiptNumber),
-                WarehouseReceiptNumberHash = _encryptionHelper.ComputeSearchHash(model.WarehouseReceiptNumber),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = createdBy,
                 GroupId = groupId,
                 CompanyId = model.CompanyId,
-                RequestTypeId = requestType.RequestTypeId
+                RequestTypeId = requestType.RequestTypeId,
+                // داده‌ی حساس فقط Enc + Hash؛ ستون‌های plaintext (legacy) برای رکورد جدید null می‌مونن
+                WareReciept = new RequestWareReciept
+                {
+                    DocumentNumber = model.DocumentNumber,
+                    NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
+                    NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
+                    MobileNumberEnc = _encryptionHelper.Encrypt(model.MobileNumber),
+                    MobileNumberHash = _encryptionHelper.ComputeSearchHash(model.MobileNumber),
+                    VerificationCodeEnc = _encryptionHelper.Encrypt(model.VerificationCode),
+                    VerificationCodeHash = _encryptionHelper.ComputeSearchHash(model.VerificationCode),
+                    WarehouseReceiptNumberEnc = _encryptionHelper.Encrypt(model.WarehouseReceiptNumber),
+                    WarehouseReceiptNumberHash = _encryptionHelper.ComputeSearchHash(model.WarehouseReceiptNumber)
+                }
             };
 
             _context.Request.Add(request);
@@ -265,9 +264,9 @@ namespace IdentityManagementSystem.API.Controllers
                 });
             }
 
-            request.IsExist = verifyDocResult.ExistDoc;
-            request.IsNationalIdInResponse = verifyDocResult.IsNationalIdInResponse;
-            request.IsNationalIdInLawyers = verifyDocResult.IsNationalIdInLawyers;
+            request.WareReciept!.IsExist = verifyDocResult.ExistDoc;
+            request.WareReciept.IsNationalIdInResponse = verifyDocResult.IsNationalIdInResponse;
+            request.WareReciept.IsNationalIdInLawyers = verifyDocResult.IsNationalIdInLawyers;
 
             if (!verifyDocResult.ExistDoc)
             {
@@ -372,6 +371,12 @@ namespace IdentityManagementSystem.API.Controllers
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 isMatch = internalShahkarResponse?.Result?.Data?.Response == 200;
             }
+            catch (InvalidOperationException ex)
+            {
+                // سقف تعداد درخواست شاهکار — پیامش برای متقاضی قابل فهمه
+                _logger.LogWarning(ex, "Shahkar rate limit for evaluation appointment, Mobile={Mobile}", model.MobileNumber);
+                return new JsonResult(new { success = false, message = ex.Message + " لطفاً کمی بعد دوباره تلاش کنید." });
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Shahkar check failed for evaluation appointment, Mobile={Mobile}", model.MobileNumber);
@@ -383,23 +388,25 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "کد ملی و شماره موبایل تطابق ندارند." });
             }
 
-            var callerRoleId = User.FindFirst("RoleId")?.Value;
-            var createdBy = callerRoleId == "2"
-                ? model.MobileNumber
-                : (User.Identity?.Name ?? "Unknown");
+            // CreatedBy یوزرنیم فراخوان‌کننده‌ست، نه موبایل — Define.Request هیچ داده‌ی حساسی نگه نمی‌داره
+            var createdBy = User.Identity?.Name ?? "Unknown";
 
             var request = new Request
             {
                 RequestCode = GenerateRequestId(),
-                NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
-                NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
-                MobileNumber = model.MobileNumber,
-                IsMatch = true,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = createdBy,
                 GroupId = groupId,
                 CompanyId = model.CompanyId,
-                RequestTypeId = requestType.RequestTypeId
+                RequestTypeId = requestType.RequestTypeId,
+                Eval = new RequestEval
+                {
+                    NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
+                    NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
+                    MobileNumberEnc = _encryptionHelper.Encrypt(model.MobileNumber),
+                    MobileNumberHash = _encryptionHelper.ComputeSearchHash(model.MobileNumber),
+                    IsMatch = true
+                }
             };
 
             _context.Request.Add(request);
@@ -614,7 +621,10 @@ namespace IdentityManagementSystem.API.Controllers
         {
             try
             {
-                request.IsMatch = isMatch;
+                if (request.WareReciept != null)
+                {
+                    request.WareReciept.IsMatch = isMatch;
+                }
                 if (description != null)
                 {
                     request.Description = description;
@@ -678,7 +688,8 @@ namespace IdentityManagementSystem.API.Controllers
         /// </summary>
         private async Task SendRejectSmsAsync(Request request, string reason)
         {
-            if (string.IsNullOrWhiteSpace(request.MobileNumber))
+            var mobileNumber = _encryptionHelper.DecryptMobile(request);
+            if (string.IsNullOrWhiteSpace(mobileNumber))
                 return;
 
             var smsText = $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} رد شد. دلیل: {reason}\nاداره کل بنادر و دریانوردی استان هرمزگان";
@@ -688,8 +699,8 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 UserId = actingUserId == 0 ? null : actingUserId,
                 RequestId = request.RequestId,
-                MobileNumberEnc = _encryptionHelper.Encrypt(request.MobileNumber),
-                MobileNumberHash = _encryptionHelper.ComputeSearchHash(request.MobileNumber),
+                MobileNumberEnc = _encryptionHelper.Encrypt(mobileNumber),
+                MobileNumberHash = _encryptionHelper.ComputeSearchHash(mobileNumber),
                 Purpose = "RequestRejected",
                 MessageText = smsText,
                 CreatedAt = DateTime.UtcNow
@@ -697,7 +708,7 @@ namespace IdentityManagementSystem.API.Controllers
 
             try
             {
-                var smsResult = await _smsService.SendAsync(request.MobileNumber, smsText);
+                var smsResult = await _smsService.SendAsync(mobileNumber, smsText);
                 smsLog.Status = smsResult.IsSuccess ? "Sent" : "Failed";
                 smsLog.ErrorMessage = smsResult.IsSuccess ? null : (smsResult.ErrorMessage ?? smsResult.RawResponse);
                 smsLog.SentAt = smsResult.IsSuccess ? DateTime.UtcNow : null;
@@ -771,17 +782,19 @@ namespace IdentityManagementSystem.API.Controllers
                 _logger.LogWarning("Invalid NationalId: {NationalId}", nationalId);
                 throw new ArgumentException("کد ملی نامعتبر است.");
             }
-            if (!await CanMakeShahkarRequest(expertId, mobile))
-            {
-                _logger.LogWarning("Request limit exceeded for expert {ExpertId}", expertId);
-                throw new InvalidOperationException("تعداد درخواست‌های شما از حد مجاز گذشته است.");
-            }
-
+            // کش قبل از محدودیت تعداد چک می‌شه — نتیجه‌ی کش‌شده اصلاً سرویس شاهکار رو صدا نمی‌زنه، پس نباید
+            // به سقف درخواست‌ها بخوره (مثلاً چک دوباره‌ی شاهکار موقع ثبت، بلافاصله بعد از CheckShahkarMatch قبل از OTP).
             string cacheKey = $"Shahkar_{nationalId}_{mobile}";
             if (_cache.TryGetValue(cacheKey, out ShahkarResponse? cachedResult) && cachedResult != null)
             {
                 _logger.LogInformation("Returning cached result for {CacheKey}", cacheKey);
                 return cachedResult;
+            }
+
+            if (!await CanMakeShahkarRequest(expertId, mobile))
+            {
+                _logger.LogWarning("Request limit exceeded for expert {ExpertId}", expertId);
+                throw new InvalidOperationException("تعداد درخواست‌های شما از حد مجاز گذشته است.");
             }
 
             try
@@ -1703,11 +1716,18 @@ namespace IdentityManagementSystem.API.Controllers
         private async Task<bool> CanMakeShahkarRequest(long expertId, string? mobile = null)
         {
             var lastHour = DateTime.UtcNow.AddHours(-1);
-            var requestCount = await _context.ShahkarLog
-                .CountAsync(r => r.ExpertId == expertId && r.CreatedAt > lastHour);
-            _logger.LogInformation("Request count for expert {ExpertId} in last hour: {RequestCount}", expertId, requestCount);
-            if (requestCount >= 10)
-                return false;
+
+            // سقف ۱۰ تایی per-expert فقط برای کارشناس‌های لاگین‌کرده‌ست. حساب سرویسی پورتال عمومی (RoleId=2)
+            // بین همه‌ی متقاضی‌ها مشترکه، پس این سقف براش معنی نداره — محدودیتش فقط per-mobile پایینه.
+            bool isPublicPortalServiceAccount = User.FindFirst("RoleId")?.Value == "2";
+            if (!isPublicPortalServiceAccount)
+            {
+                var requestCount = await _context.ShahkarLog
+                    .CountAsync(r => r.ExpertId == expertId && r.CreatedAt > lastHour);
+                _logger.LogInformation("Request count for expert {ExpertId} in last hour: {RequestCount}", expertId, requestCount);
+                if (requestCount >= 10)
+                    return false;
+            }
 
             // موقع ثبت anonymous (بدون لاگین کاربر واقعی)، همه‌ی درخواست‌ها با یک حساب سرویسی مشترک
             // میان — پس expertId به‌تنهایی کافی نیست، محدودیت جدا بر اساس شماره موبایل هم لازمه.

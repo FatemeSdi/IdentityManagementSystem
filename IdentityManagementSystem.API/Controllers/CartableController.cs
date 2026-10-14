@@ -41,7 +41,8 @@ namespace IdentityManagementSystem.API.Controllers
             // decrypt کردن با متد C# داخل .Select() قابل ترجمه به SQL نیست — اول entity های خام رو
             // میاریم تو حافظه (ToListAsync)، بعد map به ViewModel همراه با decrypt رو این‌جا انجام می‌دیم.
             var rawCartableItems = await _context.CartableItems
-                .Include(ci => ci.Request)
+                .Include(ci => ci.Request).ThenInclude(r => r!.WareReciept)
+                .Include(ci => ci.Request).ThenInclude(r => r!.Eval)
                 .Include(ci => ci.IsTakenByUser)
                 .Where(ci => ci.Request != null
                             && ci.AssignedTo != null && myGroupIds.Contains(ci.AssignedTo.Value)
@@ -52,13 +53,13 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 ItemId = ci.ItemId,
                 RequestId = ci.RequestId,
-                NationalId = _encryptionHelper.DecryptOrFallback(ci.Request!.NationalIdEnc, ci.Request!.NationalId),
-                DocumentNumber = ci.Request!.DocumentNumber,
-                VerificationCode = _encryptionHelper.DecryptOrFallback(ci.Request!.VerificationCodeEnc, ci.Request!.VerificationCode),
-                IsMatch = ci.Request!.IsMatch,
-                IsExist = ci.Request!.IsExist,
-                IsNationalIdInResponse = ci.Request!.IsNationalIdInResponse,
-                IsNationalIdInLawyers = ci.Request!.IsNationalIdInLawyers,
+                NationalId = _encryptionHelper.DecryptNationalId(ci.Request!),
+                DocumentNumber = ci.Request!.WareReciept?.DocumentNumber,
+                VerificationCode = ci.Request!.WareReciept != null ? _encryptionHelper.DecryptOrFallback(ci.Request.WareReciept.VerificationCodeEnc, ci.Request.WareReciept.VerificationCode) : null,
+                IsMatch = ci.Request!.WareReciept?.IsMatch ?? ci.Request!.Eval?.IsMatch,
+                IsExist = ci.Request!.WareReciept?.IsExist,
+                IsNationalIdInResponse = ci.Request!.WareReciept?.IsNationalIdInResponse,
+                IsNationalIdInLawyers = ci.Request!.WareReciept?.IsNationalIdInLawyers,
                 CreatedAt = ci.Request!.CreatedAt,
                 AssignedTo = ci.IsTakenBy,
                 AssignedToName = ci.IsTakenByUser != null ? $"{ci.IsTakenByUser.Name} {ci.IsTakenByUser.LastName}" : null,

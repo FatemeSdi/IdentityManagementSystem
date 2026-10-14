@@ -161,6 +161,13 @@ namespace IdentityManagementSystem.API.Models
         public string? CreatedBy { get; set; }
     }
 
+    // ---------------------------------------------------------------------
+    // درخواست — فقط ستون‌های مشترکِ همه‌ی نوع‌ها (کد پیگیری، نوع، شرکت، گروه، take، وضعیت، ممیزی).
+    // اطلاعات مخصوص هر نوع تو جدول جزئیات خودشه (۱ به ۱ با همون RequestId):
+    //   قبض انبار        → RequestWareReciept
+    //   نوبت‌دهی ارزیابی → RequestEval
+    // هیچ داده‌ی حساسی (کد ملی، موبایل، ...) تو این جدول نیست.
+    // ---------------------------------------------------------------------
     [Table("Request", Schema = "Define")]
     public class Request
     {
@@ -171,29 +178,71 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(50)]
         public string RequestCode { get; set; } = string.Empty;
 
-        [StringLength(20)]
-        public string? NationalId { get; set; }
+        // کد پیگیری قابل‌جستجو و مناسب پیامک — مثلاً REQ00020198 (مشتق‌شده از RequestId، همیشه یکتا)
+        [StringLength(30)]
+        public string? TrackingCode { get; set; }
 
-        [StringLength(20)]
-        public string? MobileNumber { get; set; }
+        // نوع درخواست (قبض انبار، نوبت‌دهی ارزیابی، ...) — مشخص می‌کنه CartableItem این درخواست باید
+        // بره تو کدوم Cartable و جزئیاتش تو کدوم جدول باشه
+        public int RequestTypeId { get; set; }
+        public RequestType? RequestType { get; set; }
+
+        // شرکتی که متقاضی موقع ثبت درخواست انتخاب کرده (برای گزارش‌گیری/ردیابی، مستقل از GroupId)
+        public int? CompanyId { get; set; }
+        public Company? Company { get; set; }
+
+        // گروه کارشناسی که این درخواست باید بره تو کارتابلش (بر اساس نوع درخواست + شرکت تعیین می‌شه)
+        public int? GroupId { get; set; }
+        public Group? Group { get; set; }
+
+        // کارشناسی که این درخواست رو Take کرده (NULL = هنوز کسی take نکرده)
+        public long? AssignedTo { get; set; }
+        public User? AssignedToUser { get; set; }
+        public DateTime? AssignedAt { get; set; }
+
+        public bool? ValidateByExpert { get; set; }
+        [StringLength(500)]
+        public string? Description { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        [StringLength(100)]
+        public string? CreatedBy { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        [StringLength(100)]
+        public string? UpdatedBy { get; set; }
+
+        public RequestWareReciept? WareReciept { get; set; }
+        public RequestEval? Eval { get; set; }
+    }
+
+    // ---------------------------------------------------------------------
+    // جزئیات درخواست قبض انبار. داده‌ی حساس فقط Enc (AES-256-CBC، IV تصادفی) + Hash (HMAC-SHA256،
+    // blind index برای جستجوی دقیق). ستون‌های plaintext فقط برای رکوردهای قدیمیِ قبل از رمزنگاری
+    // هستن (fallback نمایش) — رکورد جدید هیچ‌وقت پرشون نمی‌کنه.
+    // ---------------------------------------------------------------------
+    [Table("RequestWareReciept", Schema = "Define")]
+    public class RequestWareReciept
+    {
+        [Key]
+        public long RequestId { get; set; }
+        public Request? Request { get; set; }
 
         [StringLength(50)]
         public string? DocumentNumber { get; set; }
 
-        [StringLength(50)]
-        public string? VerificationCode { get; set; }
+        public bool? IsMatch { get; set; }
+        public bool? IsExist { get; set; }
+        public bool? IsNationalIdInResponse { get; set; }
+        public bool? IsNationalIdInLawyers { get; set; }
 
-        [StringLength(50)]
-        public string? WarehouseReceiptNumber { get; set; }
-
-        // نسخه‌ی رمزنگاری‌شده‌ی کد ملی/رمز تصدیق/شماره قبض انبار (AES-256-CBC، IV تصادفی) + هشِ
-        // deterministic (HMAC-SHA256) برای جستجوی دقیق روی داده‌ی رمزنگاری‌شده (blind index).
-        // برای رکوردهای جدید فقط این ستون‌ها پر می‌شن؛ ستون‌های بالا (plaintext) فقط برای
-        // رکوردهای قدیمی‌ترِ قبل از این تغییر مقدار دارن (fallback نمایش).
         [StringLength(256)]
         public string? NationalIdEnc { get; set; }
         [StringLength(64)]
         public string? NationalIdHash { get; set; }
+        [StringLength(256)]
+        public string? MobileNumberEnc { get; set; }
+        [StringLength(64)]
+        public string? MobileNumberHash { get; set; }
         [StringLength(256)]
         public string? VerificationCodeEnc { get; set; }
         [StringLength(64)]
@@ -203,43 +252,67 @@ namespace IdentityManagementSystem.API.Models
         [StringLength(64)]
         public string? WarehouseReceiptNumberHash { get; set; }
 
-        // کد پیگیری قابل‌جستجو و مناسب پیامک — مثلاً REQ00020198 (مشتق‌شده از RequestId، همیشه یکتا)
-        [StringLength(30)]
-        public string? TrackingCode { get; set; }
+        // legacy plaintext — فقط رکوردهای قدیمی
+        [StringLength(20)]
+        public string? NationalId { get; set; }
+        [StringLength(20)]
+        public string? MobileNumber { get; set; }
+        [StringLength(50)]
+        public string? VerificationCode { get; set; }
+        [StringLength(50)]
+        public string? WarehouseReceiptNumber { get; set; }
+    }
+
+    // ---------------------------------------------------------------------
+    // جزئیات درخواست نوبت‌دهی ارزیابی. داده‌ی حساس فقط Enc + Hash (بدون هیچ ستون plaintext).
+    // نوبتِ تعیین‌شده توسط کارشناس = SlotId (EvalAppointmentSlot)؛ تعیین نوبت یعنی تایید درخواست.
+    // ---------------------------------------------------------------------
+    [Table("RequestEval", Schema = "Define")]
+    public class RequestEval
+    {
+        [Key]
+        public long RequestId { get; set; }
+        public Request? Request { get; set; }
+
+        [StringLength(256)]
+        public string? NationalIdEnc { get; set; }
+        [StringLength(64)]
+        public string? NationalIdHash { get; set; }
+        [StringLength(256)]
+        public string? MobileNumberEnc { get; set; }
+        [StringLength(64)]
+        public string? MobileNumberHash { get; set; }
 
         public bool? IsMatch { get; set; }
-        public bool? IsExist { get; set; }
-        public bool? IsNationalIdInResponse { get; set; }
-        public bool? IsNationalIdInLawyers { get; set; }
 
-        // گروه کارشناسی که این درخواست باید بره تو کارتابلش (بر اساس نوع درخواست + شرکت تعیین می‌شه)
-        public int? GroupId { get; set; }
-        public Group? Group { get; set; }
+        public int? SlotId { get; set; }
+        public EvalAppointmentSlot? Slot { get; set; }
 
-        // شرکتی که متقاضی موقع ثبت درخواست انتخاب کرده (برای گزارش‌گیری/ردیابی، مستقل از GroupId)
-        public int? CompanyId { get; set; }
+        public long? AppointmentSetBy { get; set; }
+        public DateTime? AppointmentSetAt { get; set; }
+    }
+
+    // ---------------------------------------------------------------------
+    // نوبت‌های قابل رزرو ارزیابی برای محوطه‌ی هر شرکت — ادمین تعریفشون می‌کنه. StartAt به UTC.
+    // ظرفیت هر نوبت = Capacity؛ تعداد رزروشده = تعداد RequestEval با همین SlotId.
+    // ---------------------------------------------------------------------
+    [Table("EvalAppointmentSlot", Schema = "Define")]
+    public class EvalAppointmentSlot
+    {
+        [Key]
+        public int SlotId { get; set; }
+
+        public int CompanyId { get; set; }
         public Company? Company { get; set; }
 
-        // نوع درخواست (قبض انبار، نوبت‌دهی ارزیابی، ...) — مشخص می‌کنه CartableItem این درخواست باید
-        // بره تو کدوم Cartable
-        public int? RequestTypeId { get; set; }
-        public RequestType? RequestType { get; set; }
-
-        // کارشناسی که این درخواست رو Take کرده (NULL = هنوز کسی take نکرده)
-        public long? AssignedTo { get; set; }
-        public User? AssignedToUser { get; set; }
-        public DateTime? AssignedAt { get; set; }
+        public DateTime StartAt { get; set; }
+        public int DurationMinutes { get; set; }
+        public int Capacity { get; set; } = 1;
+        public bool IsActive { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         [StringLength(100)]
         public string? CreatedBy { get; set; }
-        public DateTime? UpdatedAt { get; set; }
-        [StringLength(100)]
-        public string? UpdatedBy { get; set; }
-
-        public bool? ValidateByExpert { get; set; }
-        [StringLength(500)]
-        public string? Description { get; set; }
     }
 
     [Table("Cartable", Schema = "WF")]

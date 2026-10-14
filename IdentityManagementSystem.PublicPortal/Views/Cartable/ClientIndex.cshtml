@@ -892,6 +892,9 @@
                 if (res.companyName) {
                     html += '<div class="mt-2 small text-muted"><i class="ri-building-2-line me-1"></i> شرکت: ' + $('<div/>').text(res.companyName).html() + '</div>';
                 }
+                if (res.appointmentText) {
+                    html += '<div class="mt-2 small fw-semibold text-success"><i class="ri-calendar-check-line me-1"></i> نوبت ارزیابی: ' + $('<div/>').text(res.appointmentText).html() + '</div>';
+                }
                 if (res.description) {
                     html += '<div class="mt-2 text-danger small">دلیل: ' + $('<div/>').text(res.description).html() + '</div>';
                 }

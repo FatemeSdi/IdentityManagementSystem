@@ -1,0 +1,253 @@
+@using IdentityManagementSystem.UI.Controllers
+@{
+    ViewData["Title"] = "نوبت‌های ارزیابی";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var companies = ViewBag.Companies as List<CompanyOption> ?? new List<CompanyOption>();
+
+    // System.DayOfWeek: 6=شنبه، 0=یک‌شنبه، ...، 5=جمعه — پیش‌فرض شنبه تا چهارشنبه
+    var weekDays = new[]
+    {
+        (Value: 6, Text: "شنبه", Checked: true),
+        (Value: 0, Text: "یک‌شنبه", Checked: true),
+        (Value: 1, Text: "دوشنبه", Checked: true),
+        (Value: 2, Text: "سه‌شنبه", Checked: true),
+        (Value: 3, Text: "چهارشنبه", Checked: true),
+        (Value: 4, Text: "پنج‌شنبه", Checked: false),
+        (Value: 5, Text: "جمعه", Checked: false),
+    };
+}
+
+@Html.AntiForgeryToken()
+
+<div class="ims-page-header">
+    <div>
+        <h1 class="page-title">نوبت‌های ارزیابی محوطه‌ها</h1>
+        <small class="text-muted">نوبت‌های خالی هر محوطه را تعریف کنید؛ کارشناس نوبت‌دهی از بین همین نوبت‌ها برای متقاضی نوبت ثبت می‌کند.</small>
+    </div>
+    <a asp-controller="Cartable" asp-action="Index" asp-route-requestType="@RequestTypeCodes.EvaluationAppointment" class="btn btn-light btn-wave">
+        <i class="ti ti-arrow-right me-1"></i> کارتابل نوبت‌دهی
+    </a>
+</div>
+
+<!-- ==================== ساخت گروهی نوبت ==================== -->
+<div class="card custom-card">
+    <div class="card-header">
+        <div class="card-title mb-0"><i class="ti ti-calendar-plus me-1"></i>ساخت نوبت</div>
+    </div>
+    <div class="card-body">
+        <div class="row gy-3">
+            <div class="col-xl-4 col-md-6">
+                <label for="genCompany" class="form-label">محوطه (شرکت) *</label>
+                <select id="genCompany" class="form-select">
+                    @foreach (var c in companies)
+                    {
+                        <option value="@c.CompanyId">@c.CompanyName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-xl-4 col-md-6">
+                <label for="genFrom" class="form-label">از تاریخ *</label>
+                <div class="input-group">
+                    <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="genFrom"><i class="ti ti-calendar"></i></span>
+                    <input id="genFrom" type="text" class="form-control dir-ltr fc-datepicker" placeholder="۱۴۰۵/۰۷/۲۵" autocomplete="off">
+                </div>
+            </div>
+            <div class="col-xl-4 col-md-6">
+                <label for="genTo" class="form-label">تا تاریخ *</label>
+                <div class="input-group">
+                    <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="genTo"><i class="ti ti-calendar"></i></span>
+                    <input id="genTo" type="text" class="form-control dir-ltr fc-datepicker" placeholder="۱۴۰۵/۰۸/۲۵" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label d-block">روزهای هفته *</label>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var d in weekDays)
+                    {
+                        <input type="checkbox" class="btn-check gen-day" id="day_@d.Value" value="@d.Value" checked="@d.Checked" autocomplete="off">
+                        <label class="btn btn-outline-primary btn-sm" for="day_@d.Value">@d.Text</label>
+                    }
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <label for="genStart" class="form-label">ساعت شروع *</label>
+                <input id="genStart" type="time" class="form-control dir-ltr" value="08:00">
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <label for="genEnd" class="form-label">ساعت پایان *</label>
+                <input id="genEnd" type="time" class="form-control dir-ltr" value="14:00">
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <label for="genDuration" class="form-label">طول هر نوبت (دقیقه) *</label>
+                <input id="genDuration" type="number" class="form-control dir-ltr" min="5" max="480" value="30">
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <label for="genCapacity" class="form-label">ظرفیت هر نوبت *</label>
+                <input id="genCapacity" type="number" class="form-control dir-ltr" min="1" max="100" value="1">
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+            <span class="text-muted small"><i class="ti ti-info-circle me-1"></i>نوبت‌های تکراری و نوبت‌های گذشته ساخته نمی‌شوند.</span>
+            <button type="button" id="btnGenerate" class="btn btn-primary btn-wave"><i class="ti ti-calendar-plus me-1"></i>ساخت نوبت‌ها</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== لیست نوبت‌ها ==================== -->
+<div class="card custom-card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="card-title mb-0"><i class="ti ti-list me-1"></i>نوبت‌های تعریف‌شده</div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <select id="listCompany" class="form-select form-select-sm" style="width:auto">
+                @foreach (var c in companies)
+                {
+                    <option value="@c.CompanyId">@c.CompanyName</option>
+                }
+            </select>
+            <input id="listFrom" type="text" class="form-control form-control-sm dir-ltr fc-datepicker" style="width:120px" placeholder="از تاریخ" autocomplete="off">
+            <input id="listTo" type="text" class="form-control form-control-sm dir-ltr fc-datepicker" style="width:120px" placeholder="تا تاریخ" autocomplete="off">
+            <button type="button" id="btnLoadSlots" class="btn btn-sm btn-light"><i class="ti ti-refresh me-1"></i>نمایش</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover text-nowrap mb-0 ims-table">
+                <thead>
+                    <tr>
+                        <th>زمان نوبت</th>
+                        <th>طول (دقیقه)</th>
+                        <th>ظرفیت</th>
+                        <th>رزرو شده</th>
+                        <th>حذف</th>
+                    </tr>
+                </thead>
+                <tbody id="slotsBody">
+                    <tr><td colspan="5" class="text-center text-muted py-4">در حال بارگذاری...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <small class="text-muted d-block mt-2">بدون انتخاب تاریخ، نوبت‌های امروز تا ۳۱ روز آینده نمایش داده می‌شود.</small>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            const token = () => $('input[name="__RequestVerificationToken"]').val();
+            const escapeHtml = (s) => $('<div/>').text(s == null ? '' : s).html();
+            const toFa = (n) => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+
+            function loadSlots() {
+                $('#slotsBody').html('<tr><td colspan="5" class="text-center py-4"><span class="spinner-border spinner-border-sm"></span></td></tr>');
+                $.get('/EvalAppointment/SlotList', {
+                    companyId: $('#listCompany').val(),
+                    fromDate: $('#listFrom').val(),
+                    toDate: $('#listTo').val()
+                })
+                    .done(function (res) {
+                        if (!res || !res.success) {
+                            $('#slotsBody').html('<tr><td colspan="5" class="text-center text-danger py-4">' + escapeHtml((res && res.message) || 'خطا در دریافت نوبت‌ها') + '</td></tr>');
+                            return;
+                        }
+                        if (!res.items || res.items.length === 0) {
+                            $('#slotsBody').html('<tr><td colspan="5" class="text-center text-muted py-4">نوبتی در این بازه تعریف نشده است.</td></tr>');
+                            return;
+                        }
+                        let html = '';
+                        res.items.forEach(function (s) {
+                            const full = s.booked >= s.capacity;
+                            html += '<tr>'
+                                + '<td>' + escapeHtml(s.text) + '</td>'
+                                + '<td>' + toFa(s.durationMinutes) + '</td>'
+                                + '<td>' + toFa(s.capacity) + '</td>'
+                                + '<td><span class="badge ' + (full ? 'bg-danger-transparent' : (s.booked > 0 ? 'bg-warning-transparent' : 'bg-light text-muted')) + '">' + toFa(s.booked) + '</span></td>'
+                                + '<td>' + (s.booked > 0
+                                    ? '<span class="text-muted small">رزرو شده</span>'
+                                    : '<button type="button" class="btn btn-icon btn-sm btn-danger-light btn-delete-slot" data-slot-id="' + s.slotId + '" title="حذف"><i class="ti ti-trash"></i></button>')
+                                + '</td></tr>';
+                        });
+                        $('#slotsBody').html(html);
+                    })
+                    .fail(function () {
+                        $('#slotsBody').html('<tr><td colspan="5" class="text-center text-danger py-4">خطا در ارتباط با سرور</td></tr>');
+                    });
+            }
+
+            $('#btnLoadSlots, #listCompany').on('click change', function (e) {
+                if (e.type === 'click' && this.id === 'listCompany') return;
+                loadSlots();
+            });
+
+            $('#btnGenerate').on('click', function () {
+                const days = $('.gen-day:checked').map(function () { return parseInt(this.value, 10); }).get();
+                const body = {
+                    CompanyId: parseInt($('#genCompany').val(), 10),
+                    FromDate: $('#genFrom').val(),
+                    ToDate: $('#genTo').val(),
+                    DaysOfWeek: days,
+                    StartTime: $('#genStart').val(),
+                    EndTime: $('#genEnd').val(),
+                    DurationMinutes: parseInt($('#genDuration').val(), 10),
+                    Capacity: parseInt($('#genCapacity').val(), 10)
+                };
+                if (!body.CompanyId || !body.FromDate || !body.ToDate) {
+                    imsToast('warning', 'محوطه و بازه‌ی تاریخ را مشخص کنید.');
+                    return;
+                }
+                if (days.length === 0) {
+                    imsToast('warning', 'حداقل یک روز هفته را انتخاب کنید.');
+                    return;
+                }
+
+                const btn = $(this);
+                btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>در حال ساخت...');
+                fetch('/EvalAppointment/Generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+                    body: JSON.stringify(body)
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        imsToast(data.success ? 'success' : 'error', data.message || (data.success ? 'نوبت‌ها ساخته شد' : 'خطا در ساخت نوبت‌ها'));
+                        if (data.success) {
+                            $('#listCompany').val(body.CompanyId);
+                            $('#listFrom').val(body.FromDate);
+                            $('#listTo').val(body.ToDate);
+                            loadSlots();
+                        }
+                    })
+                    .catch(() => imsToast('error', 'خطا در ارتباط با سرور'))
+                    .finally(() => btn.prop('disabled', false).html('<i class="ti ti-calendar-plus me-1"></i>ساخت نوبت‌ها'));
+            });
+
+            $(document).on('click', '.btn-delete-slot', function () {
+                const slotId = $(this).data('slot-id');
+                Swal.fire({
+                    title: 'حذف نوبت',
+                    text: 'این نوبت حذف شود؟',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'بله، حذف شود',
+                    cancelButtonText: 'انصراف'
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+                    fetch('/EvalAppointment/DeleteSlot?slotId=' + slotId, {
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': token() }
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            imsToast(data.success ? 'success' : 'error', data.message || (data.success ? 'حذف شد' : 'خطا'));
+                            if (data.success) loadSlots();
+                        })
+                        .catch(() => imsToast('error', 'خطا در ارتباط با سرور'));
+                });
+            });
+
+            loadSlots();
+        });
+    </script>
+}

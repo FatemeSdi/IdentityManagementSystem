@@ -28,12 +28,12 @@ namespace IdentityManagementSystem.API.Controllers
             if (!string.IsNullOrEmpty(docNumber))
             {
                 result.SearchedDocNumber = docNumber;
-                result.DocRequestCount = await _context.Request
+                result.DocRequestCount = await _context.RequestWareReciepts
                     .CountAsync(r => r.DocumentNumber == docNumber);
             }
 
             // 2. 10 سند پر درخواست
-            result.TopDocuments = await _context.Request
+            result.TopDocuments = await _context.RequestWareReciepts
                 .GroupBy(r => r.DocumentNumber)
                 .Select(g => new DocStatsDto
                 {

@@ -103,7 +103,7 @@ namespace IdentityManagementSystem.UI.Controllers
         #region CartableIndex
 
         [HttpGet]
-        public async Task<IActionResult> Index(int page = 1, string search = "", string filterStatus = "", string? fromDate = null, string? toDate = null)
+        public async Task<IActionResult> Index(int page = 1, string search = "", string filterStatus = "", string? fromDate = null, string? toDate = null, string? requestType = null)
         {
             // ========== چک نقش ==========
             int roleId = 0;
@@ -131,11 +131,21 @@ namespace IdentityManagementSystem.UI.Controllers
             ViewBag.FromDate = PersianDateHelper.ToPersianParam(fromDate);
             ViewBag.ToDate = PersianDateHelper.ToPersianParam(toDate);
 
-            // گرفتن داده‌ها از API
-            var model = await GetCartableData(page, search, filterStatus, fromDate, toDate);
+            // تب‌های نوع درخواست (قبض انبار / نوبت‌دهی ارزیابی) — فقط نوع‌هایی که کاربر تو گروه‌هاش داره؛
+            // اگه تب انتخاب‌شده جزوشون نبود، اولین تبِ مجاز.
+            var requestTypes = await GetMyRequestTypesAsync();
+            if (requestTypes.Count > 0 && !requestTypes.Any(t => t.Code == requestType))
+            {
+                requestType = requestTypes[0].Code;
+            }
+            ViewBag.RequestTypes = requestTypes;
+            ViewBag.RequestType = requestType;
 
-            // بررسی خوانده شدن سندها
-            foreach (var item in model.Items)
+            // گرفتن داده‌ها از API
+            var model = await GetCartableData(page, search, filterStatus, fromDate, toDate, requestType);
+
+            // بررسی خوانده شدن سندها (فقط قبض انبار سند داره)
+            foreach (var item in model.Items.Where(i => i.RequestTypeCode != RequestTypeCodes.EvaluationAppointment))
             {
                 try
                 {
@@ -166,6 +176,35 @@ namespace IdentityManagementSystem.UI.Controllers
             ViewBag.Companies = await GetCompaniesAsync();
 
             return View(model);
+        }
+
+        /// <summary>
+        /// نوع‌های درخواستی که کاربر جاری تو کارتابلش داره (برای تب‌ها). در صورت خطا لیست خالی — یعنی بدون تب
+        /// و بدون فیلتر نوع، مثل قبل.
+        /// </summary>
+        private async Task<List<RequestTypeOption>> GetMyRequestTypesAsync()
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JwtToken");
+                if (string.IsNullOrEmpty(token))
+                    return new List<RequestTypeOption>();
+
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await _client.GetAsync("Request/MyRequestTypes");
+                if (!response.IsSuccessStatusCode)
+                    return new List<RequestTypeOption>();
+
+                var content = await response.Content.ReadAsStringAsync();
+                var result = Newtonsoft.Json.JsonConvert.DeserializeObject<MyRequestTypesResult>(content);
+                ViewBag.IsAdmin = result?.IsAdmin ?? false;
+                return result?.Items ?? new List<RequestTypeOption>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "خطا در دریافت نوع‌های درخواست کاربر");
+                return new List<RequestTypeOption>();
+            }
         }
 
         /// <summary>
@@ -836,10 +875,15 @@ namespace IdentityManagementSystem.UI.Controllers
     string search,
     string filterStatus,
     string? fromDate = null,
-    string? toDate = null)
+    string? toDate = null,
+    string? requestType = null)
         {
             var pageSize = 10;
             var url =$"Request?page={page}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(requestType))
+            {
+                url += $"&requestType={Uri.EscapeDataString(requestType)}";
+            }
             if (!string.IsNullOrWhiteSpace(search))
             {
                 url += $"&search={Uri.EscapeDataString(search)}";
@@ -876,8 +920,8 @@ namespace IdentityManagementSystem.UI.Controllers
 
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                _logger.LogWarning("API StatusCode = {StatusCode}", response.StatusCode);
-                _logger.LogWarning("API Response = {Response}", responseContent);
+                // بدنه‌ی پاسخ عمداً لاگ نمی‌شه — شامل کد ملی/موبایلِ رمزگشایی‌شده‌ی متقاضی‌هاست
+                _logger.LogInformation("API StatusCode = {StatusCode}, Length = {Length}", response.StatusCode, responseContent.Length);
 
 
                 if (response.IsSuccessStatusCode)
@@ -1192,6 +1236,35 @@ namespace IdentityManagementSystem.UI.Controllers
         public long? AssignedTo { get; set; }
         public string? AssignedToName { get; set; }
         public DateTime? AssignedAt { get; set; }
+        public string? TrackingCode { get; set; }
+
+        // نوع درخواست و محوطه — و برای نوبت‌دهی ارزیابی، نوبتِ تعیین‌شده
+        public string? RequestTypeCode { get; set; }
+        public string? RequestTypeName { get; set; }
+        public string? CompanyName { get; set; }
+        public DateTime? AppointmentAt { get; set; }
+        public string? AppointmentText { get; set; }
+    }
+
+    public static class RequestTypeCodes
+    {
+        public const string WarehouseReceipt = "WAREHOUSE_RECEIPT";
+        public const string EvaluationAppointment = "EVALUATION_APPOINTMENT";
+    }
+
+    public class RequestTypeOption
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? CartableName { get; set; }
+        public List<string> Companies { get; set; } = new List<string>();
+    }
+
+    public class MyRequestTypesResult
+    {
+        public bool Success { get; set; }
+        public bool IsAdmin { get; set; }
+        public List<RequestTypeOption>? Items { get; set; }
     }
 
 

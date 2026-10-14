@@ -1,0 +1,117 @@
+@using IdentityManagementSystem.UI.Controllers
+@model IdentityManagementSystem.UI.Controllers.PaginatedCartableViewModel
+@{
+    // جدول درخواست‌های نوبت‌دهی ارزیابی — عمداً فقط اطلاعات لازم برای نوبت‌دهی: نه کد ملی، نه موبایل.
+    // ستون «نوبت ارزیابی»: بعد از take، دکمه‌ی «ثبت نوبت» (مودال #setAppointmentModal در Index.cshtml).
+    var currentUserId = Context.Session.GetString("UserId");
+}
+
+<div class="table-responsive">
+    <table id="evalTable" class="table table-hover text-nowrap mb-0 ims-table">
+        <thead>
+            <tr>
+                <th>کد پیگیری</th>
+                <th>تاریخ ثبت</th>
+                <th>احراز هویت متقاضی</th>
+                <th>محوطه (شرکت)</th>
+                <th>تخصیص</th>
+                <th>نوبت ارزیابی</th>
+                <th>تاریخچه</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Items.Any())
+            {
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="ti ti-inbox-off"></i>
+                            <div class="fw-medium">درخواست نوبت‌دهی ارزیابی یافت نشد</div>
+                            <small>فیلترها یا بازه‌ی تاریخ را تغییر دهید.</small>
+                        </div>
+                    </td>
+                </tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr data-request-id="@item.RequestId" data-request-type="eval" data-tracking-code="@item.TrackingCode" data-company="@item.CompanyName">
+                    <td class="fw-semibold dir-ltr text-end">@(item.TrackingCode ?? item.RequestId.ToString())</td>
+                    <td>
+                        <div>@item.CreatedAt.ToPersianDate()</div>
+                        <small class="text-muted dir-ltr d-inline-block">@item.CreatedAt.ToPersianTime()</small>
+                    </td>
+
+                    <td>
+                        @if (item.IsMatch == true)
+                        {
+                            <span class="badge bg-success-transparent"><i class="ti ti-shield-check me-1"></i>احراز هویت تایید شد</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning-transparent"><i class="ti ti-shield-x me-1"></i>احراز نشده</span>
+                        }
+                    </td>
+
+                    <td><i class="ti ti-map-pin text-muted me-1"></i>@(string.IsNullOrEmpty(item.CompanyName) ? "—" : item.CompanyName)</td>
+
+                    <!-- تخصیص -->
+                    <td class="text-center">
+                        @if (item.AssignedTo == null && item.ValidateByExpert == null)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-wave take-btn" data-request-id="@item.RequestId">
+                                <i class="ti ti-hand-grab me-1"></i> Take
+                            </button>
+                        }
+                        else if (item.AssignedTo == null)
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                        else if (item.AssignedTo?.ToString() == currentUserId)
+                        {
+                            <span class="badge bg-primary-transparent"><i class="ti ti-user-check me-1"></i>مال شماست</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-light text-dark"><i class="ti ti-user me-1"></i>@item.AssignedToName</span>
+                        }
+                    </td>
+
+                    <!-- نوبت ارزیابی -->
+                    <td class="text-center validation-cell">
+                        @if (item.ValidateByExpert == true && !string.IsNullOrEmpty(item.AppointmentText))
+                        {
+                            <span class="badge bg-success-transparent"><i class="ti ti-calendar-check me-1"></i>@item.AppointmentText</span>
+                        }
+                        else if (item.ValidateByExpert == true)
+                        {
+                            <span class="badge bg-success-transparent"><i class="ti ti-circle-check me-1"></i>تایید شده</span>
+                        }
+                        else if (item.ValidateByExpert == false)
+                        {
+                            <span class="badge bg-danger-transparent"><i class="ti ti-circle-x me-1"></i>رد شده</span>
+                        }
+                        else if (item.AssignedTo?.ToString() == currentUserId)
+                        {
+                            <button type="button" class="btn btn-sm btn-success btn-wave set-appointment-btn"
+                                    data-request-id="@item.RequestId"
+                                    data-tracking-code="@item.TrackingCode"
+                                    data-company="@item.CompanyName">
+                                <i class="ti ti-calendar-plus me-1"></i>ثبت نوبت
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">ابتدا Take کنید</span>
+                        }
+                    </td>
+
+                    <td class="text-center">
+                        <button type="button" class="btn btn-icon btn-sm btn-secondary-light btn-view-history" data-request-id="@item.RequestId" data-bs-toggle="tooltip" title="مشاهده تاریخچه">
+                            <i class="ti ti-history"></i>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -13,6 +13,9 @@ namespace IdentityManagementSystem.API.Data
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }                  // جدید
         public DbSet<Request> Request { get; set; }
+        public DbSet<RequestWareReciept> RequestWareReciepts { get; set; }
+        public DbSet<RequestEval> RequestEvals { get; set; }
+        public DbSet<EvalAppointmentSlot> EvalAppointmentSlots { get; set; }
         public DbSet<Cartable> Cartable { get; set; }
         public DbSet<CartableItem> CartableItems { get; set; }
         public DbSet<UserLog> UserLogs { get; set; }
@@ -104,8 +107,6 @@ namespace IdentityManagementSystem.API.Data
             modelBuilder.Entity<Request>(entity =>
             {
                 entity.HasKey(r => r.RequestId);
-                entity.HasIndex(r => r.DocumentNumber);
-                entity.HasIndex(r => r.NationalId);
                 entity.HasIndex(r => r.RequestCode);
                 entity.HasIndex(r => r.GroupId);
                 entity.HasIndex(r => r.AssignedTo);
@@ -128,6 +129,44 @@ namespace IdentityManagementSystem.API.Data
                 entity.HasOne(r => r.RequestType)
                       .WithMany()
                       .HasForeignKey(r => r.RequestTypeId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                // جزئیات هر نوع درخواست — ۱ به ۱ با همون RequestId
+                entity.HasOne(r => r.WareReciept)
+                      .WithOne(w => w!.Request!)
+                      .HasForeignKey<RequestWareReciept>(w => w.RequestId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.Eval)
+                      .WithOne(e => e!.Request!)
+                      .HasForeignKey<RequestEval>(e => e.RequestId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<RequestWareReciept>(entity =>
+            {
+                entity.HasKey(w => w.RequestId);
+                entity.Property(w => w.RequestId).ValueGeneratedNever();
+            });
+
+            modelBuilder.Entity<RequestEval>(entity =>
+            {
+                entity.HasKey(e => e.RequestId);
+                entity.Property(e => e.RequestId).ValueGeneratedNever();
+
+                entity.HasOne(e => e.Slot)
+                      .WithMany()
+                      .HasForeignKey(e => e.SlotId)
+                      .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<EvalAppointmentSlot>(entity =>
+            {
+                entity.HasKey(s => s.SlotId);
+
+                entity.HasOne(s => s.Company)
+                      .WithMany()
+                      .HasForeignKey(s => s.CompanyId)
                       .OnDelete(DeleteBehavior.Restrict);
             });
 
