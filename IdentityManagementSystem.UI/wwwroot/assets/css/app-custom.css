@@ -1,0 +1,446 @@
+/* Functional overrides carried over from the legacy theme's style-rtl.css.
+   Typography/theme rules were dropped in favor of the yzen template's own styling. */
+
+.page-header-breadcrumb .breadcrumb-item > a {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    text-decoration: none;
+}
+
+.page-header-breadcrumb .breadcrumb-item > a::before,
+.page-header-breadcrumb .breadcrumb-item.active::after {
+    font-family: "tabler-icons" !important;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1;
+    speak: never;
+}
+
+.page-header-breadcrumb .breadcrumb-item > a::before {
+    content: "\eade";
+    color: var(--primary-color);
+    font-size: .9rem;
+}
+
+.page-header-breadcrumb .breadcrumb-item.active {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+}
+
+.page-header-breadcrumb .breadcrumb-item.active::after {
+    content: "\eb0c";
+    color: var(--text-muted);
+    font-size: .8rem;
+}
+
+/* Sidebar brand text: force full white regardless of theme/menu-style variable
+   cascade (a highly-specific yzen selector otherwise drives it to a low-opacity
+   tint that reads as invisible in dark mode). */
+.app-sidebar .main-sidebar-header .header-logo span {
+    color: #fff !important;
+}
+
+/* Table readability: yzen ships fairly small default type for table content. */
+.table th,
+.table td {
+    font-size: 0.9rem;
+}
+
+.table thead tr th {
+    font-size: 0.925rem;
+}
+
+/* Center-align table headers; row data reads right-to-left like the rest of
+   the app instead of being centered. */
+.table thead th {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.table tbody td {
+    text-align: right;
+    vertical-align: middle;
+}
+
+/* Rounded table corners: .table-responsive already clips overflow (auto),
+   so giving it a radius rounds the table without disabling the small-screen
+   horizontal scroll it still needs to provide as a fallback. */
+.table-responsive {
+    border-radius: .75rem;
+    padding-bottom: 50px;
+}
+
+/* Clean table look (matching the yzen "gridjs" tables elsewhere in this
+   organization's apps): shaded header row + subtle row hover, instead of
+   the plain unstyled header DataTables renders by default. */
+.table thead tr th {
+    background-color: rgba(var(--light-rgb), 1);
+}
+
+.table tbody tr:hover {
+    background-color: rgba(var(--light-rgb, 248, 249, 250), .6);
+}
+
+/* DataTables top controls (length menu + search box): align them cleanly
+   and give the search box some presence instead of the bare default input. */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+    margin-bottom: .75rem;
+}
+
+    .dataTables_wrapper .dataTables_filter label {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin: 0;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
+    .dataTables_wrapper .dataTables_filter input {
+        border-radius: .375rem;
+        border: 1px solid var(--default-border, #e5e7eb);
+        padding: .3rem .75rem;
+        margin-inline-start: 0;
+    }
+
+/* DataTables pagination: give it breathing room from the table and bring its
+   button size in line with the (smaller) table text instead of Bootstrap's
+   default 1rem buttons. */
+.dataTables_wrapper .dataTables_paginate {
+    margin-top: 1rem;
+}
+
+    .dataTables_wrapper .dataTables_paginate .page-link {
+        padding: 0.35rem 0.7rem;
+        font-size: 0.8125rem;
+        border-radius: .375rem !important;
+        margin-inline: .15rem;
+    }
+
+.dataTables_wrapper .dataTables_info {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+/* Captcha input should read right-to-left like the rest of the form. */
+.captchaInput {
+    text-align: right;
+}
+
+.field-validation-error {
+    color: red;
+}
+
+.input-validation-error {
+    border: 1px solid red;
+}
+
+    .input-validation-error:focus {
+        border-color: red;
+    }
+
+.validation-summary-errors > ul > li {
+    color: red;
+}
+
+/* DataTables responsive expand/collapse control ("+"/"-" button that reveals
+   the columns hidden on narrow screens) — themed to match yzen instead of
+   the old theme's hardcoded blue/red, and sized a bit more comfortably. */
+table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > td:first-child:before,
+table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > th:first-child:before {
+    height: 20px;
+    width: 20px;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    line-height: 14px;
+    content: '+';
+    background-color: var(--primary-color, #5a8dee);
+}
+
+table.dataTable.dtr-inline.collapsed > tbody > tr.parent > td:first-child:before,
+table.dataTable.dtr-inline.collapsed > tbody > tr.parent > th:first-child:before {
+    content: '-';
+    background-color: var(--danger-color, #d33333);
+}
+
+table.dataTable.dtr-column > tbody > tr > td.control:before,
+table.dataTable.dtr-column > tbody > tr > th.control:before {
+    height: 20px;
+    width: 20px;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    line-height: 14px;
+    content: '+';
+    background-color: var(--primary-color, #5a8dee);
+}
+
+table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > td:first-child,
+table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > th:first-child {
+    padding-left: 1rem;
+}
+
+/* The expanded detail row: was an unstyled plain list, now a clean
+   label/value card matching the rest of the app instead of a bare grey box. */
+table.dataTable > tbody > tr.child {
+    background-color: var(--light, #f8f9fa);
+}
+
+    table.dataTable > tbody > tr.child:hover {
+        background: var(--light, #f8f9fa) !important;
+    }
+
+    /* Bootstrap gives every <td> a bottom border by default; that's what was
+       still showing under the expanded detail block even after the list
+       items themselves lost theirs. */
+    table.dataTable > tbody > tr.child > td {
+        border-bottom: none;
+    }
+
+.table.dataTable .dtr-details {
+    width: 100%;
+    list-style: none;
+    margin: 0;
+    padding: .75rem 1rem;
+}
+
+    .table.dataTable .dtr-details > li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: .3rem 0;
+    }
+
+        .table.dataTable .dtr-details > li .dtr-title {
+            font-weight: 600;
+            font-size: .8125rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .table.dataTable .dtr-details > li .dtr-data {
+            font-size: .875rem;
+            text-align: left;
+        }
+
+/* Select2 RTL fixes */
+.select2 {
+    width: 100% !important;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow b {
+    transform: rotate(0deg);
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    left: 1px !important;
+}
+
+.select2-container .select2-selection--single .select2-selection__rendered {
+    padding-left: 0.8rem !important;
+    padding-right: 0.47rem !important;
+}
+
+.select2-container--default .select2-search--dropdown .select2-search__field {
+    direction: rtl !important;
+}
+
+select.input-validation-error + span.select2 .select2-selection {
+    border-color: red !important;
+}
+
+.captchaInput {
+    direction: rtl !important;
+}
+
+.dir-rtl {
+    direction: rtl !important;
+}
+
+.dir-ltr {
+    direction: ltr !important;
+}
+
+.m-2px, .m-4px {
+    margin: 4px;
+}
+
+.mt-4px {
+    margin-top: 4px;
+}
+
+.mb-4px {
+    margin-bottom: 4px;
+}
+
+.p-2px, .p-4px {
+    padding: 4px;
+}
+
+/* Collapsible (advanced) search panel: make it obvious the header is
+   clickable to expand — a chevron that flips, plus a hover cue. */
+.search-collapse-toggle {
+    cursor: pointer;
+}
+
+    .search-collapse-toggle:hover {
+        background-color: rgba(var(--light-rgb, 248, 249, 250), 1);
+    }
+
+    .search-collapse-toggle .search-collapse-chevron {
+        transition: transform .2s ease;
+    }
+
+    .search-collapse-toggle[aria-expanded="true"] .search-collapse-chevron {
+        transform: rotate(180deg);
+    }
+
+/* Simple (single-field) search bars: a prominent input-group instead of a
+   cramped small box, matching the "big input + search icon" pattern. */
+.simple-search .input-group-text {
+    background: var(--custom-white, #fff);
+}
+
+.simple-search .form-control {
+    height: 3rem;
+    font-size: 1rem;
+}
+
+
+.side-menu__item {
+    position: relative;
+}
+
+.dashboard-notification-hint {
+    position: absolute !important;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50%;
+}
+
+.slide__category {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+}
+
+.slide__category .category-toggle-icon {
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.slide__category.category-collapsed .category-toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.main-menu > .slide {
+    overflow: hidden;
+    transition: opacity 0.15s ease;
+}
+
+.main-menu > .slide.menu-item-collapsed {
+    display: none;
+}
+
+:root {
+    --app-sidebar-expanded-width: 17rem;
+}
+
+@media (min-width: 992px) {
+    [data-nav-layout=vertical] .app-sidebar,
+    [data-nav-layout=vertical] .app-sidebar .main-sidebar-header {
+        width: var(--app-sidebar-expanded-width);
+    }
+
+    [data-nav-layout=vertical] .app-header {
+        padding-inline-start: var(--app-sidebar-expanded-width);
+    }
+
+    [data-nav-layout=vertical] .app-content {
+        margin-inline-start: var(--app-sidebar-expanded-width);
+    }
+}
+
+@media (max-width: 991.98px) {
+    [data-toggled=close] .app-sidebar {
+        transform: translateX(calc(-1 * var(--app-sidebar-expanded-width)));
+    }
+
+    [data-toggled=close][dir=rtl] .app-sidebar {
+        transform: translateX(var(--app-sidebar-expanded-width));
+    }
+}
+
+[data-nav-layout=vertical] .app-sidebar .side-menu__item {
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: 2.5rem;
+}
+
+[data-nav-layout=vertical] .app-sidebar .side-menu__label {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
+
+[data-nav-layout=vertical] .app-sidebar .side-menu__icon {
+    flex: 0 0 auto;
+    margin-inline-end: 0;
+    margin-block-start: 0.125rem;
+}
+
+[data-nav-layout=vertical] .app-sidebar .side-menu__angle {
+    flex: 0 0 auto;
+    position: static;
+    margin-inline-start: auto;
+    margin-block-start: 0.125rem;
+}
+
+[data-nav-layout=vertical] .app-sidebar .slide-menu.child1 .side-menu__item,
+[data-nav-layout=vertical] .app-sidebar .slide-menu.child2 .side-menu__item,
+[data-nav-layout=vertical] .app-sidebar .slide-menu.child3 .side-menu__item {
+    padding-inline-end: 1rem;
+}
+
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item:not(.active):not(:hover),
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item:not(.active):not(:hover) .side-menu__label,
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item:not(.active):not(:hover) .side-menu__icon,
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item:not(.active):not(:hover)::before {
+    color: var(--menu-prime-color) !important;
+    fill: var(--menu-prime-color) !important;
+}
+
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item.active {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item.active .side-menu__label,
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item.active .side-menu__icon,
+[data-nav-layout=vertical] .app-sidebar .slide-menu .side-menu__item.active::before {
+    color: #fff !important;
+    fill: #fff !important;
+}

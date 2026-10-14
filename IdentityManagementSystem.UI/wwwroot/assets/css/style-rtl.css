@@ -1,0 +1,320 @@
+/*================================================================================
+	Item Name: Frest HTML Admin Template
+	Version: 1.0
+	Author: PIXINVENT
+	Author URL: http://www.themeforest.net/user/pixinvent
+================================================================================
+
+NOTE:
+------
+PLACE HERE YOUR OWN SCSS CODES AND IF NEEDED, OVERRIDE THE STYLES FROM THE OTHER STYLESHEETS.
+WE WILL RELEASE FUTURE UPDATES SO IN ORDER TO NOT OVERWRITE YOUR STYLES IT'S BETTER LIKE THIS.  */
+/*rtlmellatweb*/
+
+@font-face {
+	font-family: iranyekan;
+	font-style: normal;
+	font-weight: bold;
+	src: url('fonts/eot/iranyekanwebbold.eot');
+	src: url('fonts/eot/iranyekanwebbold.eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/iranyekanwebbold.woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/iranyekanwebbold.woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/iranyekanwebbold.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: iranyekan;
+	font-style: normal;
+	font-weight: 300;
+	src: url('fonts/eot/iranyekanweblight.eot');
+	src: url('fonts/eot/iranyekanweblight.eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/iranyekanweblight.woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/iranyekanweblight.woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/iranyekanweblight.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: iranyekan;
+	font-style: normal;
+	font-weight: normal;
+	src: url('fonts/eot/iranyekanwebregular.eot');
+	src: url('fonts/eot/iranyekanwebregular.eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/iranyekanwebregular.woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/iranyekanwebregular.woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/iranyekanwebregular.ttf') format('truetype');
+}
+
+/* Latin fonts (Roboto) */
+
+@font-face {
+	font-family: roboto;
+	font-style: normal;
+	font-weight: bold;
+	src: url('fonts/eot/robotobold.eot');
+	src: url('fonts/eot/robotobold.eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/robotobold.woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/robotobold.woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/robotobold.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: roboto;
+	font-style: normal;
+	font-weight: 300;
+	src: url('fonts/eot/robotolight.eot');
+	src: url('fonts/eot/robotolight.eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/robotolight.woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/robotolight.woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/robotolight.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: roboto;
+	font-style: normal;
+	font-weight: normal;
+	src: url('fonts/eot/robotoregular.eot');
+	src: url('fonts/eot/robotoregular.eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/robotoregular.woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/robotoregular.woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/robotoregular.ttf') format('truetype');
+}
+@font-face {
+	font-family: iranyekan;
+	font-style: normal;
+	font-weight: bold;
+	src: url('fonts/eot/iranyekanwebbold(fanum).eot');
+	src: url('fonts/eot/iranyekanwebbold(fanum).eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/iranyekanwebbold(fanum).woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/iranyekanwebbold(fanum).woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/iranyekanwebbold(fanum).ttf') format('truetype');
+}
+
+@font-face {
+	font-family: iranyekan;
+	font-style: normal;
+	font-weight: 300;
+	src: url('fonts/eot/iranyekanweblight(fanum).eot');
+	src: url('fonts/eot/iranyekanweblight(fanum).eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/iranyekanweblight(fanum).woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/iranyekanweblight(fanum).woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/iranyekanweblight(fanum).ttf') format('truetype');
+}
+
+@font-face {
+	font-family: iranyekan;
+	font-style: normal;
+	font-weight: normal;
+	src: url('fonts/eot/iranyekanwebregular(fanum).eot');
+	src: url('fonts/eot/iranyekanwebregular(fanum).eot?#iefix') format('embedded-opentype'),  /* IE6-8 */
+		 url('fonts/woff2/iranyekanwebregular(fanum).woff2') format('woff2'),  /* FF39+,Chrome36+, Opera24+*/
+		 url('fonts/woff/iranyekanwebregular(fanum).woff') format('woff'),  /* FF3.6+, IE9, Chrome6+, Saf5.1+*/
+		 url('fonts/ttf/iranyekanwebregular(fanum).ttf') format('truetype');
+}
+
+/**IranYekan>>*/  a,body,h1,h2,h3,h4,h5,h6,p,.button, button, input, textarea,.header-navbar,.navigation,#widget-earnings .widget-earnings-swiper.swiper-container .swiper-slide .swiper-text,.table th, .table td,.badge  {font-family:iranyekan! important;}
+body.vertical-layout.vertical-menu-modern .main-menu .navigation .menu-content > li > a > i,.horizontal-menu .navbar-expand-sm .navbar-nav .dropdown-menu li a i,.horizontal-menu .navbar-expand-sm .navbar-nav .dropdown .dropdown-menu .dropdown-submenu .dropdown-toggle:after {
+    transform: rotate(180deg);
+}
+
+
+.content-body{
+	padding-bottom:30px;
+}
+
+/*Right Menu*/
+.main-menu.menu-light .navigation > li {
+	margin: 0.1rem 1rem;
+}
+
+.field-validation-error {
+	color: red;
+}
+.input-validation-error {
+	border: 1px solid red;
+}
+.input-validation-error:focus{
+	border-color:red;
+}
+
+.validation-summary-errors > ul > li{
+	color:red;
+}
+
+.toast-title {
+	padding-bottom: 15px;
+}
+.toast-message{
+	font-size:0.85rem;
+}
+.table th, .table td {
+	padding: 1rem;
+}
+
+/*dataTabel*/
+table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > td:first-child:before, table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > th:first-child:before {
+	height: 18px;
+	width: 18px;
+	display: flex;
+	align-content: center;
+	justify-content: center;
+	align-items: center;
+	color: white;
+	border: 2px solid white;
+	border-radius: 4px;
+	box-shadow: 0 0 1px #ededed;
+	line-height: 14px;
+	content: '+';
+	background-color: #5a8dee;
+	font-family: iranyekan;
+}
+table.dataTable.dtr-inline.collapsed > tbody > tr.parent > td:first-child:before, table.dataTable.dtr-inline.collapsed > tbody > tr.parent > th:first-child:before {
+	content: '-';
+	background-color: #d33333
+}
+
+table.dataTable.dtr-column > tbody > tr > td.control:before, table.dataTable.dtr-column > tbody > tr > th.control:before {
+	height: 18px;
+	width: 18px;
+	display: flex;
+	align-content: center;
+	justify-content: center;
+	align-items: center;
+	color: white;
+	border: 2px solid white;
+	border-radius: 4px;
+	box-shadow: 0 0 1px #ededed;
+	line-height: 14px;
+	content: '+';
+	background-color: #5a8dee;
+	font-family: iranyekan;
+}
+
+.table.dataTable thead .sorting:before, .table.dataTable thead .sorting:after, .table.dataTable thead .sorting_asc:before, .table.dataTable thead .sorting_asc:after, .table.dataTable thead .sorting_desc:before, .table.dataTable thead .sorting_desc:after {
+	top: 4px;
+	left: 3px;
+}
+table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > td:first-child, table.dataTable.dtr-inline.collapsed > tbody > tr[role="row"] > th:first-child {
+	padding-left: 1rem;
+}
+table.dataTable > tbody > tr.child {
+	background-color: #f5f5f5;
+}
+	table.dataTable > tbody > tr.child:hover {
+		background: #f5f5f5 !important;
+	}
+.table.dataTable .dtr-details {
+	width: 100%;
+}
+.dataTables_wrapper .dataTables_filter {
+	text-align: right !important;
+}
+.dataTables_wrapper div.dataTables_length select {
+	padding: 0 0.7rem 0 1.4rem !important;
+}
+
+/*pagination*/
+.pagination .page-item .page-link {
+	color: #5d8fee;
+}
+.pagination .page-item .page-link:hover {
+	border-radius: 0;
+}
+.pagination .page-item.active {
+	border-radius: 0;
+}
+.pagination .page-item.active .page-link, .pagination .page-item.active .page-link:hover {
+	border-radius: 0;
+	background-color: #f2f4f4 !important;
+	color: #8d8f99;
+}
+
+
+/*DropZone*/
+.dropzone .dz-preview .dz-error-message{
+	top:150px !important;
+}
+
+/*Select2   Drop down List*/
+.select2 {
+	width: 100% !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow b {
+	transform: rotate(0deg);
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+	left: 1px !important;
+}
+.select2-container .select2-selection--single .select2-selection__rendered {
+	padding-left: 0.8rem !important;
+	padding-right: 0.47rem !important;
+}
+.select2-container--default .select2-search--dropdown .select2-search__field {
+	direction: rtl !important;
+}
+
+select.input-validation-error + span.select2 .select2-selection {
+	border-color: red !important;
+}
+
+/*modal*/
+.modal .modal-content .modal-header .close{
+	display:flex;
+	justify-content:center;
+	align-items:center;
+}
+
+
+
+.m-2px {
+	margin: 4px;
+}
+.m-4px{
+	margin:4px;
+}
+.mt-4px {
+	margin-top: 4px;
+}
+.mb-4px {
+	margin-bottom: 4px;
+}
+.p-2px {
+	padding: 4px;
+}
+
+.p-4px {
+	padding: 4px;
+}
+
+.dir-rtl{
+	direction:rtl !important;
+}
+.dir-ltr {
+	direction: ltr !important;
+}
+
+@media (min-width: 768px) {
+	.justify-content-md-center {
+		justify-content: center;
+	}
+}
+@media (min-width: 576px) and (max-width: 768px) {
+	.justify-content-sm-end {
+		justify-content: flex-end;
+	}
+}
+@media (max-width: 576px) {
+	.justify-content-xs-center {
+		justify-content: center;
+	}
+}
+
+.captchaInput{
+	direction:rtl !important;
+}
+
+
+
+
+
+
+
