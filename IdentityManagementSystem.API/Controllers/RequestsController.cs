@@ -44,7 +44,8 @@ namespace IdentityManagementSystem.API.Controllers
             string search = "",
             string filterStatus = "",
             string? fromDate = null,
-            string? toDate = null)
+            string? toDate = null,
+            string? requestType = null)
         {
             var username = User.Identity?.Name;
 
@@ -59,6 +60,12 @@ namespace IdentityManagementSystem.API.Controllers
                 return Unauthorized();
 
             var query = _context.Request.AsQueryable();
+
+            // تب کارتابل: فقط یک نوع درخواست (WAREHOUSE_RECEIPT / EVALUATION_APPOINTMENT)
+            if (!string.IsNullOrWhiteSpace(requestType))
+            {
+                query = query.Where(r => r.RequestType!.Code == requestType);
+            }
 
             // متقاضی (RoleId == 2) فقط درخواست‌های خودش رو می‌بینه.
             // ادمین (RoleId == 3) همه‌ی درخواست‌ها رو می‌بینه (نظارت کامل).
@@ -84,10 +91,10 @@ namespace IdentityManagementSystem.API.Controllers
                     r.GroupId != null && myGroupIds.Contains(r.GroupId.Value) &&
                     (r.AssignedTo == null || r.AssignedTo == currentUser.UserId));
 
-                // کارتابل کارشناس پیش‌فرض فقط درخواست‌های همون روزه؛ برای دیدن روزهای قبل باید
-                // بازه‌ی تاریخ (fromDate/toDate) صریحاً مشخص بشه. تاریخ‌ها به‌صورت میلادی «yyyy/M/d»
-                // (تقویم ایران، نه UTC) از سمت کلاینت میان — همون چیزی که پلاگین تاریخ فارسی برمی‌گردونه.
-                var (defaultFromUtc, defaultToUtcExclusive) = ResolveDateRangeUtc(fromDate, toDate);
+                // کارتابل کارشناس پیش‌فرض همه‌ی درخواست‌های گروهشه (جدیدترین اول)؛ بازه‌ی تاریخ (fromDate/toDate)
+                // فقط فیلتر اختیاریه. تاریخ‌ها به‌صورت میلادی «yyyy/M/d» (تقویم ایران، نه UTC) از سمت کلاینت
+                // میان — همون چیزی که پلاگین تاریخ فارسی برمی‌گردونه.
+                var (defaultFromUtc, defaultToUtcExclusive) = ResolveDateRangeUtc(fromDate, toDate, defaultToToday: false);
                 if (defaultFromUtc.HasValue)
                     query = query.Where(r => r.CreatedAt >= defaultFromUtc.Value);
                 if (defaultToUtcExclusive.HasValue)
@@ -108,15 +115,22 @@ namespace IdentityManagementSystem.API.Controllers
                 // کد ملی/رمز تصدیق دیگه plaintext نیستن، پس substring search روشون کار نمی‌کنه —
                 // به‌جاش تطابق دقیق روی هشِ جستجو (blind index) انجام می‌شه. رکوردهای قدیمی‌تر که هنوز
                 // Enc/Hash ندارن با Contains روی ستون plaintext قدیمی همچنان قابل جستجو می‌مونن.
+                // موبایل هم (برای رکوردهای جدید) فقط با تطابق دقیق روی هش پیدا می‌شه.
                 var searchHash = _encryptionHelper.ComputeSearchHash(search);
                 query = query.Where(r =>
-                    (r.NationalIdHash != null && r.NationalIdHash == searchHash) ||
-                    (r.NationalId != null && r.NationalId.Contains(search)) ||
-                    (r.MobileNumber != null && r.MobileNumber.Contains(search)) ||
-                    (r.DocumentNumber != null && r.DocumentNumber.Contains(search)) ||
-                    (r.VerificationCodeHash != null && r.VerificationCodeHash == searchHash) ||
-                    (r.VerificationCode != null && r.VerificationCode.Contains(search)) ||
-                    (r.RequestCode != null && r.RequestCode.Contains(search)) ||
+                    (r.WareReciept != null && (
+                        r.WareReciept.NationalIdHash == searchHash ||
+                        r.WareReciept.MobileNumberHash == searchHash ||
+                        r.WareReciept.VerificationCodeHash == searchHash ||
+                        (r.WareReciept.NationalId != null && r.WareReciept.NationalId.Contains(search)) ||
+                        (r.WareReciept.MobileNumber != null && r.WareReciept.MobileNumber.Contains(search)) ||
+                        (r.WareReciept.DocumentNumber != null && r.WareReciept.DocumentNumber.Contains(search)) ||
+                        (r.WareReciept.VerificationCode != null && r.WareReciept.VerificationCode.Contains(search)))) ||
+                    (r.Eval != null && (
+                        r.Eval.NationalIdHash == searchHash ||
+                        r.Eval.MobileNumberHash == searchHash)) ||
+                    (r.TrackingCode != null && r.TrackingCode.Contains(search)) ||
+                    r.RequestCode.Contains(search) ||
                     r.RequestId.ToString().Contains(search));
             }
 
@@ -148,6 +162,10 @@ namespace IdentityManagementSystem.API.Controllers
             var rawItems = await query
                 .Include(r => r.Group)
                 .Include(r => r.AssignedToUser)
+                .Include(r => r.RequestType)
+                .Include(r => r.Company)
+                .Include(r => r.WareReciept)
+                .Include(r => r.Eval).ThenInclude(e => e!.Slot)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -156,16 +174,23 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 RequestId = r.RequestId,
                 RequestCode = r.RequestCode,
-                NationalId = _encryptionHelper.DecryptOrFallback(r.NationalIdEnc, r.NationalId),
-                MobileNumber = r.MobileNumber,
-                DocumentNumber = r.DocumentNumber,
-                VerificationCode = _encryptionHelper.DecryptOrFallback(r.VerificationCodeEnc, r.VerificationCode),
-                WarehouseReceiptNumber = _encryptionHelper.DecryptOrFallback(r.WarehouseReceiptNumberEnc, r.WarehouseReceiptNumber),
+                NationalId = _encryptionHelper.DecryptNationalId(r),
+                MobileNumber = _encryptionHelper.DecryptMobile(r),
+                DocumentNumber = r.WareReciept?.DocumentNumber,
+                VerificationCode = r.WareReciept != null ? _encryptionHelper.DecryptOrFallback(r.WareReciept.VerificationCodeEnc, r.WareReciept.VerificationCode) : null,
+                WarehouseReceiptNumber = r.WareReciept != null ? _encryptionHelper.DecryptOrFallback(r.WareReciept.WarehouseReceiptNumberEnc, r.WareReciept.WarehouseReceiptNumber) : null,
                 TrackingCode = r.TrackingCode,
-                IsMatch = r.IsMatch ?? false,
-                IsExist = r.IsExist ?? false,
-                IsNationalIdInResponse = r.IsNationalIdInResponse ?? false,
-                IsNationalIdInLawyers = r.IsNationalIdInLawyers ?? false,
+                IsMatch = (r.WareReciept?.IsMatch ?? r.Eval?.IsMatch) ?? false,
+                IsExist = r.WareReciept?.IsExist ?? false,
+                IsNationalIdInResponse = r.WareReciept?.IsNationalIdInResponse ?? false,
+                IsNationalIdInLawyers = r.WareReciept?.IsNationalIdInLawyers ?? false,
+                RequestTypeCode = r.RequestType?.Code,
+                RequestTypeName = r.RequestType?.TypeName,
+                CompanyId = r.CompanyId,
+                CompanyName = r.Company?.CompanyName,
+                AppointmentSlotId = r.Eval?.SlotId,
+                AppointmentAt = r.Eval?.Slot?.StartAt,
+                AppointmentText = r.Eval?.Slot != null ? PersianDateText.Format(r.Eval.Slot.StartAt) : null,
                 ValidateByExpert = r.ValidateByExpert,
                 Description = r.Description,
                 CreatedAt = r.CreatedAt,
@@ -187,6 +212,60 @@ namespace IdentityManagementSystem.API.Controllers
         }
 
         /// <summary>
+        /// نوع‌های درخواستی که کاربر جاری تو کارتابلش می‌بینه (برای تب‌های کارتابل): ادمین همه‌ی نوع‌های فعال،
+        /// کارشناس فقط نوع گروه‌هایی که عضوشونه.
+        /// </summary>
+        [HttpGet("MyRequestTypes")]
+        public async Task<IActionResult> MyRequestTypes()
+        {
+            if (!long.TryParse(User.FindFirst("UserId")?.Value, out long userId))
+                return Unauthorized(new { success = false, message = "کاربر شناسایی نشد." });
+
+            bool isAdmin = await _context.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == 3);
+
+            // (نوع درخواست، شرکت) گروه‌هایی که کاربر عضوشونه — ادمین همه‌ی گروه‌ها رو می‌بینه
+            var groupsQuery = _context.Groups.Where(g => g.RequestTypeId != null);
+            if (!isAdmin)
+            {
+                var myGroupIds = _context.UserGroups.Where(ug => ug.UserId == userId).Select(ug => ug.GroupId);
+                groupsQuery = groupsQuery.Where(g => myGroupIds.Contains(g.Id));
+            }
+
+            var groups = await groupsQuery
+                .Select(g => new { RequestTypeId = g.RequestTypeId!.Value, CompanyName = g.Company != null ? g.Company.CompanyName : null })
+                .ToListAsync();
+
+            var typeIds = groups.Select(g => g.RequestTypeId).Distinct().ToList();
+
+            var types = await _context.RequestTypes
+                .Where(rt => rt.IsActive && typeIds.Contains(rt.RequestTypeId))
+                .OrderBy(rt => rt.RequestTypeId)
+                .Select(rt => new
+                {
+                    rt.RequestTypeId,
+                    rt.Code,
+                    rt.TypeName,
+                    CartableName = rt.Cartable != null ? rt.Cartable.CartableName : null
+                })
+                .ToListAsync();
+
+            var items = types.Select(t => new
+            {
+                code = t.Code,
+                name = t.TypeName,
+                cartableName = t.CartableName,
+                // شرکت(های) این کارتابل برای کاربر جاری — برای کارد اطلاعات بالای کارتابل
+                companies = groups
+                    .Where(g => g.RequestTypeId == t.RequestTypeId && !string.IsNullOrEmpty(g.CompanyName))
+                    .Select(g => g.CompanyName!)
+                    .Distinct()
+                    .ToList()
+            });
+
+            return Ok(new { success = true, isAdmin, items });
+        }
+
+        /// <summary>
         /// پیگیری وضعیت یک درخواست با کد پیگیری + شماره موبایل — هر دو باید با هم مطابقت داشته باشن
         /// (چون کد پیگیری از RequestId مشتق و قابل حدس زدنه، تنهایی برای شناسایی کافی نیست).
         /// </summary>
@@ -198,10 +277,15 @@ namespace IdentityManagementSystem.API.Controllers
                 return BadRequest(new { success = false, message = "کد پیگیری و شماره موبایل الزامی است." });
             }
 
+            var mobile = mobileNumber.Trim();
+            var mobileHash = _encryptionHelper.ComputeSearchHash(mobile);
             var request = await _context.Request
                 .Include(r => r.AssignedToUser)
                 .Include(r => r.Company)
-                .FirstOrDefaultAsync(r => r.TrackingCode == trackingCode.Trim() && r.MobileNumber == mobileNumber.Trim());
+                .Include(r => r.RequestType)
+                .Include(r => r.Eval).ThenInclude(e => e!.Slot)
+                .Where(MatchesMobile(mobile, mobileHash))
+                .FirstOrDefaultAsync(r => r.TrackingCode == trackingCode.Trim());
 
             if (request == null)
             {
@@ -232,11 +316,23 @@ namespace IdentityManagementSystem.API.Controllers
                 createdAt = request.CreatedAt,
                 status = statusText,
                 companyName = request.Company?.CompanyName,
+                requestTypeName = request.RequestType?.TypeName,
+                requestTypeCode = request.RequestType?.Code,
                 description = request.ValidateByExpert == false ? request.Description : null,
+                appointmentText = request.Eval?.Slot != null ? PersianDateText.Format(request.Eval.Slot.StartAt) : null,
                 handlerName,
                 handlerExtension
             });
         }
+
+        /// <summary>
+        /// تطابق موبایل متقاضی روی جدول جزئیات (قبض انبار یا ارزیابی) — رکورد جدید فقط با هش؛ رکورد قدیمی
+        /// قبض انبار که هنوز رمزنگاری نشده با ستون plaintext قدیمی (تا وقتی BackfillEncryption اجرا بشه).
+        /// </summary>
+        private static System.Linq.Expressions.Expression<Func<Request, bool>> MatchesMobile(string mobile, string mobileHash) =>
+            r => (r.WareReciept != null && (r.WareReciept.MobileNumberHash == mobileHash
+                                            || (r.WareReciept.MobileNumberHash == null && r.WareReciept.MobileNumber == mobile)))
+              || (r.Eval != null && r.Eval.MobileNumberHash == mobileHash);
 
         /// <summary>
         /// لیست درخواست‌های «در انتظار بررسی» یک متقاضی بر اساس شماره موبایل — بدون نیاز به کد پیگیری.
@@ -251,19 +347,27 @@ namespace IdentityManagementSystem.API.Controllers
                 return BadRequest(new { success = false, message = "شماره موبایل الزامی است." });
             }
 
+            var mobile = mobileNumber.Trim();
+            var mobileHash = _encryptionHelper.ComputeSearchHash(mobile);
             var rawPendingRequests = await _context.Request
                 .Include(r => r.Company)
+                .Include(r => r.RequestType)
+                .Include(r => r.WareReciept)
+                .Where(MatchesMobile(mobile, mobileHash))
                 // TrackingCode خالی یعنی رکورد قدیمی/ناقصه (قبل از این‌که تولید خودکار کد پیگیری همیشگی بشه) —
                 // بدون کد پیگیری، متقاضی هیچ راهی برای تشخیص این درخواست نداره، پس نشونش نمی‌دیم.
-                .Where(r => r.MobileNumber == mobileNumber.Trim() && r.ValidateByExpert == null && r.TrackingCode != null)
+                .Where(r => r.ValidateByExpert == null && r.TrackingCode != null)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 
             var pendingRequests = rawPendingRequests.Select(r => new
             {
                 trackingCode = r.TrackingCode,
-                warehouseReceiptNumber = _encryptionHelper.DecryptOrFallback(r.WarehouseReceiptNumberEnc, r.WarehouseReceiptNumber),
+                warehouseReceiptNumber = r.WareReciept != null
+                    ? _encryptionHelper.DecryptOrFallback(r.WareReciept.WarehouseReceiptNumberEnc, r.WareReciept.WarehouseReceiptNumber)
+                    : null,
                 companyName = r.Company?.CompanyName,
+                requestTypeCode = r.RequestType?.Code,
                 createdAt = r.CreatedAt
             });
 
@@ -356,9 +460,7 @@ namespace IdentityManagementSystem.API.Controllers
                 var cartableItem = await _context.CartableItems.FirstOrDefaultAsync(ci => ci.RequestId == model.RequestId);
                 if (cartableItem == null)
                 {
-                    var requestType = request.RequestTypeId.HasValue
-                        ? await _context.RequestTypes.FindAsync(request.RequestTypeId.Value)
-                        : null;
+                    var requestType = await _context.RequestTypes.FindAsync(request.RequestTypeId);
 
                     cartableItem = new CartableItem
                     {
@@ -460,14 +562,24 @@ namespace IdentityManagementSystem.API.Controllers
 
             try
             {
+                var wareTypeId = await _context.RequestTypes
+                    .Where(rt => rt.Code == "WAREHOUSE_RECEIPT")
+                    .Select(rt => rt.RequestTypeId)
+                    .FirstAsync();
+
                 var newRequest = new Request
                 {
-                    NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
-                    NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
-                    MobileNumber = model.MobileNumber,
-                    DocumentNumber = model.DocumentNumber,
-                    VerificationCodeEnc = _encryptionHelper.Encrypt(model.VerificationCode),
-                    VerificationCodeHash = _encryptionHelper.ComputeSearchHash(model.VerificationCode),
+                    RequestTypeId = wareTypeId,
+                    WareReciept = new RequestWareReciept
+                    {
+                        NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
+                        NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
+                        MobileNumberEnc = _encryptionHelper.Encrypt(model.MobileNumber),
+                        MobileNumberHash = _encryptionHelper.ComputeSearchHash(model.MobileNumber),
+                        DocumentNumber = model.DocumentNumber,
+                        VerificationCodeEnc = _encryptionHelper.Encrypt(model.VerificationCode),
+                        VerificationCodeHash = _encryptionHelper.ComputeSearchHash(model.VerificationCode)
+                    },
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = User.Identity?.Name ?? "Unknown",
                     ValidateByExpert = null,
@@ -637,10 +749,15 @@ namespace IdentityManagementSystem.API.Controllers
 
                 // 2. پیدا کردن درخواست
                 var request = await _context.Request
+                    .Include(r => r.WareReciept)
                     .FirstOrDefaultAsync(r => r.RequestId == requestId);
 
                 if (request == null)
                     return NotFound(new { success = false, message = "درخواست یافت نشد." });
+
+                // این اکشن فقط برای قبض انباره — درخواست نوبت‌دهی ارزیابی فقط با «ثبت نوبت» (SetAppointment) تایید می‌شه
+                if (request.WareReciept == null)
+                    return BadRequest(new { success = false, message = "❌ این درخواست نوبت‌دهی ارزیابی است؛ تایید آن فقط با ثبت نوبت انجام می‌شود." });
 
                 // 2b. فقط کارشناسی که خودش این درخواست رو take کرده می‌تونه تاییدش کنه (ادمین مستثناست)
                 bool isAdminCaller = await _context.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == 3);
@@ -677,10 +794,10 @@ namespace IdentityManagementSystem.API.Controllers
 
                     // رد کاملاً سیستمیه؛ پس تایید دستی فقط وقتی مجازه که همه‌ی گام‌های احراز از قبل true بوده باشن.
                     // (این چک عمداً مستقل از فرانت‌اِنده — حتی اگه کسی مستقیم این endpoint رو صدا بزنه هم رعایت می‌شه.)
-                    bool allChecksPassed = request.IsMatch == true
-                        && request.IsExist == true
-                        && request.IsNationalIdInResponse == true
-                        && request.IsNationalIdInLawyers == true;
+                    bool allChecksPassed = request.WareReciept.IsMatch == true
+                        && request.WareReciept.IsExist == true
+                        && request.WareReciept.IsNationalIdInResponse == true
+                        && request.WareReciept.IsNationalIdInLawyers == true;
 
                     if (!allChecksPassed)
                         return BadRequest(new
@@ -748,7 +865,8 @@ namespace IdentityManagementSystem.API.Controllers
                     $"{statusName} درخواست #{requestId} توسط کارشناس");
 
                 // 9. اطلاع‌رسانی پیامکی به متقاضی — عدم موفقیت پیامک نباید ثبت وضعیت رو خراب کنه
-                if (!string.IsNullOrWhiteSpace(request.MobileNumber))
+                var applicantMobile = _encryptionHelper.DecryptMobile(request);
+                if (!string.IsNullOrWhiteSpace(applicantMobile))
                 {
                     var smsText = validateByExpert
                         ? $"کاربر گرامی، درخواست شما با کد پیگیری {request.TrackingCode ?? request.RequestCode} تایید شد.\nاداره کل بنادر و دریانوردی استان هرمزگان"
@@ -758,8 +876,8 @@ namespace IdentityManagementSystem.API.Controllers
                     {
                         UserId = userId,
                         RequestId = requestId,
-                        MobileNumberEnc = _encryptionHelper.Encrypt(request.MobileNumber),
-                        MobileNumberHash = _encryptionHelper.ComputeSearchHash(request.MobileNumber),
+                        MobileNumberEnc = _encryptionHelper.Encrypt(applicantMobile),
+                        MobileNumberHash = _encryptionHelper.ComputeSearchHash(applicantMobile),
                         // مقادیر مجاز طبق CK_Sms_Purpose: General/RequestRejected/RequestApproved/RequestStageUpdate/Otp
                         Purpose = validateByExpert ? "RequestApproved" : "RequestRejected",
                         MessageText = smsText,
@@ -768,7 +886,7 @@ namespace IdentityManagementSystem.API.Controllers
 
                     try
                     {
-                        var smsResult = await _smsService.SendAsync(request.MobileNumber, smsText);
+                        var smsResult = await _smsService.SendAsync(applicantMobile, smsText);
                         smsLog.Status = smsResult.IsSuccess ? "Sent" : "Failed";
                         smsLog.ErrorMessage = smsResult.IsSuccess ? null : (smsResult.ErrorMessage ?? smsResult.RawResponse);
                         smsLog.SentAt = smsResult.IsSuccess ? DateTime.UtcNow : null;
@@ -835,9 +953,10 @@ namespace IdentityManagementSystem.API.Controllers
 
             while (true)
             {
-                var batch = await _context.Request
+                var batch = await _context.RequestWareReciepts
                     .Where(r =>
                         (r.NationalId != null && r.NationalIdEnc == null) ||
+                        (r.MobileNumber != null && r.MobileNumberEnc == null) ||
                         (r.VerificationCode != null && r.VerificationCodeEnc == null) ||
                         (r.WarehouseReceiptNumber != null && r.WarehouseReceiptNumberEnc == null))
                     .Take(batchSize)
@@ -852,6 +971,11 @@ namespace IdentityManagementSystem.API.Controllers
                     {
                         r.NationalIdEnc = _encryptionHelper.Encrypt(r.NationalId);
                         r.NationalIdHash = _encryptionHelper.ComputeSearchHash(r.NationalId);
+                    }
+                    if (!string.IsNullOrWhiteSpace(r.MobileNumber) && r.MobileNumberEnc == null)
+                    {
+                        r.MobileNumberEnc = _encryptionHelper.Encrypt(r.MobileNumber);
+                        r.MobileNumberHash = _encryptionHelper.ComputeSearchHash(r.MobileNumber);
                     }
                     if (!string.IsNullOrWhiteSpace(r.VerificationCode) && r.VerificationCodeEnc == null)
                     {

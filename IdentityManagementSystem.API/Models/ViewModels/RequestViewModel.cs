@@ -45,6 +45,17 @@ namespace IdentityManagementSystem.API.Models.ViewModels
         public long? AssignedTo { get; set; }
         public string? AssignedToName { get; set; }
         public DateTime? AssignedAt { get; set; }
+
+        // نوع درخواست و محوطه (شرکت) — برای جدا کردن جدول قبض انبار / نوبت‌دهی ارزیابی تو کارتابل
+        public string? RequestTypeCode { get; set; }
+        public string? RequestTypeName { get; set; }
+        public int? CompanyId { get; set; }
+        public string? CompanyName { get; set; }
+
+        // فقط نوبت‌دهی ارزیابی: نوبتی که کارشناس تعیین کرده (UTC + متن فارسی آماده‌ی نمایش)
+        public int? AppointmentSlotId { get; set; }
+        public DateTime? AppointmentAt { get; set; }
+        public string? AppointmentText { get; set; }
     }
 
     // تاریخچه‌ی کامل یک درخواست (Sec.RequestHistory) — کی چیکار کرد، سیستمی بود یا دستی

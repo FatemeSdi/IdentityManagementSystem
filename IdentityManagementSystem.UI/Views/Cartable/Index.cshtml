@@ -24,8 +24,15 @@
     var currentStatusText = statusOptions.FirstOrDefault(s => s.Value == currentFilter).Text;
     var hasAnyFilter = !string.IsNullOrWhiteSpace(currentSearch) || !string.IsNullOrWhiteSpace(currentFilter) || hasCustomRange;
 
+    // تب نوع درخواست — جدول قبض انبار و نوبت‌دهی ارزیابی کاملاً جدا هستن
+    var requestTypes = ViewBag.RequestTypes as List<IdentityManagementSystem.UI.Controllers.RequestTypeOption> ?? new List<IdentityManagementSystem.UI.Controllers.RequestTypeOption>();
+    var currentRequestType = ViewBag.RequestType as string;
+    var isEval = currentRequestType == IdentityManagementSystem.UI.Controllers.RequestTypeCodes.EvaluationAppointment;
+    var isAdmin = ViewBag.IsAdmin is bool adminFlag && adminFlag;
+    var currentTypeInfo = requestTypes.FirstOrDefault(t => t.Code == currentRequestType);
+
     var totalPages = Math.Max(1, Model.TotalPages);
-    string PageUrl(int p) => Url.Action("Index", new { page = p, search = currentSearch, filterStatus = currentFilter, fromDate, toDate })!;
+    string PageUrl(int p) => Url.Action("Index", new { page = p, search = currentSearch, filterStatus = currentFilter, fromDate, toDate, requestType = currentRequestType })!;
 }
 
 @functions {
@@ -42,15 +49,77 @@
     }
 }
 
+<!-- کارد اطلاعات کارتابل: اسم کارتابل + شرکت(های) مربوط به کاربر جاری -->
+@if (currentTypeInfo != null)
+{
+    <div class="card custom-card mb-3">
+        <div class="card-body d-flex flex-wrap align-items-center gap-4 py-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="avatar avatar-md avatar-rounded bg-primary-transparent">
+                    <i class="ti @(isEval ? "ti-calendar-check" : "ti-building-warehouse") fs-18"></i>
+                </span>
+                <div>
+                    <div class="text-muted fs-12">کارتابل</div>
+                    <div class="fw-semibold">@(currentTypeInfo.CartableName ?? currentTypeInfo.Name)</div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="avatar avatar-md avatar-rounded bg-info-transparent">
+                    <i class="ti ti-building fs-18"></i>
+                </span>
+                <div>
+                    <div class="text-muted fs-12">شرکت</div>
+                    <div class="fw-semibold">
+                        @if (currentTypeInfo.Companies.Count == 0)
+                        {
+                            <span>—</span>
+                        }
+                        else
+                        {
+                            @string.Join("، ", currentTypeInfo.Companies)
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <!-- سربرگ صفحه -->
 <div class="ims-page-header">
     <div>
         <h1 class="page-title">کارتابل درخواست‌ها</h1>
     </div>
-    <button id="AddDoc" type="button" class="btn btn-primary btn-wave" data-bs-toggle="modal" data-bs-target="#scrollingmodal">
-        <i class="ti ti-file-plus me-1"></i> ثبت درخواست جدید
-    </button>
+    <div class="d-flex gap-2">
+        @if (isAdmin)
+        {
+            <a asp-controller="EvalAppointment" asp-action="Slots" class="btn btn-outline-primary btn-wave">
+                <i class="ti ti-calendar-cog me-1"></i> مدیریت نوبت‌های ارزیابی
+            </a>
+        }
+        @if (!isEval)
+        {
+            <button id="AddDoc" type="button" class="btn btn-primary btn-wave" data-bs-toggle="modal" data-bs-target="#scrollingmodal">
+                <i class="ti ti-file-plus me-1"></i> ثبت درخواست جدید
+            </button>
+        }
+    </div>
 </div>
+
+@if (requestTypes.Count > 1)
+{
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        @foreach (var t in requestTypes)
+        {
+            <li class="nav-item" role="presentation">
+                <a class="nav-link @(t.Code == currentRequestType ? "active" : "")"
+                   href="@Url.Action("Index", new { requestType = t.Code })">
+                    <i class="ti @(t.Code == IdentityManagementSystem.UI.Controllers.RequestTypeCodes.EvaluationAppointment ? "ti-calendar-check" : "ti-building-warehouse") me-1"></i>@t.Name
+                </a>
+            </li>
+        }
+    </ul>
+}
 
 <!-- ==================== جستجو و فیلتر ==================== -->
 <div class="card custom-card ims-search">
@@ -84,7 +153,7 @@
             }
             else
             {
-                <span class="badge bg-light text-muted"><i class="ti ti-calendar me-1"></i>امروز</span>
+                <span class="badge bg-light text-muted"><i class="ti ti-calendar me-1"></i>همه‌ی تاریخ‌ها</span>
             }
         </div>
 
@@ -94,6 +163,7 @@
     <div id="collapseSearch" class="collapse show" aria-labelledby="headingCollapseSearch">
         <div class="card-body border-top">
             <form asp-action="Index" method="get" id="cartableFilterForm" data-search-scope autocomplete="off">
+                <input type="hidden" name="requestType" value="@currentRequestType" />
                 <div class="row gy-3">
                     <!-- جستجوی متنی -->
                     <div class="col-xl-6 col-lg-12">
@@ -105,7 +175,7 @@
                                    class="form-control"
                                    name="search"
                                    value="@currentSearch"
-                                   placeholder="شماره درخواست، کد ملی، شماره همراه، شناسه سند..." />
+                                   placeholder="@(isEval ? "کد پیگیری، کد ملی یا شماره همراه (کامل)..." : "شماره درخواست، کد ملی، شماره همراه، شناسه سند...")" />
                         </div>
                     </div>
 
@@ -152,10 +222,10 @@
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4">
                     <span class="search-hint">
                         <i class="ti ti-info-circle"></i>
-                        @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده است." : "بدون انتخاب بازه‌ی تاریخ، فقط درخواست‌های امروز نمایش داده می‌شود.")
+                        @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده است." : "بدون انتخاب بازه‌ی تاریخ، همه‌ی درخواست‌ها (جدیدترین اول) نمایش داده می‌شود.")
                     </span>
                     <div class="d-flex gap-2">
-                        <a id="searchRemoveBtn" asp-action="Index" class="btn btn-light btn-wave @(hasAnyFilter ? "" : "disabled")" title="حذف فیلتر">
+                        <a id="searchRemoveBtn" asp-action="Index" asp-route-requestType="@currentRequestType" class="btn btn-light btn-wave @(hasAnyFilter ? "" : "disabled")" title="حذف فیلتر">
                             <i class="ti ti-refresh me-1"></i>حذف فیلتر
                         </a>
                         <button id="searchBtn" type="submit" class="btn btn-primary btn-wave" title="جستجو">
@@ -178,6 +248,12 @@
         <span class="badge bg-primary-transparent fs-12">@Model.TotalCount مورد</span>
     </div>
     <div class="card-body">
+        @if (isEval)
+        {
+            <partial name="_EvalTable" model="Model" view-data="ViewData" />
+        }
+        else
+        {
         <div class="table-responsive">
             <table id="cartableTable" class="table table-hover text-nowrap mb-0 ims-table">
                 <thead>
@@ -209,7 +285,7 @@
                                 <div class="empty-state">
                                     <i class="ti ti-inbox-off"></i>
                                     <div class="fw-medium">درخواستی یافت نشد</div>
-                                    <small>@(hasAnyFilter ? "فیلترها را تغییر دهید یا حذف کنید." : "امروز هنوز درخواستی ثبت نشده است.")</small>
+                                    <small>@(hasAnyFilter ? "فیلترها را تغییر دهید یا حذف کنید." : "هنوز درخواستی برای شما ثبت نشده است.")</small>
                                 </div>
                             </td>
                         </tr>
@@ -333,6 +409,7 @@
                 </tbody>
             </table>
         </div>
+        }
 
         <!-- صفحه‌بندی (فیلترها حفظ می‌شوند) -->
         @if (Model.TotalCount > 0)
@@ -361,6 +438,49 @@
 </div>
 
 <!-- ==================== مودال‌ها ==================== -->
+<!-- مودال ثبت نوبت ارزیابی — نوبت‌های خالی محوطه‌ی همین درخواست، گروه‌بندی بر اساس روز -->
+<div class="modal fade ims-modal" id="setAppointmentModal" tabindex="-1" aria-labelledby="setAppointmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="avatar avatar-md avatar-rounded bg-success-transparent modal-icon"><i class="ti ti-calendar-plus fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="setAppointmentModalLabel">ثبت نوبت ارزیابی</h6>
+                    <div class="modal-subtitle" id="setAppointmentSubtitle"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body">
+                <!-- تاریخ و ساعت دلخواه کارشناس -->
+                <div class="fw-semibold mb-2"><i class="ti ti-calendar-time me-1"></i>تاریخ و ساعت نوبت</div>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label for="appointmentDate" class="form-label">تاریخ *</label>
+                        <div class="input-group">
+                            <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="appointmentDate" title="انتخاب تاریخ"><i class="ti ti-calendar"></i></span>
+                            <input id="appointmentDate" type="text" class="form-control dir-ltr fc-datepicker" placeholder="۱۴۰۵/۰۷/۲۳" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="appointmentTime" class="form-label">ساعت *</label>
+                        <input id="appointmentTime" type="time" class="form-control dir-ltr" step="300">
+                    </div>
+                </div>
+
+                <!-- نوبت‌های از پیش تعریف‌شده (اگه ادمین تعریف کرده باشه) -->
+                <div id="setAppointmentBody" class="mt-4"></div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <small class="text-muted"><i class="ti ti-message-2 me-1"></i>پس از ثبت، زمان نوبت برای متقاضی پیامک می‌شود.</small>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
+                    <button type="button" class="btn btn-success btn-wave" id="confirmAppointment" disabled><i class="ti ti-check me-1"></i>ثبت نوبت</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- مودال دلیل رد -->
 <div class="modal fade ims-modal" id="rejectReasonModal" tabindex="-1" aria-labelledby="rejectReasonModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -1011,9 +1131,18 @@
                         if (data.success) {
                             imsToast('success', data.message || 'درخواست برداشته شد');
                             row.find('.take-btn').replaceWith('<span class="badge bg-primary-transparent"><i class="ti ti-user-check me-1"></i>مال شماست</span>');
-                            row.find('.validation-cell').html(
-                                '<button type="button" class="btn btn-sm btn-success btn-wave approve-btn" data-request-id="' + requestId + '"><i class="ti ti-check me-1"></i>تایید</button>'
-                            );
+                            if (row.data('request-type') === 'eval') {
+                                // نوبت‌دهی ارزیابی: تایید = ثبت نوبت
+                                const setBtn = $('<button type="button" class="btn btn-sm btn-success btn-wave set-appointment-btn"><i class="ti ti-calendar-plus me-1"></i>ثبت نوبت</button>')
+                                    .attr('data-request-id', requestId)
+                                    .attr('data-tracking-code', row.data('tracking-code') || '')
+                                    .attr('data-company', row.data('company') || '');
+                                row.find('.validation-cell').empty().append(setBtn);
+                            } else {
+                                row.find('.validation-cell').html(
+                                    '<button type="button" class="btn btn-sm btn-success btn-wave approve-btn" data-request-id="' + requestId + '"><i class="ti ti-check me-1"></i>تایید</button>'
+                                );
+                            }
                         } else {
                             imsToast('error', data.message || 'خطا در برداشتن درخواست');
                             btn.prop('disabled', false).html(takeHtml);
@@ -1023,6 +1152,116 @@
                         imsToast('error', 'خطا در ارتباط با سرور');
                         btn.prop('disabled', false).html(takeHtml);
                     });
+            });
+
+            // ---------- ثبت نوبت ارزیابی ----------
+            let appointmentRequestId = null;
+
+            $(document).on('click', '.set-appointment-btn', function () {
+                const btn = $(this);
+                appointmentRequestId = btn.data('request-id');
+                $('#setAppointmentSubtitle').text('کد پیگیری ' + (btn.data('tracking-code') || appointmentRequestId) + ' — محوطه شرکت ' + (btn.data('company') || ''));
+                $('#appointmentDate, #appointmentTime').val('');
+                $('#confirmAppointment').prop('disabled', false);
+                $('#setAppointmentBody').html('<div class="text-center text-muted small py-2"><span class="spinner-border spinner-border-sm me-1"></span>بررسی نوبت‌های تعریف‌شده...</div>');
+                showModal('setAppointmentModal');
+
+                // نوبت‌های از پیش تعریف‌شده فقط یه میانبره — نبودنشون مانع ثبت نیست (تاریخ/ساعت دلخواه همیشه هست)
+                $.get('/EvalAppointment/FreeSlots', { requestId: appointmentRequestId })
+                    .done(function (res) {
+                        if (!res || !res.success) {
+                            $('#setAppointmentBody').html('<div class="text-danger small">' + escapeHtml((res && res.message) || 'خطا در دریافت نوبت‌های تعریف‌شده') + '</div>');
+                            return;
+                        }
+                        if (!res.days || res.days.length === 0) {
+                            $('#setAppointmentBody').empty();
+                            return;
+                        }
+                        let html = '<div class="fw-semibold mb-2 border-top pt-3"><i class="ti ti-list-check me-1"></i>یا انتخاب از نوبت‌های خالیِ تعریف‌شده</div>';
+                        res.days.forEach(function (d) {
+                            html += '<div class="mb-3"><div class="fw-semibold mb-2"><i class="ti ti-calendar me-1"></i>' + escapeHtml(d.dayText) + '</div><div class="d-flex flex-wrap gap-2">';
+                            d.slots.forEach(function (s) {
+                                const id = 'slot_' + s.slotId;
+                                html += '<input type="radio" class="btn-check" name="appointmentSlot" id="' + id + '" value="' + s.slotId + '" data-label="' + escapeHtml(d.dayText + ' ساعت ' + s.time) + '" autocomplete="off">'
+                                    + '<label class="btn btn-outline-success btn-sm" for="' + id + '" title="ظرفیت باقی‌مانده: ' + s.remaining + '">' + escapeHtml(s.time) + '</label>';
+                            });
+                            html += '</div></div>';
+                        });
+                        $('#setAppointmentBody').html(html);
+                    })
+                    .fail(function () {
+                        $('#setAppointmentBody').html('<div class="text-danger small">خطا در دریافت نوبت‌های تعریف‌شده</div>');
+                    });
+            });
+
+            // انتخاب نوبت تعریف‌شده ↔ تاریخ/ساعت دلخواه: فقط یکی از دو حالت فعاله
+            $(document).on('change', 'input[name="appointmentSlot"]', function () {
+                $('#appointmentDate, #appointmentTime').val('');
+            });
+            $('#appointmentDate, #appointmentTime').on('input change', function () {
+                $('input[name="appointmentSlot"]').prop('checked', false);
+            });
+
+            $('#confirmAppointment').on('click', function () {
+                if (!appointmentRequestId) return;
+
+                const selected = $('input[name="appointmentSlot"]:checked');
+                const customDate = $('#appointmentDate').val().trim();
+                const customTime = $('#appointmentTime').val().trim();
+                let payload, label;
+
+                if (selected.length) {
+                    payload = { SlotId: parseInt(selected.val(), 10) };
+                    label = selected.data('label');
+                } else if (customDate && customTime) {
+                    payload = { SlotId: 0, Date: customDate, Time: customTime };
+                    label = customDate + ' ساعت ' + customTime;
+                } else {
+                    imsToast('warning', 'تاریخ و ساعت نوبت را وارد کنید (یا یکی از نوبت‌های تعریف‌شده را انتخاب کنید).');
+                    return;
+                }
+
+                const requestId = appointmentRequestId;
+                Swal.fire({
+                    title: 'ثبت نوبت ارزیابی',
+                    html: 'نوبت <b>' + escapeHtml(label) + '</b> ثبت و برای متقاضی پیامک شود؟',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'بله، ثبت شود',
+                    cancelButtonText: 'انصراف'
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+
+                    const btn = $('#confirmAppointment');
+                    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>در حال ثبت...');
+
+                    fetch('/EvalAppointment/SetAppointment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                        },
+                        body: JSON.stringify(Object.assign({ RequestId: requestId }, payload))
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            btn.html('<i class="ti ti-check me-1"></i>ثبت نوبت');
+                            if (data.success) {
+                                imsToast(data.smsSent === false ? 'warning' : 'success', data.message || 'نوبت ثبت شد');
+                                $(`tr[data-request-id="${requestId}"]`).find('.validation-cell').html(
+                                    '<span class="badge bg-success-transparent"><i class="ti ti-calendar-check me-1"></i>' + escapeHtml(data.appointmentText || label) + '</span>'
+                                );
+                                hideModal('setAppointmentModal');
+                            } else {
+                                imsToast('error', data.message || 'خطا در ثبت نوبت');
+                                btn.prop('disabled', false);
+                            }
+                        })
+                        .catch(() => {
+                            imsToast('error', 'خطا در ارتباط با سرور');
+                            btn.prop('disabled', false).html('<i class="ti ti-check me-1"></i>ثبت نوبت');
+                        });
+                });
             });
 
             // نمایش دلیل رد سیستمی

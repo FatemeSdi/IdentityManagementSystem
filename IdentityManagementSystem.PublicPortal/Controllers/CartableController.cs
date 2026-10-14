@@ -370,19 +370,24 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
         {
             // اعتبارسنجی فرمت پایه — این فقط یه گیت جلوی داده‌ی واضحاً غلط هست،
             // نه احراز هویت واقعی. تصمیم نهایی (تایید/رد) رو سرویس‌ها و متصدی می‌گیرن.
+            bool isEvaluation = model.RequestTypeCode == RequestTypeCodes.EvaluationAppointment;
+
             var formatErrors = new List<string>();
             if (string.IsNullOrEmpty(model.NationalCode) || !Regex.IsMatch(model.NationalCode, @"^\d{10}$"))
                 formatErrors.Add("کد ملی نامعتبر است.");
             if (string.IsNullOrEmpty(model.MobileNumber) || !Regex.IsMatch(model.MobileNumber, @"^09\d{9}$"))
                 formatErrors.Add("شماره موبایل نامعتبر است.");
-            if (string.IsNullOrEmpty(model.DocumentNumber) || !Regex.IsMatch(model.DocumentNumber, @"^\d{18}$"))
-                formatErrors.Add("شناسه سند نامعتبر است.");
-            if (string.IsNullOrEmpty(model.VerifyCode) || !Regex.IsMatch(model.VerifyCode, @"^\d{6}$"))
-                formatErrors.Add("رمز تصدیق نامعتبر است.");
-            if (string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
-                formatErrors.Add("شماره قبض انبار الزامی است.");
+            if (!isEvaluation)
+            {
+                if (string.IsNullOrEmpty(model.DocumentNumber) || !Regex.IsMatch(model.DocumentNumber, @"^\d{18}$"))
+                    formatErrors.Add("شناسه سند نامعتبر است.");
+                if (string.IsNullOrEmpty(model.VerifyCode) || !Regex.IsMatch(model.VerifyCode, @"^\d{6}$"))
+                    formatErrors.Add("رمز تصدیق نامعتبر است.");
+                if (string.IsNullOrWhiteSpace(model.WarehouseReceiptNumber))
+                    formatErrors.Add("شماره قبض انبار الزامی است.");
+            }
             if (!model.CompanyId.HasValue || model.CompanyId.Value <= 0)
-                formatErrors.Add("شرکت مربوط به قبض انبار را انتخاب کنید.");
+                formatErrors.Add(isEvaluation ? "شرکت محوطه را انتخاب کنید." : "شرکت مربوط به قبض انبار را انتخاب کنید.");
 
             if (formatErrors.Count > 0)
             {
@@ -407,21 +412,28 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
             {
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-                var response = await _client.PostAsJsonAsync("Service/ProcessCombinedRequest", new CombinedRequestViewModel
-                {
-                    NationalId = model.NationalCode,
-                    MobileNumber = model.MobileNumber,
-                    DocumentNumber = model.DocumentNumber,
-                    VerificationCode = model.VerifyCode,
-                    WarehouseReceiptNumber = model.WarehouseReceiptNumber,
-                    CompanyId = model.CompanyId!.Value
-                });
+                var response = isEvaluation
+                    ? await _client.PostAsJsonAsync("Service/ProcessEvaluationAppointment", new
+                    {
+                        NationalId = model.NationalCode,
+                        MobileNumber = model.MobileNumber,
+                        CompanyId = model.CompanyId!.Value
+                    })
+                    : await _client.PostAsJsonAsync("Service/ProcessCombinedRequest", new CombinedRequestViewModel
+                    {
+                        NationalId = model.NationalCode,
+                        MobileNumber = model.MobileNumber,
+                        DocumentNumber = model.DocumentNumber,
+                        VerificationCode = model.VerifyCode,
+                        WarehouseReceiptNumber = model.WarehouseReceiptNumber,
+                        CompanyId = model.CompanyId!.Value
+                    });
 
                 var content = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("ProcessCombinedRequest returned {StatusCode}: {Content}", response.StatusCode, content);
+                    _logger.LogWarning("Submit ({RequestType}) returned {StatusCode}: {Content}", model.RequestTypeCode, response.StatusCode, content);
                     return Json(new { success = false, message = "خطا در ارتباط با سرویس. لطفاً دوباره تلاش کنید." });
                 }
 
@@ -463,8 +475,16 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
         }
     }
 
+    public static class RequestTypeCodes
+    {
+        public const string WarehouseReceipt = "WAREHOUSE_RECEIPT";
+        public const string EvaluationAppointment = "EVALUATION_APPOINTMENT";
+    }
+
     public class CartableFormViewModel
     {
+        // نوع درخواستی که متقاضی از مودال انتخاب کرده — پیش‌فرض قبض انبار
+        public string RequestTypeCode { get; set; } = RequestTypeCodes.WarehouseReceipt;
         public string NationalCode { get; set; } = string.Empty;
         public string MobileNumber { get; set; } = string.Empty;
         public string VerifyCode { get; set; } = string.Empty;
@@ -505,6 +525,7 @@ namespace IdentityManagementSystem.PublicPortal.Controllers
         public string? TrackingCode { get; set; }
         public string? WarehouseReceiptNumber { get; set; }
         public string? CompanyName { get; set; }
+        public string? RequestTypeCode { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
