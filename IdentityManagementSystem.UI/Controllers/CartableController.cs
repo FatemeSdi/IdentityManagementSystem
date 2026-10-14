@@ -125,8 +125,11 @@ namespace IdentityManagementSystem.UI.Controllers
             }
             // ============================
 
-            ViewBag.FromDate = fromDate;
-            ViewBag.ToDate = toDate;
+            // فیلتر تاریخ از تقویم شمسی (fc-datepicker) به‌صورت «۱۴۰۵/۰۷/۲۲» میاد؛ API میلادی «yyyy/M/d» می‌خواد
+            fromDate = PersianDateHelper.ToGregorianParam(fromDate);
+            toDate = PersianDateHelper.ToGregorianParam(toDate);
+            ViewBag.FromDate = PersianDateHelper.ToPersianParam(fromDate);
+            ViewBag.ToDate = PersianDateHelper.ToPersianParam(toDate);
 
             // گرفتن داده‌ها از API
             var model = await GetCartableData(page, search, filterStatus, fromDate, toDate);
@@ -1001,6 +1004,47 @@ namespace IdentityManagementSystem.UI.Controllers
         {
             var pc = new System.Globalization.PersianCalendar();
             return $"{pc.GetYear(date)}/{pc.GetMonth(date):00}/{pc.GetDayOfMonth(date):00}";
+        }
+
+        /// <summary>
+        /// تاریخ ورودی فیلتر (شمسی یا میلادی، با ارقام فارسی/عربی/لاتین) رو به رشته‌ی میلادی «yyyy/M/d»
+        /// که API انتظار داره تبدیل می‌کنه. سال کمتر از ۱۷۰۰ شمسی فرض می‌شه. ورودی نامعتبر → null.
+        /// </summary>
+        public static string? ToGregorianParam(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+
+            var normalized = new string(value.Trim().Select(ch =>
+                ch >= '۰' && ch <= '۹' ? (char)('0' + (ch - '۰')) :
+                ch >= '٠' && ch <= '٩' ? (char)('0' + (ch - '٠')) : ch).ToArray());
+
+            var parts = normalized.Split('/', '-');
+            if (parts.Length != 3
+                || !int.TryParse(parts[0], out var y)
+                || !int.TryParse(parts[1], out var m)
+                || !int.TryParse(parts[2], out var d))
+                return null;
+
+            try
+            {
+                var dt = y < 1700
+                    ? new System.Globalization.PersianCalendar().ToDateTime(y, m, d, 0, 0, 0, 0)
+                    : new DateTime(y, m, d);
+                return dt.ToString("yyyy/M/d", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>رشته‌ی میلادی «yyyy/M/d» → شمسی «yyyy/MM/dd» برای نمایش دوباره در فیلد فیلتر.</summary>
+        public static string ToPersianParam(string? gregorian)
+        {
+            if (string.IsNullOrWhiteSpace(gregorian)
+                || !DateTime.TryParseExact(gregorian, "yyyy/M/d", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dt))
+                return "";
+            return dt.ToPersianDate();
         }
 
         public static string ToPersianTime(this DateTime date)

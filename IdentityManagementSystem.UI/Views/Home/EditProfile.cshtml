@@ -41,14 +41,6 @@
 
             <div class="card-body p-0 position-relative mx-3 main-card-body mt-4">
                 <div class="profile-content">
-                    @if (ViewBag.ErrorMessage != null)
-                    {
-                        <script>toastr.error('@ViewBag.ErrorMessage');</script>
-                    }
-                    @if (ViewBag.SuccessMessage != null)
-                    {
-                        <script>toastr.success('@ViewBag.SuccessMessage');</script>
-                    }
 
                     <form id="changePasswordForm" asp-controller="Home" asp-action="ChangePassword" method="post">
                         @Html.AntiForgeryToken()
@@ -110,6 +102,14 @@
 
 @section Scripts {
     <script>
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <text>imsToast('error', @Json.Serialize((string)ViewBag.ErrorMessage));</text>
+        }
+        @if (ViewBag.SuccessMessage != null)
+        {
+            <text>imsToast('success', @Json.Serialize((string)ViewBag.SuccessMessage));</text>
+        }
         $(document).ready(function () {
             $("#changePasswordForm").submit(function (e) {
                 e.preventDefault();
@@ -121,10 +121,10 @@
                     dataType: "json",
                     success: function (response) {
                         if (response && response.success) {
-                            toastr.success(response.message || "رمز عبور با موفقیت تغییر کرد");
+                            imsToast('success', response.message || "رمز عبور با موفقیت تغییر کرد");
                             form[0].reset();
                         } else {
-                            toastr.error((response && response.message) || "خطا در تغییر رمز عبور");
+                            imsToast('error', (response && response.message) || "خطا در تغییر رمز عبور");
                         }
                     },
                     error: function (xhr) {
@@ -133,7 +133,7 @@
                             var res = xhr.responseJSON || JSON.parse(xhr.responseText);
                             msg = (res && res.message) || msg;
                         } catch (e) { }
-                        toastr.error(msg);
+                        imsToast('error', msg);
                     }
                 });
             });

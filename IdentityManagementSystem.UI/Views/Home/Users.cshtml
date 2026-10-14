@@ -5,18 +5,6 @@
     Layout = "_Layout";
 }
 
-<link rel="stylesheet" href="~/assets/libs/choices.js/public/assets/styles/choices.min.css" />
-
-<style>
-    #usersTable thead th {
-        background-color: rgb(var(--primary-rgb));
-        color: #fff;
-        border-color: rgb(var(--primary-rgb));
-        white-space: nowrap;
-        vertical-align: middle;
-    }
-</style>
-
 <div class="my-4 page-header-breadcrumb d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div>
         <nav>
@@ -284,7 +272,6 @@
     </div>
 </div>
 
-<script src="~/assets/libs/choices.js/public/assets/scripts/choices.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         let addModal, editModal;
@@ -380,11 +367,11 @@
                         document.getElementById('editConfirmPassword').value = '';
                         editModal.show();
                     } else {
-                        window.showToast ? window.showToast(response.message, false) : alert(response.message);
+                        imsToast('error', response.message);
                     }
                 })
                 .catch(function() {
-                    window.showToast ? window.showToast('خطا در دریافت اطلاعات کاربر', false) : alert('خطا در دریافت اطلاعات کاربر');
+                    imsToast('error', 'خطا در دریافت اطلاعات کاربر');
                 });
             });
         });
@@ -410,10 +397,10 @@
                     if (response.success) {
                         setTimeout(function() { location.reload(); }, 800);
                     } else {
-                        alert(response.message);
+                        imsToast('error', response.message);
                     }
                 })
-                .catch(function() { alert('خطا در غیرفعال‌سازی کاربر'); });
+                .catch(function() { imsToast('error', 'خطا در غیرفعال‌سازی کاربر'); });
             });
         });
 
@@ -436,10 +423,10 @@
                     if (response.success) {
                         setTimeout(function() { location.reload(); }, 800);
                     } else {
-                        alert(response.message);
+                        imsToast('error', response.message);
                     }
                 })
-                .catch(function() { alert('خطا در فعال‌سازی کاربر'); });
+                .catch(function() { imsToast('error', 'خطا در فعال‌سازی کاربر'); });
             });
         });
 
@@ -451,7 +438,7 @@
             var confirmPassword = document.getElementById('editConfirmPassword').value;
 
             if (password && password !== confirmPassword) {
-                alert('رمز عبور و تأیید رمز عبور یکسان نیستند');
+                imsToast('warning', 'رمز عبور و تأیید رمز عبور یکسان نیستند');
                 return;
             }
 
@@ -474,10 +461,10 @@
                     editModal.hide();
                     setTimeout(function() { location.reload(); }, 800);
                 } else {
-                    alert(response.message || 'خطا در به‌روزرسانی');
+                    imsToast('error', response.message || 'خطا در به‌روزرسانی');
                 }
             })
-            .catch(function() { alert('خطا در به‌روزرسانی کاربر'); });
+            .catch(function() { imsToast('error', 'خطا در به‌روزرسانی کاربر'); });
         });
 
         // ارسال فرم ایجاد کاربر
@@ -512,10 +499,10 @@
                     addModal.hide();
                     setTimeout(function() { location.reload(); }, 800);
                 } else {
-                    alert(response.message || 'خطا در ایجاد کاربر');
+                    imsToast('error', response.message || 'خطا در ایجاد کاربر');
                 }
             })
-            .catch(function() { alert('خطا در ایجاد کاربر'); });
+            .catch(function() { imsToast('error', 'خطا در ایجاد کاربر'); });
         });
 
         document.getElementById('addUserModal').addEventListener('hidden.bs.modal', function() {

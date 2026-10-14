@@ -1,4 +1,4 @@
-﻿@using IdentityManagementSystem.UI.Controllers
+@using IdentityManagementSystem.UI.Controllers
 @model IdentityManagementSystem.UI.Controllers.PaginatedCartableViewModel
 @{
     ViewData["Title"] = "کارتابل";
@@ -9,160 +9,177 @@
     var currentFilter = ViewBag.FilterStatus as string ?? "";
     var currentUserId = Context.Session.GetString("UserId");
 
-    var fromDateGregorian = ViewBag.FromDate as string;
-    var toDateGregorian = ViewBag.ToDate as string;
+    // تاریخ‌ها از کنترلر به‌صورت شمسی «yyyy/MM/dd» میان (کنترلر خودش به میلادی برای API تبدیل می‌کنه)
+    var fromDate = ViewBag.FromDate as string ?? "";
+    var toDate = ViewBag.ToDate as string ?? "";
+    var hasCustomRange = !string.IsNullOrWhiteSpace(fromDate) || !string.IsNullOrWhiteSpace(toDate);
 
-    string ToPersianDisplay(string? g)
+    var statusOptions = new[]
     {
-        if (string.IsNullOrWhiteSpace(g)) return "";
-        if (!DateTime.TryParseExact(g.Trim(), "yyyy/M/d", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dt))
-            return "";
-        var pc = new System.Globalization.PersianCalendar();
-        return $"{pc.GetYear(dt)}/{pc.GetMonth(dt):00}/{pc.GetDayOfMonth(dt):00}";
-    }
+        (Value: "", Text: "همه", Icon: "ti ti-list"),
+        (Value: "pending", Text: "در انتظار بررسی", Icon: "ti ti-hourglass"),
+        (Value: "approved", Text: "تایید شده", Icon: "ti ti-circle-check"),
+        (Value: "rejected", Text: "رد شده", Icon: "ti ti-circle-x"),
+    };
+    var currentStatusText = statusOptions.FirstOrDefault(s => s.Value == currentFilter).Text;
+    var hasAnyFilter = !string.IsNullOrWhiteSpace(currentSearch) || !string.IsNullOrWhiteSpace(currentFilter) || hasCustomRange;
 
-    var fromDatePersianDisplay = ToPersianDisplay(fromDateGregorian);
-    var toDatePersianDisplay = ToPersianDisplay(toDateGregorian);
-    var hasCustomRange = !string.IsNullOrWhiteSpace(fromDateGregorian) || !string.IsNullOrWhiteSpace(toDateGregorian);
+    var totalPages = Math.Max(1, Model.TotalPages);
+    string PageUrl(int p) => Url.Action("Index", new { page = p, search = currentSearch, filterStatus = currentFilter, fromDate, toDate })!;
 }
 
-<link rel="stylesheet" href="~/css/IndexStyle.css" asp-append-version="true" />
-<link rel="stylesheet" href="~/css/persianDatepicker-default.css" asp-append-version="true" />
-<link rel="stylesheet" href="~/assets/libs/choices.js/public/assets/styles/choices.min.css" />
-
-<style>
-    #cartableTable thead th {
-        background-color: rgb(var(--primary-rgb));
-        color: #fff;
-        border-color: rgb(var(--primary-rgb));
-        white-space: nowrap;
-        vertical-align: middle;
+@functions {
+    // آیکن وضعیت هر مرحله‌ی احراز (true/false/null)
+    private static Microsoft.AspNetCore.Html.IHtmlContent CheckState(bool? value, string okTitle, string failTitle)
+    {
+        var html = value switch
+        {
+            true => $"<span class=\"check-state bg-success-transparent text-success\" data-bs-toggle=\"tooltip\" title=\"{okTitle}\"><i class=\"ti ti-check\"></i></span>",
+            false => $"<span class=\"check-state bg-danger-transparent text-danger\" data-bs-toggle=\"tooltip\" title=\"{failTitle}\"><i class=\"ti ti-x\"></i></span>",
+            _ => "<span class=\"check-state bg-light text-muted\" data-bs-toggle=\"tooltip\" title=\"نامشخص\"><i class=\"ti ti-minus\"></i></span>"
+        };
+        return new Microsoft.AspNetCore.Html.HtmlString(html);
     }
+}
 
-    /* اطمینان از باکس‌دار بودن ظاهر ویجت Choices.js و اینپوت‌های تقویم فارسی روی این صفحه
-       (مستقل از اینکه CSS کتابخونه درست لود شده باشه یا نه) — هم‌راستا با ظاهر form-control */
-    #cartableFilterForm .choices {
-        margin-bottom: 0;
-    }
+<!-- سربرگ صفحه -->
+<div class="ims-page-header">
+    <div>
+        <h1 class="page-title">کارتابل درخواست‌ها</h1>
+    </div>
+    <button id="AddDoc" type="button" class="btn btn-primary btn-wave" data-bs-toggle="modal" data-bs-target="#scrollingmodal">
+        <i class="ti ti-file-plus me-1"></i> ثبت درخواست جدید
+    </button>
+</div>
 
-        #cartableFilterForm .choices .choices__inner {
-            background-color: var(--form-control-bg, #fff);
-            border: 1px solid var(--input-border, #e2e6f1);
-            border-radius: 0.25rem;
-            min-height: calc(1.7em + 0.75rem + 2px);
-            padding: 0.375rem 0.75rem;
-            font-size: 0.8125rem;
-            display: flex;
-            align-items: center;
-        }
+<!-- ==================== جستجو و فیلتر ==================== -->
+<div class="card custom-card ims-search">
+    <div class="card-header search-collapse-toggle d-flex align-items-center flex-wrap"
+         id="headingCollapseSearch"
+         data-bs-toggle="collapse"
+         data-bs-target="#collapseSearch"
+         role="button"
+         aria-expanded="true"
+         aria-controls="collapseSearch">
+        <div class="card-title mb-0">
+            <i class="ti ti-adjustments-horizontal me-1"></i>
+            جستجوی پیشرفته
+        </div>
 
-        #cartableFilterForm .choices.is-open .choices__inner {
-            border-color: rgb(var(--primary-rgb));
-        }
+        <div class="active-filters">
+            @if (!string.IsNullOrWhiteSpace(currentSearch))
+            {
+                <span class="badge bg-primary-transparent"><i class="ti ti-search me-1"></i>@currentSearch</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(currentFilter))
+            {
+                <span class="badge bg-info-transparent"><i class="ti ti-flag me-1"></i>@currentStatusText</span>
+            }
+            @if (hasCustomRange)
+            {
+                <span class="badge bg-warning-transparent">
+                    <i class="ti ti-calendar me-1"></i>
+                    از <bdi>@(string.IsNullOrWhiteSpace(fromDate) ? "…" : fromDate)</bdi> تا <bdi>@(string.IsNullOrWhiteSpace(toDate) ? "…" : toDate)</bdi>
+                </span>
+            }
+            else
+            {
+                <span class="badge bg-light text-muted"><i class="ti ti-calendar me-1"></i>امروز</span>
+            }
+        </div>
 
-    #cartableFilterForm .jalali-date-input {
-        background-color: var(--form-control-bg, #fff) !important;
-    }
-</style>
+        <i class="ti ti-chevron-down search-collapse-chevron ms-2"></i>
+    </div>
 
-<!-- جستجو و فیلتر -->
-<div class="card custom-card mb-3">
-    <div class="card-body pb-2">
-        <form asp-action="Index" method="get" id="cartableFilterForm" class="row gy-3 align-items-end">
-            <div class="col-lg-3 col-md-6">
-                <label for="cartableSearch" class="form-label text-default fs-13">جستجو</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="ri-search-line"></i></span>
-                    <input type="text"
-                           id="cartableSearch"
-                           class="form-control"
-                           name="search"
-                           value="@currentSearch"
-                           placeholder="شماره درخواست، کد ملی، شماره همراه..." />
+    <div id="collapseSearch" class="collapse show" aria-labelledby="headingCollapseSearch">
+        <div class="card-body border-top">
+            <form asp-action="Index" method="get" id="cartableFilterForm" data-search-scope autocomplete="off">
+                <div class="row gy-3">
+                    <!-- جستجوی متنی -->
+                    <div class="col-xl-6 col-lg-12">
+                        <label for="cartableSearch" class="form-label">جستجو</label>
+                        <div class="input-group search-main">
+                            <span class="input-group-text"><i class="ti ti-search"></i></span>
+                            <input type="search"
+                                   id="cartableSearch"
+                                   class="form-control"
+                                   name="search"
+                                   value="@currentSearch"
+                                   placeholder="شماره درخواست، کد ملی، شماره همراه، شناسه سند..." />
+                        </div>
+                    </div>
+
+                    <!-- بازه‌ی تاریخ (تقویم شمسی استاندارد fc-datepicker) -->
+                    <div class="col-xl-3 col-md-6">
+                        <label for="FromDate" class="form-label">از تاریخ</label>
+                        <div class="input-group">
+                            <span class="input-group-text cursor-pointer fc-datepicker-clear" data-target="FromDate" title="پاک کردن">
+                                <i class="ti ti-x"></i>
+                            </span>
+                            <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="FromDate" title="انتخاب تاریخ">
+                                <i class="ti ti-calendar"></i>
+                            </span>
+                            <input id="FromDate" name="fromDate" type="text" class="form-control dir-ltr fc-datepicker" value="@fromDate" placeholder="۱۴۰۵/۰۱/۰۱" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <label for="ToDate" class="form-label">تا تاریخ</label>
+                        <div class="input-group">
+                            <span class="input-group-text cursor-pointer fc-datepicker-clear" data-target="ToDate" title="پاک کردن">
+                                <i class="ti ti-x"></i>
+                            </span>
+                            <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="ToDate" title="انتخاب تاریخ">
+                                <i class="ti ti-calendar"></i>
+                            </span>
+                            <input id="ToDate" name="toDate" type="text" class="form-control dir-ltr fc-datepicker" value="@toDate" placeholder="۱۴۰۵/۱۲/۲۹" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <!-- وضعیت -->
+                    <div class="col-12">
+                        <label class="form-label d-block">وضعیت درخواست</label>
+                        <div class="ims-status-filter" role="group" aria-label="وضعیت درخواست">
+                            @foreach (var s in statusOptions)
+                            {
+                                var id = "status_" + (string.IsNullOrEmpty(s.Value) ? "all" : s.Value);
+                                <input type="radio" class="btn-check" name="filterStatus" id="@id" value="@s.Value" checked="@(currentFilter == s.Value)" autocomplete="off">
+                                <label class="btn" for="@id"><i class="@s.Icon"></i>@s.Text</label>
+                            }
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="col-lg-3 col-md-6">
-                <label for="filterStatus" class="form-label text-default fs-13">وضعیت</label>
-                <select name="filterStatus" id="filterStatus" class="form-select">
-                    <option value="">همه درخواست‌ها</option>
-                    <option value="approved" selected="@(currentFilter == "approved")">تایید شده</option>
-                    <option value="rejected" selected="@(currentFilter == "rejected")">رد شده</option>
-                    <option value="pending" selected="@(currentFilter == "pending")">در انتظار بررسی</option>
-                </select>
-            </div>
-
-            <div class="col-lg-2 col-md-6">
-                <label for="fromDateDisplay" class="form-label text-default fs-13">از تاریخ</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="ri-calendar-line"></i></span>
-                    <input type="text"
-                           id="fromDateDisplay"
-                           class="form-control jalali-date-input"
-                           placeholder="از تاریخ"
-                           value="@fromDatePersianDisplay"
-                           readonly />
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-4">
+                    <span class="search-hint">
+                        <i class="ti ti-info-circle"></i>
+                        @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده است." : "بدون انتخاب بازه‌ی تاریخ، فقط درخواست‌های امروز نمایش داده می‌شود.")
+                    </span>
+                    <div class="d-flex gap-2">
+                        <a id="searchRemoveBtn" asp-action="Index" class="btn btn-light btn-wave @(hasAnyFilter ? "" : "disabled")" title="حذف فیلتر">
+                            <i class="ti ti-refresh me-1"></i>حذف فیلتر
+                        </a>
+                        <button id="searchBtn" type="submit" class="btn btn-primary btn-wave" title="جستجو">
+                            <i class="ti ti-search me-1"></i>جستجو
+                        </button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="col-lg-2 col-md-6">
-                <label for="toDateDisplay" class="form-label text-default fs-13">تا تاریخ</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="ri-calendar-line"></i></span>
-                    <input type="text"
-                           id="toDateDisplay"
-                           class="form-control jalali-date-input"
-                           placeholder="تا تاریخ"
-                           value="@toDatePersianDisplay"
-                           readonly />
-                </div>
-            </div>
-
-            <input type="hidden" name="fromDate" id="fromDateHidden" value="@fromDateGregorian" />
-            <input type="hidden" name="toDate" id="toDateHidden" value="@toDateGregorian" />
-
-            <div class="col-lg-2 col-md-12 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-fill">
-                    <i class="ri-search-line me-1"></i> اعمال فیلتر
-                </button>
-
-                @if (hasCustomRange)
-                {
-                    <a href="@Url.Action("Index", new { search = currentSearch, filterStatus = currentFilter })" class="btn btn-outline-secondary" title="بازگشت به امروز">
-                        <i class="ri-calendar-check-line"></i>
-                    </a>
-                }
-            </div>
-        </form>
-
-        <small class="text-muted d-block mt-2">
-            <i class="ri-information-line"></i>
-            @(hasCustomRange ? "بازه‌ی تاریخ سفارشی اعمال شده." : "بدون انتخاب بازه، فقط درخواست‌های امروز نمایش داده می‌شود.")
-        </small>
+            </form>
+        </div>
     </div>
 </div>
 
-<!-- کارت جدول -->
+<!-- ==================== جدول درخواست‌ها ==================== -->
 <div class="card custom-card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="card-title mb-0">درخواست‌ها</div>
-        <button id="AddDoc" type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#scrollingmodal">
-            <i class="ri-add-line me-1"></i> سند جدید
-        </button>
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="card-title mb-0">
+            <i class="ti ti-inbox me-1"></i>
+            درخواست‌ها
+        </div>
+        <span class="badge bg-primary-transparent fs-12">@Model.TotalCount مورد</span>
     </div>
     <div class="card-body">
-
-        @if (ViewBag.ErrorMessage != null)
-        {
-            <script>toastr.error('@ViewBag.ErrorMessage');</script>
-        }
-        @if (ViewBag.SuccessMessage != null)
-        {
-            <script>toastr.success('@ViewBag.SuccessMessage');</script>
-        }
-
-        <div class="table-responsive">  
-            <table id="cartableTable" class="table table-bordered text-nowrap">
+        <div class="table-responsive">
+            <table id="cartableTable" class="table table-hover text-nowrap mb-0 ims-table">
                 <thead>
                     <tr>
                         <th>شماره درخواست</th>
@@ -185,89 +202,42 @@
                     </tr>
                 </thead>
                 <tbody id="cartableBody">
+                    @if (!Model.Items.Any())
+                    {
+                        <tr>
+                            <td colspan="17">
+                                <div class="empty-state">
+                                    <i class="ti ti-inbox-off"></i>
+                                    <div class="fw-medium">درخواستی یافت نشد</div>
+                                    <small>@(hasAnyFilter ? "فیلترها را تغییر دهید یا حذف کنید." : "امروز هنوز درخواستی ثبت نشده است.")</small>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                     @foreach (var item in Model.Items)
                     {
                         <tr data-request-id="@item.RequestId">
-                            <td>@item.RequestId</td>
+                            <td class="text-center fw-semibold">@item.RequestId</td>
                             <td>
-                                <div>@item.CreatedAt.ToPersianTime()</div>
-                                <small class="text-muted">@item.CreatedAt.ToPersianDate()</small>
+                                <div>@item.CreatedAt.ToPersianDate()</div>
+                                <small class="text-muted dir-ltr d-inline-block">@item.CreatedAt.ToPersianTime()</small>
                             </td>
-                            <td>@item.NationalId</td>
-                            <td>@item.MobileNumber</td>
-                            <td>@item.DocumentNumber</td>
-                            <td>@item.VerificationCode</td>
+                            <td class="dir-ltr text-end">@item.NationalId</td>
+                            <td class="dir-ltr text-end">@item.MobileNumber</td>
+                            <td class="dir-ltr text-end">@item.DocumentNumber</td>
+                            <td class="dir-ltr text-end">@item.VerificationCode</td>
                             <td>@(string.IsNullOrEmpty(item.WarehouseReceiptNumber) ? "—" : item.WarehouseReceiptNumber)</td>
                             <td>@(string.IsNullOrEmpty(item.GroupTitle) ? "—" : item.GroupTitle)</td>
 
-                            <!-- احراز هویت متقاضی -->
-                            <td class="text-center">
-                                @if (item.IsMatch == true)
-                                {
-                                    <i class="ri-check-line text-success fs-18" title="تایید شده"></i>
-                                }
-                                else if (item.IsMatch == false)
-                                {
-                                    <i class="ri-close-line text-danger fs-18" title="تایید نشده"></i>
-                                }
-                                else
-                                {
-                                    <span class="text-muted">نامشخص</span>
-                                }
-                            </td>
-
-                            <!-- احراز اصالت سند -->
-                            <td class="text-center">
-                                @if (item.IsExist == true)
-                                {
-                                    <i class="ri-check-line text-success fs-18" title="وجود دارد"></i>
-                                }
-                                else if (item.IsExist == false)
-                                {
-                                    <i class="ri-close-line text-danger fs-18" title="وجود ندارد"></i>
-                                }
-                                else
-                                {
-                                    <span class="text-muted">نامشخص</span>
-                                }
-                            </td>
-
-                            <!-- ارتباط متقاضی با سند -->
-                            <td class="text-center">
-                                @if (item.IsNationalIdInResponse == true)
-                                {
-                                    <i class="ri-check-line text-success fs-18" title="تایید شده"></i>
-                                }
-                                else if (item.IsNationalIdInResponse == false)
-                                {
-                                    <i class="ri-close-line text-danger fs-18" title="تایید نشده"></i>
-                                }
-                                else
-                                {
-                                    <span class="text-muted">نامشخص</span>
-                                }
-                            </td>
-
-                            <!-- احراز وکالت -->
-                            <td class="text-center">
-                                @if (item.IsNationalIdInLawyers == true)
-                                {
-                                    <i class="ri-check-line text-success fs-18" title="تایید شده"></i>
-                                }
-                                else if (item.IsNationalIdInLawyers == false)
-                                {
-                                    <i class="ri-close-line text-danger fs-18" title="تایید نشده"></i>
-                                }
-                                else
-                                {
-                                    <span class="text-muted">نامشخص</span>
-                                }
-                            </td>
+                            <td class="text-center">@CheckState(item.IsMatch, "تایید شده", "تایید نشده")</td>
+                            <td class="text-center">@CheckState(item.IsExist, "وجود دارد", "وجود ندارد")</td>
+                            <td class="text-center">@CheckState(item.IsNationalIdInResponse, "تایید شده", "تایید نشده")</td>
+                            <td class="text-center">@CheckState(item.IsNationalIdInLawyers, "تایید شده", "تایید نشده")</td>
 
                             <!-- نمایش سند -->
                             <td class="text-center">
-                                <button class="btn btn-sm btn-light btn-view-doc" data-request-id="@item.RequestId" title="مشاهده متن سند">
-                                    <i class="ri-file-text-line @(item.IsRead ? "text-success" : "text-primary")"></i>
+                                <button type="button" class="btn btn-icon btn-sm @(item.IsRead ? "btn-success-light" : "btn-primary-light") btn-view-doc" data-request-id="@item.RequestId" data-bs-toggle="tooltip" title="@(item.IsRead ? "سند بررسی شده" : "مشاهده متن سند")">
+                                    <i class="ti ti-file-text"></i>
                                 </button>
                             </td>
 
@@ -275,8 +245,8 @@
                             <td class="text-center">
                                 @if (!string.IsNullOrEmpty(item.WarehouseReceiptNumber))
                                 {
-                                    <button class="btn btn-sm btn-light btn-view-warehouse-receipt" data-request-id="@item.RequestId" title="مشاهده قبض انبار">
-                                        <i class="ri-archive-line text-primary"></i>
+                                    <button type="button" class="btn btn-icon btn-sm btn-info-light btn-view-warehouse-receipt" data-request-id="@item.RequestId" data-bs-toggle="tooltip" title="مشاهده قبض انبار">
+                                        <i class="ti ti-building-warehouse"></i>
                                     </button>
                                 }
                                 else
@@ -289,26 +259,26 @@
                             <td class="text-center">
                                 @if (item.ValidateByExpert == false)
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="این درخواست به‌صورت سیستمی رد شده؛ دیگه قابل take نیست">
-                                        <i class="ri-hand-coin-line me-1"></i> Take
+                                    <button type="button" class="btn btn-sm btn-light" disabled title="این درخواست به‌صورت سیستمی رد شده؛ دیگر قابل برداشتن نیست">
+                                        <i class="ti ti-hand-grab me-1"></i> Take
                                     </button>
                                 }
                                 else if (item.AssignedTo == null)
                                 {
                                     <button type="button"
-                                            class="btn btn-sm btn-outline-primary take-btn"
+                                            class="btn btn-sm btn-outline-primary btn-wave take-btn"
                                             data-request-id="@item.RequestId">
-                                        <i class="ri-hand-coin-line me-1"></i> Take
+                                        <i class="ti ti-hand-grab me-1"></i> Take
                                     </button>
                                 }
                                 else if (item.AssignedTo?.ToString() == currentUserId)
                                 {
-                                    <span class="badge bg-primary-transparent">مال شماست</span>
+                                    <span class="badge bg-primary-transparent"><i class="ti ti-user-check me-1"></i>مال شماست</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-light text-dark" title="این درخواست توسط کارشناس دیگری take شده">
-                                        @item.AssignedToName
+                                    <span class="badge bg-light text-dark" title="این درخواست توسط کارشناس دیگری برداشته شده">
+                                        <i class="ti ti-user me-1"></i>@item.AssignedToName
                                     </span>
                                 }
                             </td>
@@ -317,34 +287,33 @@
                             <td class="text-center validation-cell">
                                 @if (item.ValidateByExpert == false)
                                 {
-                                    <span class="badge bg-danger">رد شده (سیستمی)</span>
+                                    <span class="badge bg-danger-transparent"><i class="ti ti-circle-x me-1"></i>رد شده (سیستمی)</span>
                                 }
                                 else if (item.ValidateByExpert == true)
                                 {
-                                    <span class="badge bg-success">تایید شده</span>
+                                    <span class="badge bg-success-transparent"><i class="ti ti-circle-check me-1"></i>تایید شده</span>
                                 }
                                 else if (item.IsMatch == true && item.IsExist == true && item.IsNationalIdInResponse == true && item.IsNationalIdInLawyers == true && item.AssignedTo?.ToString() == currentUserId)
                                 {
                                     <button type="button"
-                                            class="btn btn-sm btn-outline-success approve-btn"
+                                            class="btn btn-sm btn-success btn-wave approve-btn"
                                             data-request-id="@item.RequestId">
-                                        تایید
+                                        <i class="ti ti-check me-1"></i>تایید
                                     </button>
                                 }
                                 else if (item.IsMatch == true && item.IsExist == true && item.IsNationalIdInResponse == true && item.IsNationalIdInLawyers == true)
                                 {
-                                    <span class="text-muted small">ابتدا take کنید</span>
+                                    <span class="text-muted small">ابتدا Take کنید</span>
                                 }
                                 else
                                 {
-                                    <span class="text-muted small">در انتظار تکمیل احراز</span>
+                                    <span class="badge bg-warning-transparent">در انتظار تکمیل احراز</span>
                                 }
 
                                 @if (item.ValidateByExpert == false && !string.IsNullOrEmpty(item.RejectReasonDisplay))
                                 {
                                     <div class="mt-1">
                                         <small class="text-danger reject-reason-text"
-                                               style="cursor:pointer; text-decoration:underline dotted;"
                                                data-reason="@item.RejectReasonDisplay"
                                                title="@item.RejectReasonDisplay">
                                             @(item.RejectReasonDisplay.Length > 40 ? item.RejectReasonDisplay.Substring(0, 40) + "..." : item.RejectReasonDisplay)
@@ -353,10 +322,10 @@
                                 }
                             </td>
 
-                            <!-- تاریخچه: کی ایجاد کرد، کی take کرد، تایید/رد دستی یا سیستمی بود -->
+                            <!-- تاریخچه -->
                             <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-light btn-view-history" data-request-id="@item.RequestId" title="مشاهده تاریخچه">
-                                    <i class="ri-history-line text-primary"></i>
+                                <button type="button" class="btn btn-icon btn-sm btn-secondary-light btn-view-history" data-request-id="@item.RequestId" data-bs-toggle="tooltip" title="مشاهده تاریخچه">
+                                    <i class="ti ti-history"></i>
                                 </button>
                             </td>
                         </tr>
@@ -365,101 +334,47 @@
             </table>
         </div>
 
-        <!-- صفحه‌بندی -->
-        <nav class="pagination-style-1 mt-3">
-            <ul class="pagination justify-content-center mb-0">
-                <li class="page-item @(Model.CurrentPage == 1 ? "disabled" : "")">
-                    <a class="page-link" href="@Url.Action("Index", new { page = Model.CurrentPage - 1, search = Model.SearchQuery, filterStatus = ViewBag.FilterStatus })">
-                        <i class="ri-arrow-right-s-line"></i>
-                    </a>
-                </li>
-
-                @for (var i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2); i++)
-                {
-                    <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
-                        <a class="page-link" href="@Url.Action("Index", new { page = i, search = Model.SearchQuery, filterStatus = ViewBag.FilterStatus })">@i</a>
-                    </li>
-                }
-
-                <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
-                    <a class="page-link" href="@Url.Action("Index", new { page = Model.CurrentPage + 1, search = Model.SearchQuery, filterStatus = ViewBag.FilterStatus })">
-                        <i class="ri-arrow-left-s-line"></i>
-                    </a>
-                </li>
-            </ul>
-        </nav>
+        <!-- صفحه‌بندی (فیلترها حفظ می‌شوند) -->
+        @if (Model.TotalCount > 0)
+        {
+            <div class="ims-pagination">
+                <span class="page-info">صفحه @Model.CurrentPage از @totalPages — مجموع @Model.TotalCount درخواست</span>
+                <nav aria-label="صفحه‌بندی">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                            <a class="page-link" href="@PageUrl(Model.CurrentPage - 1)" aria-label="قبلی"><i class="ti ti-chevron-right"></i></a>
+                        </li>
+                        @for (var i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(totalPages, Model.CurrentPage + 2); i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link" href="@PageUrl(i)">@i</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.CurrentPage >= totalPages ? "disabled" : "")">
+                            <a class="page-link" href="@PageUrl(Model.CurrentPage + 1)" aria-label="بعدی"><i class="ti ti-chevron-left"></i></a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        }
     </div>
 </div>
 
 <!-- ==================== مودال‌ها ==================== -->
 <!-- مودال دلیل رد -->
-<div class="modal fade" id="rejectReasonModal" tabindex="-1">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
+<div class="modal fade ims-modal" id="rejectReasonModal" tabindex="-1" aria-labelledby="rejectReasonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title">دلیل عدم تایید</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <span class="avatar avatar-md avatar-rounded bg-danger-transparent modal-icon"><i class="ti ti-alert-triangle fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="rejectReasonModalLabel">دلیل عدم تایید</h6>
+                    <div class="modal-subtitle">این درخواست به‌صورت سیستمی رد شده است</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
             </div>
             <div class="modal-body">
-                <p id="rejectReasonText" class="mb-0"></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">بستن</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- مودال تاریخچه‌ی درخواست -->
-<div class="modal fade" id="historyModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">تاریخچه‌ی درخواست</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="historyModalBody">
-                <div class="text-center text-muted py-5">در حال بارگذاری...</div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">بستن</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- مودال نمایش سند -->
-<div class="modal fade" id="documentModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="documentModalLabel">متن سند</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="documentModalBody">
-                <div class="text-center text-muted py-5">در حال بارگذاری...</div>
-            </div>
-            <div class="modal-footer justify-content-between">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="documentChecked">
-                    <label class="form-check-label" for="documentChecked">متن سند بررسی شد</label>
-                </div>
-                <button type="button" class="btn btn-success" id="confirmDocument">تایید</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- مودال نمایش قبض انبار -->
-<div class="modal fade" id="warehouseReceiptModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="warehouseReceiptModalLabel">قبض انبار</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="warehouseReceiptModalBody">
-                <div class="text-center text-muted py-5">در حال بارگذاری...</div>
+                <div class="alert alert-danger-transparent mb-0" id="rejectReasonText"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
@@ -468,75 +383,155 @@
     </div>
 </div>
 
-<!-- مودال ایجاد درخواست جدید -->
-<div class="modal fade" id="scrollingmodal" tabindex="-1" aria-labelledby="scrollingmodalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+<!-- مودال تاریخچه‌ی درخواست -->
+<div class="modal fade ims-modal" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-semibold" id="scrollingmodalLabel">ایجاد درخواست جدید</h5>
+                <span class="avatar avatar-md avatar-rounded bg-secondary-transparent modal-icon"><i class="ti ti-history fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="historyModalLabel">تاریخچه‌ی درخواست</h6>
+                    <div class="modal-subtitle" id="historyModalSubtitle"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body" id="historyModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال نمایش سند -->
+<div class="modal fade ims-modal" id="documentModal" tabindex="-1" aria-labelledby="documentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="avatar avatar-md avatar-rounded bg-primary-transparent modal-icon"><i class="ti ti-file-text fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="documentModalLabel">متن سند</h6>
+                    <div class="modal-subtitle">متن سند را به‌دقت بررسی و سپس تایید کنید</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body" id="documentModalBody"></div>
+            <div class="modal-footer justify-content-between">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="documentChecked">
+                    <label class="form-check-label" for="documentChecked">متن سند بررسی شد</label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
+                    <button type="button" class="btn btn-success btn-wave" id="confirmDocument"><i class="ti ti-check me-1"></i>تایید</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال نمایش قبض انبار -->
+<div class="modal fade ims-modal" id="warehouseReceiptModal" tabindex="-1" aria-labelledby="warehouseReceiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="avatar avatar-md avatar-rounded bg-info-transparent modal-icon"><i class="ti ti-building-warehouse fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="warehouseReceiptModalLabel">قبض انبار</h6>
+                    <div class="modal-subtitle">اطلاعات دریافت‌شده از سامانه‌ی قبض انبار</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body" id="warehouseReceiptModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- مودال ایجاد درخواست جدید -->
+<div class="modal fade ims-modal" id="scrollingmodal" tabindex="-1" aria-labelledby="scrollingmodalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="avatar avatar-md avatar-rounded bg-primary-transparent modal-icon"><i class="ti ti-file-plus fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="scrollingmodalLabel">ثبت درخواست جدید</h6>
+                    <div class="modal-subtitle">ابتدا هویت متقاضی را با کد پیامکی تایید کنید، سپس اطلاعات سند و قبض انبار را وارد نمایید</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
             </div>
 
-            <div class="modal-body p-4">
-                <form asp-action="ValidateSteps" method="post" id="needs-validation-form" autocomplete="off">
+            <div class="modal-body">
+                <form asp-action="ValidateSteps" method="post" id="needs-validation-form" autocomplete="off" novalidate>
                     @Html.AntiForgeryToken()
 
-                    <!-- بخش اطلاعات متقاضی -->
-                    <div class="mb-4">
-                        <p class="fw-semibold mb-3 text-primary">
-                            <i class="ri-user-line me-1"></i>
-                            اطلاعات متقاضی
-                        </p>
+                    <!-- مرحله ۱: اطلاعات متقاضی -->
+                    <div class="ims-step" id="stepApplicant">
+                        <div class="step-head">
+                            <span class="step-number"><span class="step-num-text">۱</span></span>
+                            <div>
+                                <div class="step-title">اطلاعات متقاضی</div>
+                                <div class="step-desc">احراز هویت (شاهکار) و تایید شماره همراه با کد پیامکی</div>
+                            </div>
+                        </div>
 
                         <div class="row gy-3">
                             <div class="col-md-6">
-                                <label for="NationalCode" class="form-label text-default">کد ملی</label>
-                                <input type="text"
-                                       class="form-control form-control-lg"
-                                       id="NationalCode"
-                                       name="NationalCode"
-                                       placeholder="کد ملی ۱۰ رقمی"
-                                       maxlength="10"
-                                       inputmode="numeric"
-                                       required />
+                                <label for="NationalCode" class="form-label">کد ملی <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="ti ti-id"></i></span>
+                                    <input type="text"
+                                           class="form-control dir-ltr"
+                                           id="NationalCode"
+                                           name="NationalCode"
+                                           placeholder="کد ملی ۱۰ رقمی"
+                                           maxlength="10"
+                                           inputmode="numeric"
+                                           required />
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label for="MobileNumber" class="form-label text-default">شماره موبایل</label>
-                                <input type="text"
-                                       class="form-control form-control-lg"
-                                       id="MobileNumber"
-                                       name="MobileNumber"
-                                       placeholder="09xxxxxxxxx"
-                                       maxlength="11"
-                                       inputmode="numeric"
-                                       required />
+                                <label for="MobileNumber" class="form-label">شماره همراه <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="ti ti-device-mobile"></i></span>
+                                    <input type="text"
+                                           class="form-control dir-ltr"
+                                           id="MobileNumber"
+                                           name="MobileNumber"
+                                           placeholder="09xxxxxxxxx"
+                                           maxlength="11"
+                                           inputmode="numeric"
+                                           required />
+                                </div>
                             </div>
                         </div>
 
-                        <!-- دکمه ارسال کد دو عاملی -->
-                        <div class="mt-3">
-                            <button type="button" id="btnSendOtp" class="btn btn-outline-primary btn-sm">
-                                <i class="ri-message-2-line me-1"></i> ارسال کد تایید
+                        <div class="d-flex align-items-center flex-wrap gap-2 mt-3">
+                            <button type="button" id="btnSendOtp" class="btn btn-primary-light btn-wave">
+                                <i class="ti ti-message-2 me-1"></i> ارسال کد تایید
                             </button>
-                            <span id="otpTimer" class="text-muted ms-2" style="display:none;"></span>
+                            <span id="otpTimer" class="badge bg-light text-muted fs-12" style="display:none;"></span>
                         </div>
 
                         <!-- فیلد کد دو عاملی -->
-                        <div class="row gy-3 mt-2" id="otpSection" style="display:none;">
-                            <div class="col-md-6">
-                                <label for="OtpCode" class="form-label text-default">کد تایید پیامکی</label>
-                                <input type="text"
-                                       class="form-control form-control-lg"
-                                       id="OtpCode"
-                                       name="OtpCode"
-                                       placeholder="کد ۶ رقمی"
-                                       maxlength="6"
-                                       inputmode="numeric" />
-                            </div>
-                            <div class="col-md-6 d-flex align-items-end">
-                                <button type="button" id="btnVerifyOtp" class="btn btn-success btn-sm">
-                                    تایید کد
-                                </button>
+                        <div class="row gy-3 mt-1" id="otpSection" style="display:none;">
+                            <div class="col-md-8">
+                                <label for="OtpCode" class="form-label">کد تایید پیامکی</label>
+                                <div class="input-group">
+                                    <input type="text"
+                                           class="form-control ims-otp-input"
+                                           id="OtpCode"
+                                           name="OtpCode"
+                                           placeholder="------"
+                                           maxlength="6"
+                                           inputmode="numeric"
+                                           autocomplete="one-time-code" />
+                                    <button type="button" id="btnVerifyOtp" class="btn btn-success btn-wave">
+                                        <i class="ti ti-shield-check me-1"></i>تایید کد
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -552,29 +547,30 @@
                         }
                     </div>
 
-                    <hr class="my-4" />
-
-                    <!-- بخش اطلاعات سند -->
-                    <div class="mb-2">
-                        <p class="fw-semibold mb-3 text-primary">
-                            <i class="ri-file-text-line me-1"></i>
-                            اطلاعات سند
-                        </p>
+                    <!-- مرحله ۲: اطلاعات سند -->
+                    <div class="ims-step" id="stepDocument">
+                        <div class="step-head">
+                            <span class="step-number">۲</span>
+                            <div>
+                                <div class="step-title">اطلاعات سند</div>
+                                <div class="step-desc">شناسه و رمز تصدیق درج‌شده روی سند</div>
+                            </div>
+                        </div>
 
                         <div class="row gy-3">
                             <div class="col-md-6">
-                                <label for="DocumentNumber" class="form-label text-default">شناسه سند</label>
+                                <label for="DocumentNumber" class="form-label">شناسه سند <span class="text-danger">*</span></label>
                                 <input type="text"
-                                       class="form-control form-control-lg"
+                                       class="form-control dir-ltr"
                                        id="DocumentNumber"
                                        name="DocumentNumber"
                                        placeholder="شناسه سند را وارد کنید"
                                        required />
                             </div>
                             <div class="col-md-6">
-                                <label for="VerifyCode" class="form-label text-default">رمز تصدیق</label>
+                                <label for="VerifyCode" class="form-label">رمز تصدیق <span class="text-danger">*</span></label>
                                 <input type="text"
-                                       class="form-control form-control-lg"
+                                       class="form-control dir-ltr"
                                        id="VerifyCode"
                                        name="VerifyCode"
                                        placeholder="رمز تصدیق را وارد کنید"
@@ -592,28 +588,29 @@
                         }
                     </div>
 
-                    <hr class="my-4" />
-
-                    <!-- بخش قبض انبار -->
-                    <div class="mb-2">
-                        <p class="fw-semibold mb-3 text-primary">
-                            <i class="ri-archive-line me-1"></i>
-                            قبض انبار
-                        </p>
+                    <!-- مرحله ۳: قبض انبار -->
+                    <div class="ims-step" id="stepWarehouse">
+                        <div class="step-head">
+                            <span class="step-number">۳</span>
+                            <div>
+                                <div class="step-title">قبض انبار</div>
+                                <div class="step-desc">شماره قبض و شرکت صادرکننده</div>
+                            </div>
+                        </div>
 
                         <div class="row gy-3">
                             <div class="col-md-6">
-                                <label for="WarehouseReceiptNumber" class="form-label text-default">شماره قبض انبار</label>
+                                <label for="WarehouseReceiptNumber" class="form-label">شماره قبض انبار <span class="text-danger">*</span></label>
                                 <input type="text"
-                                       class="form-control form-control-lg"
+                                       class="form-control dir-ltr"
                                        id="WarehouseReceiptNumber"
                                        name="WarehouseReceiptNumber"
                                        placeholder="شماره قبض انبار را وارد کنید"
                                        required />
                             </div>
                             <div class="col-md-6">
-                                <label for="CompanyId" class="form-label text-default">شرکت مربوط به قبض انبار</label>
-                                <select class="form-control form-control-lg" id="CompanyId" name="CompanyId" required>
+                                <label for="CompanyId" class="form-label">شرکت مربوط به قبض انبار <span class="text-danger">*</span></label>
+                                <select class="form-control" id="CompanyId" name="CompanyId" required>
                                     <option value="">انتخاب کنید...</option>
                                     @foreach (var company in companies)
                                     {
@@ -626,67 +623,90 @@
                 </form>
             </div>
 
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
-                <button type="submit" form="needs-validation-form" id="btnVerify" class="btn btn-primary" disabled>
-                    ثبت درخواست
-                </button>
+            <div class="modal-footer justify-content-between">
+                <small class="text-muted" id="submitHint"><i class="ti ti-lock me-1"></i>ثبت پس از تایید کد پیامکی فعال می‌شود</small>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">انصراف</button>
+                    <button type="submit" form="needs-validation-form" id="btnVerify" class="btn btn-primary btn-wave" disabled>
+                        <i class="ti ti-send me-1"></i>ثبت درخواست
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
-    <script src="~/assets/js/persianDatepicker.min.js"></script>
-    <script src="~/assets/libs/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
-        $(document).ready(function () {
-            // مخفی کردن لودر (اگر هنوز مونده باشه)
-            $("#global-loader").fadeOut("slow");
-
-            // دراپ‌داون‌های استاندارد یزن به‌جای select خام مرورگر
-            if (typeof Choices !== 'undefined') {
-                new Choices('#filterStatus', { searchEnabled: false, shouldSort: false, itemSelectText: '' });
-
-                // #CompanyId داخل مودالیه که پیش‌فرض مخفیه؛ باید بعد از باز شدن مودال init بشه
-                // وگرنه Choices.js عرض/موقعیت درست رو محاسبه نمی‌کنه
-                var companyChoices = null;
-                $('#scrollingmodal').on('shown.bs.modal', function () {
-                    if (!companyChoices && document.getElementById('CompanyId')) {
-                        companyChoices = new Choices('#CompanyId', { searchEnabled: true, shouldSort: false, itemSelectText: '', placeholder: true });
-                    }
-                });
-                $('#scrollingmodal').on('hidden.bs.modal', function () {
-                    if (companyChoices) companyChoices.setChoiceByValue('');
-                });
+        $(function () {
+            @if (ViewBag.ErrorMessage != null)
+            {
+                <text>imsToast('error', @Json.Serialize((string)ViewBag.ErrorMessage));</text>
+            }
+            @if (ViewBag.SuccessMessage != null)
+            {
+                <text>imsToast('success', @Json.Serialize((string)ViewBag.SuccessMessage));</text>
             }
 
-            // فیلتر بازه‌ی تاریخ (کارتابل کارشناس) — تقویم فارسی روی فیلدهای نمایشی،
-            // مقدار میلادی معادل (data-gDate که خودِ پلاگین محاسبه می‌کنه) موقع submit تو فیلد hidden می‌ره.
-            try {
-                $('.jalali-date-input').persianDatepicker({ formatDate: 'YYYY/MM/DD' });
-            } catch (e) {
-                console.warn('persianDatepicker init failed, falling back to plain text inputs', e);
-            }
+            // باز/بسته کردن مودال با API خود Bootstrap 5 (وابسته به bridge جی‌کوئری نیست)
+            const showModal = (id) => bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).show();
+            const hideModal = (id) => bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).hide();
 
-            $('#cartableFilterForm').on('submit', function () {
-                $('#fromDateHidden').val($('#fromDateDisplay').attr('data-gDate') || $('#fromDateHidden').val());
-                $('#toDateHidden').val($('#toDateDisplay').attr('data-gDate') || $('#toDateHidden').val());
+            const loadingHtml = '<div class="ims-modal-loading"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">در حال بارگذاری...</div></div>';
+            const escapeHtml = (s) => $('<div/>').text(s == null ? '' : s).html();
+            const errorBox = (msg) => '<div class="text-center py-5"><span class="avatar avatar-lg avatar-rounded bg-danger-transparent mb-2"><i class="ti ti-alert-circle fs-24"></i></span><div class="text-danger">' + escapeHtml(msg) + '</div></div>';
+
+            // ---------- فیلتر ----------
+            // تغییر وضعیت = اعمال فوری فیلتر
+            $('input[name="filterStatus"]').on('change', function () {
+                $('#cartableFilterForm').trigger('submit');
             });
 
-            // وضعیت تایید دو عاملی برای فرم «سند جدید»
+            // ---------- مودال ثبت درخواست ----------
             let otpVerified = false;
             let otpTimerInterval = null;
             let remainingSeconds = 0;
+            const sendOtpHtml = '<i class="ti ti-message-2 me-1"></i> ارسال کد تایید';
+            const verifyOtpHtml = '<i class="ti ti-shield-check me-1"></i>تایید کد';
+            const submitHtml = '<i class="ti ti-send me-1"></i>ثبت درخواست';
+
+            // فقط رقم (لاتین) در فیلدهای عددی؛ ارقام فارسی/عربی خودکار تبدیل می‌شن
+            $('#NationalCode, #MobileNumber, #OtpCode').on('input', function () {
+                const v = this.value
+                    .replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728))
+                    .replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0) - 1584))
+                    .replace(/\D/g, '');
+                if (v !== this.value) this.value = v;
+            });
+
+            // دراپ‌داون شرکت با select2 استاندارد (داخل مودال باید dropdownParent داشته باشه)
+            $('#CompanyId').select2({
+                dropdownParent: $('#scrollingmodal'),
+                dropdownAutoWidth: true,
+                width: '100%',
+                placeholder: 'انتخاب کنید...',
+                dir: 'rtl'
+            });
+
+            $('#scrollingmodal').on('shown.bs.modal', function () {
+                $('#NationalCode').trigger('focus');
+            });
 
             // ریست فرم مودال
             $('#scrollingmodal').on('hidden.bs.modal', function () {
                 $('#needs-validation-form')[0].reset();
+                $('#needs-validation-form').removeClass('was-validated');
+                $('#CompanyId').val('').trigger('change');
                 otpVerified = false;
                 $('#otpSection').hide();
                 $('#otpMessage').html('');
-                $('#btnVerify').prop('disabled', true);
-                $('#btnSendOtp').prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                $('#stepApplicant').removeClass('is-done').find('.step-num-text').text('۱');
+                $('#NationalCode, #MobileNumber').prop('readonly', false);
+                $('#OtpCode, #btnVerifyOtp').prop('disabled', false);
+                $('#btnVerifyOtp').html(verifyOtpHtml);
+                $('#btnVerify').prop('disabled', true).html(submitHtml);
+                $('#submitHint').show();
+                $('#btnSendOtp').prop('disabled', false).html(sendOtpHtml);
                 clearInterval(otpTimerInterval);
                 $('#otpTimer').hide();
             });
@@ -697,11 +717,13 @@
                 const mobile = $('#MobileNumber').val().trim();
 
                 if (!nationalCode || nationalCode.length !== 10) {
-                    toastr.warning('کد ملی را به درستی وارد کنید');
+                    imsToast('warning', 'کد ملی را به درستی وارد کنید');
+                    $('#NationalCode').trigger('focus');
                     return;
                 }
                 if (!mobile || mobile.length !== 11 || !mobile.startsWith('09')) {
-                    toastr.warning('شماره موبایل را به درستی وارد کنید');
+                    imsToast('warning', 'شماره همراه را به درستی وارد کنید');
+                    $('#MobileNumber').trigger('focus');
                     return;
                 }
 
@@ -715,13 +737,13 @@
                 })
                 .done(function (checkRes) {
                     if (!checkRes.success) {
-                        toastr.error(checkRes.message || 'خطا در احراز هویت');
-                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                        imsToast('error', checkRes.message || 'خطا در احراز هویت');
+                        btn.prop('disabled', false).html(sendOtpHtml);
                         return;
                     }
                     if (!checkRes.isMatch) {
-                        toastr.error('کد ملی و شماره موبایل تطابق ندارند');
-                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                        imsToast('error', 'کد ملی و شماره همراه تطابق ندارند');
+                        btn.prop('disabled', false).html(sendOtpHtml);
                         return;
                     }
 
@@ -733,36 +755,42 @@
                     })
                     .done(function (res) {
                         if (res.success) {
-                            toastr.success(res.message || 'کد تایید ارسال شد');
+                            imsToast('success', res.message || 'کد تایید ارسال شد');
                             if (res.debugOtp) {
-                                toastr.info('کد تست: ' + res.debugOtp);
+                                imsToast('info', 'کد تست: ' + res.debugOtp);
                             }
-                            $('#otpSection').slideDown();
+                            $('#otpSection').slideDown(150, function () { $('#OtpCode').trigger('focus'); });
                             startOtpTimer(120);
                         } else {
-                            toastr.error(res.message || 'خطا در ارسال کد');
+                            imsToast('error', res.message || 'خطا در ارسال کد');
+                            btn.prop('disabled', false).html(sendOtpHtml);
                         }
                     })
                     .fail(function () {
-                        toastr.error('خطا در ارتباط با سرور');
-                    })
-                    .always(function () {
-                        btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                        imsToast('error', 'خطا در ارتباط با سرور');
+                        btn.prop('disabled', false).html(sendOtpHtml);
                     });
                 })
                 .fail(function () {
-                    toastr.error('خطا در ارتباط با سرور');
-                    btn.prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال کد تایید');
+                    imsToast('error', 'خطا در ارتباط با سرور');
+                    btn.prop('disabled', false).html(sendOtpHtml);
                 });
             });
 
-            // تایید کد OTP
+            // تایید کد OTP (Enter داخل فیلد هم همین کار رو می‌کنه)
+            $('#OtpCode').on('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    $('#btnVerifyOtp').trigger('click');
+                }
+            });
+
             $('#btnVerifyOtp').click(function () {
                 const otp = $('#OtpCode').val().trim();
                 const mobile = $('#MobileNumber').val().trim();
 
                 if (!otp || otp.length !== 6) {
-                    toastr.warning('کد ۶ رقمی را وارد کنید');
+                    imsToast('warning', 'کد ۶ رقمی را وارد کنید');
                     return;
                 }
 
@@ -776,166 +804,201 @@
                 .done(function (res) {
                     if (res.success) {
                         otpVerified = true;
-                        $('#otpMessage').html('<small class="text-success"><i class="ri-check-line"></i> شماره موبایل تایید شد</small>');
+                        clearInterval(otpTimerInterval);
+                        $('#otpTimer').hide();
+                        $('#otpMessage').html('<span class="badge bg-success-transparent fs-12"><i class="ti ti-circle-check me-1"></i>شماره همراه تایید شد</span>');
+                        $('#stepApplicant').addClass('is-done').find('.step-num-text').html('<i class="ti ti-check"></i>');
                         $('#btnVerify').prop('disabled', false);
+                        $('#submitHint').hide();
+                        // readonly به‌جای disabled تا مقادیر کد ملی/موبایل همچنان با فرم ارسال بشن
+                        $('#NationalCode, #MobileNumber').prop('readonly', true);
                         $('#OtpCode, #btnVerifyOtp, #btnSendOtp').prop('disabled', true);
-                        toastr.success('کد تایید صحیح است');
+                        btn.html(verifyOtpHtml);
+                        imsToast('success', 'کد تایید صحیح است');
+                        $('#DocumentNumber').trigger('focus');
                     } else {
-                        $('#otpMessage').html('<small class="text-danger">' + (res.message || 'کد اشتباه است') + '</small>');
-                        toastr.error(res.message || 'کد اشتباه است');
-                        btn.prop('disabled', false).html('تایید کد');
+                        $('#otpMessage').html('<small class="text-danger"><i class="ti ti-alert-circle me-1"></i>' + escapeHtml(res.message || 'کد اشتباه است') + '</small>');
+                        imsToast('error', res.message || 'کد اشتباه است');
+                        btn.prop('disabled', false).html(verifyOtpHtml);
                     }
                 })
                 .fail(function () {
-                    toastr.error('خطا در ارتباط با سرور');
-                    btn.prop('disabled', false).html('تایید کد');
+                    imsToast('error', 'خطا در ارتباط با سرور');
+                    btn.prop('disabled', false).html(verifyOtpHtml);
                 });
             });
 
             // تایمر OTP
             function startOtpTimer(seconds) {
                 remainingSeconds = seconds;
+                $('#btnSendOtp').prop('disabled', true).html(sendOtpHtml);
                 $('#otpTimer').show();
                 clearInterval(otpTimerInterval);
 
-                otpTimerInterval = setInterval(function () {
-                    remainingSeconds--;
+                const render = function () {
                     const min = Math.floor(remainingSeconds / 60);
                     const sec = remainingSeconds % 60;
-                    $('#otpTimer').text(`ارسال مجدد تا ${min}:${sec.toString().padStart(2, '0')}`);
+                    $('#otpTimer').html('<i class="ti ti-clock me-1"></i>ارسال مجدد تا ' + min + ':' + sec.toString().padStart(2, '0'));
+                };
+                render();
+
+                otpTimerInterval = setInterval(function () {
+                    remainingSeconds--;
+                    render();
 
                     if (remainingSeconds <= 0) {
                         clearInterval(otpTimerInterval);
                         $('#otpTimer').hide();
-                        $('#btnSendOtp').prop('disabled', false).html('<i class="ri-message-2-line me-1"></i> ارسال مجدد کد');
+                        if (!otpVerified) {
+                            $('#btnSendOtp').prop('disabled', false).html('<i class="ti ti-refresh me-1"></i> ارسال مجدد کد');
+                        }
                     }
                 }, 1000);
             }
 
-            // نمایش متن سند
+            // ---------- نمایش متن سند ----------
             $(document).on('click', '.btn-view-doc', function () {
                 const requestId = $(this).data('request-id');
                 $('#documentModalLabel').text('متن سند درخواست ' + requestId);
-                $('#documentModalBody').html('<div class="text-center py-5"><div class="spinner-border"></div><div class="mt-2">در حال بارگذاری...</div></div>');
+                $('#documentModalBody').html(loadingHtml);
                 $('#documentChecked').prop('checked', false).prop('disabled', false);
                 $('#confirmDocument').data('request-id', requestId).prop('disabled', false);
-                $('#documentModal').modal('show');
+                showModal('documentModal');
 
                 $.get('/Cartable/GetDocumentText', { requestId: requestId })
                     .done(function (res) {
                         if (res?.success && res.documentText?.trim()) {
-                            let safe = $('<div/>').text(res.documentText).html();
+                            let safe = escapeHtml(res.documentText);
                             safe = safe.replace(
                                 /(مهلت اعتبار این وکالتنامه تا تاریخ\s*\d{4}\/\d{2}\/\d{2}\s*می باشد)/g,
-                                '<strong class="text-danger">$1</strong>'
+                                '<mark class="bg-danger-transparent text-danger fw-semibold px-1 rounded">$1</mark>'
                             );
-                            $('#documentModalBody').html('<pre class="document-content" style="white-space:pre-wrap;line-height:1.8;background:#f8f9fa;padding:1rem;border-radius:8px;">' + safe + '</pre>');
+                            $('#documentModalBody').html('<pre class="ims-doc-text document-content">' + safe + '</pre>');
                             $('#documentChecked').prop('checked', res.isRead === true);
                         } else {
-                            $('#documentModalBody').html('<p class="text-danger text-center py-4">رمز تصدیق یا شماره سند صحیح نیست.</p>');
+                            $('#documentModalBody').html(errorBox('رمز تصدیق یا شماره سند صحیح نیست.'));
                             $('#documentChecked, #confirmDocument').prop('disabled', true);
-                            toastr.error(res?.message || 'اطلاعات سند صحیح نیست');
+                            imsToast('error', res?.message || 'اطلاعات سند صحیح نیست');
                         }
                     })
                     .fail(function (xhr) {
                         const msg = xhr.responseJSON?.message || 'خطا در دریافت سند';
-                        $('#documentModalBody').html('<p class="text-danger text-center py-4">' + msg + '</p>');
+                        $('#documentModalBody').html(errorBox(msg));
                         $('#documentChecked, #confirmDocument').prop('disabled', true);
-                        toastr.error(msg);
+                        imsToast('error', msg);
                     });
             });
 
-            // نمایش تاریخچه‌ی درخواست
+            // ---------- تاریخچه‌ی درخواست (تایم‌لاین) ----------
             $(document).on('click', '.btn-view-history', function () {
                 const requestId = $(this).data('request-id');
-                $('#historyModalBody').html('<div class="text-center py-5"><div class="spinner-border"></div><div class="mt-2">در حال بارگذاری...</div></div>');
-                $('#historyModal').modal('show');
+                $('#historyModalSubtitle').text('درخواست شماره ' + requestId);
+                $('#historyModalBody').html(loadingHtml);
+                showModal('historyModal');
 
                 $.get('/Cartable/RequestHistory', { id: requestId })
                     .done(function (res) {
                         if (!Array.isArray(res) || res.length === 0) {
-                            $('#historyModalBody').html('<p class="text-muted text-center py-4">تاریخچه‌ای ثبت نشده است.</p>');
+                            $('#historyModalBody').html('<div class="text-center text-muted py-5"><i class="ti ti-history-off fs-32 d-block mb-2 opacity-50"></i>تاریخچه‌ای ثبت نشده است.</div>');
                             return;
                         }
 
-                        let html = '<ul class="list-group list-group-flush">';
+                        let html = '<ul class="ims-timeline">';
                         res.forEach(function (h) {
-                            const actorBadge = h.isSystemAction
-                                ? '<span class="badge bg-secondary">سیستم</span>'
-                                : '<span class="badge bg-primary-transparent">' + $('<div/>').text(h.updatedStatusBy || 'نامشخص').html() + '</span>';
-                            const dateStr = new Date(h.createdAt).toLocaleString('fa-IR');
-                            html += '<li class="list-group-item">';
+                            const dot = h.isSystemAction
+                                ? '<span class="tl-dot bg-secondary-transparent text-secondary"><i class="ti ti-robot"></i></span>'
+                                : '<span class="tl-dot bg-primary-transparent text-primary"><i class="ti ti-user"></i></span>';
+                            const actor = h.isSystemAction ? 'سیستم' : (h.updatedStatusBy || 'نامشخص');
+                            const d = new Date(h.createdAt);
+                            const dateStr = d.toLocaleDateString('fa-IR') + ' — ' + d.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+                            html += '<li>' + dot + '<div class="tl-card">';
                             html += '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">';
-                            html += '<div>' + actorBadge + ' <span class="fw-semibold ms-1">' + $('<div/>').text(h.updatedStatus || h.statusName || '').html() + '</span></div>';
-                            html += '<small class="text-muted">' + dateStr + '</small>';
+                            html += '<span class="fw-semibold">' + escapeHtml(h.updatedStatus || h.statusName || '') + '</span>';
+                            html += '<small class="text-muted"><i class="ti ti-clock me-1"></i>' + dateStr + '</small>';
                             html += '</div>';
+                            html += '<div class="small text-muted mt-1"><i class="ti ti-user-circle me-1"></i>' + escapeHtml(actor) + '</div>';
                             if (h.actionDescription) {
-                                html += '<div class="mt-1 small text-muted">' + $('<div/>').text(h.actionDescription).html() + '</div>';
+                                html += '<div class="mt-1 small">' + escapeHtml(h.actionDescription) + '</div>';
                             }
-                            html += '</li>';
+                            html += '</div></li>';
                         });
                         html += '</ul>';
                         $('#historyModalBody').html(html);
                     })
                     .fail(function (xhr) {
                         const msg = xhr.responseJSON?.message || 'خطا در دریافت تاریخچه';
-                        $('#historyModalBody').html('<p class="text-danger text-center py-4">' + msg + '</p>');
-                        toastr.error(msg);
+                        $('#historyModalBody').html(errorBox(msg));
+                        imsToast('error', msg);
                     });
             });
 
-            // نمایش متن قبض انبار
+            // ---------- نمایش قبض انبار ----------
             $(document).on('click', '.btn-view-warehouse-receipt', function () {
                 const requestId = $(this).data('request-id');
                 $('#warehouseReceiptModalLabel').text('قبض انبار درخواست ' + requestId);
-                $('#warehouseReceiptModalBody').html('<div class="text-center py-5"><div class="spinner-border"></div><div class="mt-2">در حال بارگذاری...</div></div>');
-                $('#warehouseReceiptModal').modal('show');
+                $('#warehouseReceiptModalBody').html(loadingHtml);
+                showModal('warehouseReceiptModal');
 
                 $.get('/Cartable/GetWarehouseReceiptText', { requestId: requestId })
                     .done(function (res) {
                         if (res?.success && res.text?.trim()) {
-                            const safe = $('<div/>').text(res.text).html();
-                            $('#warehouseReceiptModalBody').html('<pre style="white-space:pre-wrap;line-height:1.8;background:#f8f9fa;padding:1rem;border-radius:8px;">' + safe + '</pre>');
+                            $('#warehouseReceiptModalBody').html('<pre class="ims-doc-text">' + escapeHtml(res.text) + '</pre>');
                         } else {
-                            $('#warehouseReceiptModalBody').html('<p class="text-danger text-center py-4">' + (res?.message || 'اطلاعاتی برای این قبض انبار یافت نشد.') + '</p>');
+                            $('#warehouseReceiptModalBody').html(errorBox(res?.message || 'اطلاعاتی برای این قبض انبار یافت نشد.'));
                         }
                     })
                     .fail(function (xhr) {
-                        const msg = xhr.responseJSON?.message || 'خطا در دریافت قبض انبار';
-                        $('#warehouseReceiptModalBody').html('<p class="text-danger text-center py-4">' + msg + '</p>');
+                        $('#warehouseReceiptModalBody').html(errorBox(xhr.responseJSON?.message || 'خطا در دریافت قبض انبار'));
                     });
             });
 
-            // تایید خواندن سند
+            // ---------- تایید خواندن سند ----------
             $('#confirmDocument').click(function () {
                 if (!$('#documentChecked').is(':checked')) {
-                    toastr.warning('لطفاً گزینه «متن سند بررسی شد» را تیک بزنید');
+                    imsToast('warning', 'لطفاً گزینه «متن سند بررسی شد» را فعال کنید');
                     return;
                 }
-                const requestId = $(this).data('request-id');
+                const btn = $(this);
+                const requestId = btn.data('request-id');
+                btn.prop('disabled', true);
                 $.post('/Cartable/MarkDocumentAsRead', { requestId: requestId })
                     .done(function (res) {
                         if (res.success) {
-                            toastr.success('سند به عنوان خوانده‌شده ثبت شد');
-                            $('#documentModal').modal('hide');
+                            imsToast('success', 'سند به عنوان خوانده‌شده ثبت شد');
+                            $(`.btn-view-doc[data-request-id="${requestId}"]`).removeClass('btn-primary-light').addClass('btn-success-light');
+                            hideModal('documentModal');
                         } else {
-                            toastr.error(res.message || 'خطا در ثبت');
+                            imsToast('error', res.message || 'خطا در ثبت');
                         }
                     })
-                    .fail(() => toastr.error('خطا در ارتباط با سرور'));
+                    .fail(() => imsToast('error', 'خطا در ارتباط با سرور'))
+                    .always(() => btn.prop('disabled', false));
             });
 
-            // دکمه تایید — رد کاملاً سیستمیه، متصدی فقط می‌تونه تایید بزنه
+            // ---------- تایید درخواست (با تاییدیه) — رد کاملاً سیستمیه ----------
             $(document).on('click', '.approve-btn', function () {
-                submitValidation($(this).data('request-id'), true, null);
+                const requestId = $(this).data('request-id');
+                Swal.fire({
+                    title: 'تایید درخواست ' + requestId,
+                    text: 'آیا از تایید این درخواست اطمینان دارید؟',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'بله، تایید شود',
+                    cancelButtonText: 'انصراف',
+                    customClass: { confirmButton: 'btn btn-success mx-1', cancelButton: 'btn btn-light mx-1' },
+                    buttonsStyling: false
+                }).then(function (result) {
+                    if (result.isConfirmed) submitValidation(requestId, true, null);
+                });
             });
 
-            // دکمه Take — کارشناس درخواست رو از صف مشترک گروهش برمی‌داره
+            // ---------- Take ----------
             $(document).on('click', '.take-btn', function () {
                 const btn = $(this);
                 const requestId = btn.data('request-id');
                 const row = $(`tr[data-request-id="${requestId}"]`);
                 const token = $('input[name="__RequestVerificationToken"]').val();
+                const takeHtml = '<i class="ti ti-hand-grab me-1"></i> Take';
 
                 btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
@@ -946,31 +1009,32 @@
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
-                            toastr.success(data.message || 'درخواست take شد');
-                            row.find('.take-btn').replaceWith('<span class="badge bg-primary-transparent">مال شماست</span>');
+                            imsToast('success', data.message || 'درخواست برداشته شد');
+                            row.find('.take-btn').replaceWith('<span class="badge bg-primary-transparent"><i class="ti ti-user-check me-1"></i>مال شماست</span>');
                             row.find('.validation-cell').html(
-                                '<button type="button" class="btn btn-sm btn-outline-success approve-btn" data-request-id="' + requestId + '">تایید</button>'
+                                '<button type="button" class="btn btn-sm btn-success btn-wave approve-btn" data-request-id="' + requestId + '"><i class="ti ti-check me-1"></i>تایید</button>'
                             );
                         } else {
-                            toastr.error(data.message || 'خطا در take کردن درخواست');
-                            btn.prop('disabled', false).html('<i class="ri-hand-coin-line me-1"></i> Take');
+                            imsToast('error', data.message || 'خطا در برداشتن درخواست');
+                            btn.prop('disabled', false).html(takeHtml);
                         }
                     })
                     .catch(() => {
-                        toastr.error('خطا در ارتباط با سرور');
-                        btn.prop('disabled', false).html('<i class="ri-hand-coin-line me-1"></i> Take');
+                        imsToast('error', 'خطا در ارتباط با سرور');
+                        btn.prop('disabled', false).html(takeHtml);
                     });
             });
 
             // نمایش دلیل رد سیستمی
             $(document).on('click', '.reject-reason-text', function () {
                 $('#rejectReasonText').text($(this).data('reason') || 'دلیلی ثبت نشده');
-                $('#rejectReasonModal').modal('show');
+                showModal('rejectReasonModal');
             });
 
             function submitValidation(requestId, validateByExpert, description) {
                 const row = $(`tr[data-request-id="${requestId}"]`);
                 const token = $('input[name="__RequestVerificationToken"]').val();
+                row.find('.approve-btn').prop('disabled', true);
                 fetch('/Cartable/UpdateValidationStatus', {
                     method: 'POST',
                     headers: {
@@ -986,27 +1050,32 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) {
-                        toastr.success(data.message || "وضعیت به‌روز شد");
-                        row.find('.approve-btn').replaceWith('<span class="badge bg-success">تایید شده</span>');
+                        imsToast('success', data.message || "وضعیت به‌روز شد");
+                        row.find('.approve-btn').replaceWith('<span class="badge bg-success-transparent"><i class="ti ti-circle-check me-1"></i>تایید شده</span>');
                     } else {
-                        toastr.error(data.message || "خطا");
+                        imsToast('error', data.message || "خطا");
+                        row.find('.approve-btn').prop('disabled', false);
                     }
                 })
-                .catch(() => toastr.error("خطا در ارتباط با سرور"));
+                .catch(() => {
+                    imsToast('error', "خطا در ارتباط با سرور");
+                    row.find('.approve-btn').prop('disabled', false);
+                });
             }
 
-            // فرم درخواست جدید
+            // ---------- ارسال فرم درخواست جدید ----------
             $('#needs-validation-form').on('submit', function (e) {
                 e.preventDefault();
 
                 if (!otpVerified) {
-                    toastr.error('لطفاً ابتدا کد تایید پیامکی را وارد و تایید کنید');
+                    imsToast('error', 'لطفاً ابتدا کد تایید پیامکی را وارد و تایید کنید');
                     return;
                 }
 
                 const btn = $('#btnVerify');
                 if (!this.checkValidity()) {
-                    toastr.error('لطفاً فیلدهای الزامی را پر کنید');
+                    $(this).addClass('was-validated');
+                    imsToast('error', 'لطفاً فیلدهای الزامی را پر کنید');
                     return;
                 }
                 btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> در حال ارسال...');
@@ -1018,18 +1087,18 @@
                 })
                     .done((data) => {
                         if (data && data.success) {
-                            toastr.success(data.message || 'درخواست با موفقیت ثبت شد');
-                            $('#scrollingmodal').modal('hide');
+                            imsToast('success', data.message || 'درخواست با موفقیت ثبت شد');
+                            hideModal('scrollingmodal');
                             // اجازه می‌دیم توست قبل از رفرش صفحه دیده بشه
                             setTimeout(() => location.reload(), 1500);
                         } else {
-                            toastr.error((data && data.message) || 'اطلاعات وارد شده معتبر نیست.');
-                            btn.prop('disabled', false).html('ثبت درخواست');
+                            imsToast('error', (data && data.message) || 'اطلاعات وارد شده معتبر نیست.');
+                            btn.prop('disabled', false).html(submitHtml);
                         }
                     })
                     .fail((xhr) => {
-                        toastr.error(xhr.responseJSON?.message || 'خطا در ارسال درخواست');
-                        btn.prop('disabled', false).html('ثبت درخواست');
+                        imsToast('error', xhr.responseJSON?.message || 'خطا در ارسال درخواست');
+                        btn.prop('disabled', false).html(submitHtml);
                     });
             });
         });

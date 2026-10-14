@@ -4,240 +4,308 @@
     var isAdmin = (userRole == "ادمین" || userRoleId == "3");
     var userName = Context.Session.GetString("UserName");
     var userLastName = Context.Session.GetString("UserLastName");
+    var fullName = $"{userName ?? "کاربر"} {userLastName ?? ""}".Trim();
+    var pc = new System.Globalization.PersianCalendar();
+    var now = DateTime.Now;
+    string FaDigits(object n) => string.Concat(n.ToString()!.Select(ch => char.IsDigit(ch) ? (char)('۰' + (ch - '0')) : ch));
 }
 <!DOCTYPE html>
-<html dir="rtl" data-header-styles="light" data-menu-styles="light" data-nav-layout="vertical" data-theme-mode="light" data-toggled="close" data-vertical-style="overlay" lang="fa">
+<html dir="rtl" data-header-styles="light" data-menu-styles="dark" data-nav-layout="vertical" data-theme-mode="light" data-toggled="close" data-width="fullwidth" lang="fa">
 <head>
+    <!-- Meta Data -->
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="IE=edge" http-equiv="X-UA-Compatible" />
     <title>@ViewData["Title"] - سامانه احراز اصالت سند و قبض انبار</title>
-
     <!-- Favicon -->
-    <link rel="icon" href="~/assets/images/brand-logos/favicon.ico" type="image/x-icon" />
-
+    <link href="~/assets/images/brand-logos/favicon.ico" rel="icon" type="image/x-icon" />
+    <!-- Start::Styles (هم‌راستا با TaskTrack / قالب yzen) -->
+    <script src="~/assets/libs/choices.js/public/assets/scripts/choices.min.js"></script>
     <script src="~/assets/js/main.js"></script>
-    <script>
-        (function () {
-            var html = document.querySelector('html');
-            html.setAttribute('data-theme-mode', 'light');
-            html.setAttribute('data-header-styles', 'light');
-            html.setAttribute('data-menu-styles', 'light');
-            html.setAttribute('data-nav-layout', 'vertical');
-        })();
-    </script>
-
-    <!-- Bootstrap RTL -->
     <link href="~/assets/libs/bootstrap/css/bootstrap.rtl.min.css" id="style" rel="stylesheet" />
-
-    <!-- Vazir Font -->
     <link href="~/assets/css/vazir-font.css" rel="stylesheet" />
-
-    <!-- Main Styles -->
     <link href="~/assets/css/styles.css" rel="stylesheet" />
-
-    <!-- Icons -->
     <link href="~/assets/css/icons.css" rel="stylesheet" />
-
-    <!-- Toastr -->
-    <link href="~/lib/bootstrap/dist/css/toastr.min.css" rel="stylesheet" />
-
-    <style>
-        /* فعلا منو/سایدبار برداشته شده — هدر و محتوا دیگه نباید فضایی برای سایدبار رزرو کنن
-           (padding-inline-start روی app-header و margin-inline-start روی app-content که
-           پیش‌فرض یزن برای عرض ۱۵rem سایدبار بود) */
-        @@media (min-width: 992px) {
-            .app-header {
-                padding-inline-start: 0;
-            }
-
-            .app-content {
-                margin-inline-start: 0;
-            }
-        }
-    </style>
-
-    @RenderSection("Styles", required: false)
+    <link href="~/assets/libs/node-waves/waves.min.css" rel="stylesheet" />
+    <link href="~/assets/libs/simplebar/simplebar.min.css" rel="stylesheet" />
+    <link href="~/assets/libs/flatpickr/flatpickr.min.css" rel="stylesheet" />
+    <link href="~/assets/libs/choices.js/public/assets/styles/choices.min.css" rel="stylesheet" />
+    <!-- Functional plugin styles -->
+    <link href="~/app-assets/vendors/css/forms/select/select2.min.css" rel="stylesheet" />
+    <link href="~/assets/libs/sweetalert2/sweetalert2.min.css" rel="stylesheet" />
+    <link href="~/assets/libs/toastify-js/src/toastify.css" rel="stylesheet" />
+    <link href="~/assets/libs/persian-datepicker/css/persian-datepicker.min.css" rel="stylesheet" />
+    <!-- App custom styles -->
+    <link href="~/assets/css/app-custom.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/ims.css" rel="stylesheet" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+    <!-- End::Styles -->
 </head>
+<body>
+    <div id="loader"></div>
 
-<body class="app rtl">
+    <form id="antiForgeryForm" hidden>
+        @Html.AntiForgeryToken()
+    </form>
 
-    <!-- GLOBAL LOADER -->
-    <div id="global-loader">
-        <img src="~/assets/images/loader.svg" class="loader-img" alt="Loader" onerror="this.parentElement.style.display='none'">
-    </div>
-
-    <!-- PAGE -->
-    <div class="page">
-        <div class="page-main">
-
-            <!-- HEADER -->
-            <header class="app-header">
-                <div class="main-header-container container-fluid">
-                    <div class="header-content-left d-flex align-items-center gap-2">
-                        <a asp-controller="Cartable" asp-action="Index" class="d-flex align-items-center gap-2 text-decoration-none">
-                            <img src="~/assets/images/brand-logos/logo-pmo.png" alt="Logo" style="height:36px;width:auto;">
-                            <span class="d-none d-sm-block fs-14 fw-bold text-default">سامانه احراز اصالت سند و قبض انبار</span>
-                        </a>
-                    </div>
-
-                    <div class="header-content-right d-flex align-items-center gap-3">
-                        @if (isAdmin)
-                        {
-                            <a class="btn btn-outline-primary btn-sm" asp-controller="Home" asp-action="Users">
-                                <i class="ti ti-users"></i>
-                                <span class="d-none d-md-inline">مدیریت کاربران</span>
-                            </a>
-                        }
-
-                        <a href="javascript:void(0)" id="fullScreenBtn" class="text-dark fs-18" title="تمام صفحه">
-                            <i class="ti ti-maximize" id="fullScreenIcon"></i>
-                        </a>
-
-                        <div class="dropdown">
-                            <a href="javascript:void(0)" class="d-flex align-items-center" data-bs-auto-close="outside" data-bs-toggle="dropdown" id="mainHeaderProfile">
-                                <img alt="پروفایل" class="avatar avatar-xs avatar-rounded" src="~/assets/images/faces/21.jpg">
-                            </a>
-                            <ul aria-labelledby="mainHeaderProfile" class="dropdown-menu pt-0 overflow-hidden dropdown-menu-end">
-                                <li>
-                                    <a class="dropdown-item d-flex align-items-center" asp-controller="Home" asp-action="EditProfile">
-                                        <i class="ti ti-user me-2 fs-16"></i>
-                                        @(userName ?? "نام کاربر") @(userLastName ?? "")
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal">
-                                        <i class="ti ti-headset me-2 fs-16"></i>پشتیبانی
-                                    </a>
-                                </li>
-                                <li>
-                                    <form id="logout-form" asp-controller="Home" asp-action="Logout" method="post" class="d-none">
-                                        @Html.AntiForgeryToken()
-                                    </form>
-                                    <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);" onclick="document.getElementById('logout-form').submit();">
-                                        <i class="ti ti-logout me-2 fs-16"></i>از سیستم خارج شوید
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <!-- MAIN CONTENT -->
-            <div class="main-content app-content">
-                <div class="container-fluid py-3">
-                    @RenderBody()
+    <!-- ========== HEADER ========== -->
+    <header class="app-header sticky" id="header">
+        <div class="main-header-container container-fluid px-0">
+            <!-- Start::header-content-left -->
+            <div class="header-content-left">
+                <div class="header-element">
+                    <a asp-controller="Cartable" asp-action="Index" class="header-brand">
+                        <img src="~/assets/images/brand-logos/logo-pmo.png" alt="لوگو">
+                        <span class="d-none d-sm-flex flex-column">
+                            <span class="brand-title">سامانه احراز اصالت سند و قبض انبار</span>
+                            <span class="brand-subtitle">اداره کل بنادر و دریانوردی هرمزگان</span>
+                        </span>
+                    </a>
                 </div>
             </div>
+            <!-- End::header-content-left -->
+            <!-- Start::header-content-right -->
+            <ul class="header-content-right">
+                <!-- Theme Mode -->
+                <li class="header-element header-theme-mode">
+                    <a class="header-link layout-setting" href="javascript:void(0);" title="حالت روشن/تاریک">
+                        <span class="light-layout">
+                            <svg class="header-link-icon" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                <path color="currentColor" d="M21.5 14.078A8.557 8.557 0 0 1 9.922 2.5C5.668 3.497 2.5 7.315 2.5 11.873a9.627 9.627 0 0 0 9.627 9.627c4.558 0 8.376-3.168 9.373-7.422" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+                            </svg>
+                        </span>
+                        <span class="dark-layout">
+                            <svg class="header-link-icon" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                <path color="currentColor" d="M17 12a5 5 0 1 1-10 0a5 5 0 0 1 10 0M12 2v1.5m0 17V22m7.07-2.929l-1.06-1.06M5.99 5.989L4.928 4.93M22 12h-1.5m-17 0H2m17.071-7.071l-1.06 1.06M5.99 18.011l-1.06 1.06" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+                            </svg>
+                        </span>
+                    </a>
+                </li>
 
-            <!-- FOOTER -->
-            <footer class="footer mt-auto py-3 border-top">
-                <div class="container-fluid">
-                    <div class="text-center small text-muted">
-                        © <span id="year"></span>
-                        <span class="fw-semibold">اداره کل بنادر و دریانوردی هرمزگان</span> —
-                        طراحی و توسعه توسط
-                        <span class="text-primary fw-semibold">تیم فناوری اطلاعات</span>
-                    </div>
-                </div>
-            </footer>
+                <!-- Fullscreen -->
+                <li class="header-element header-fullscreen">
+                    <a class="header-link" href="javascript:void(0);" onclick="openFullscreen();" title="تمام صفحه / خروج از تمام صفحه">
+                        <svg class="full-screen-open header-link-icon" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg">
+                            <path color="currentColor" d="m12.567 7.934l2.742.1c.407.015.73.35.73.758v2.615m-5.5 2.027l5.044-5.018M2 17c0-1.886 0-2.828.586-3.414S4.114 13 6 13h1c1.886 0 2.828 0 3.414.586S11 15.114 11 17v1c0 1.886 0 2.828-.586 3.414S8.886 22 7 22H6c-1.886 0-2.828 0-3.414-.586S2 19.886 2 18zm0-8.5v2M14 2h-4m12 12v-4m-8.5 12h2M2.06 5.5c.154-1.066.453-1.821 1.036-2.404S4.434 2.214 5.5 2.06m13 0c1.066.154 1.821.453 2.404 1.036c.582.583.882 1.338 1.036 2.404m0 13c-.154 1.066-.454 1.821-1.036 2.404c-.583.582-1.338.882-2.404 1.036" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+                        </svg>
+                        <svg class="full-screen-close header-link-icon d-none" height="1em" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg">
+                            <g color="currentColor" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                                <path d="M2 10.002c.029-3.414.218-5.296 1.46-6.537C4.924 2 7.282 2 11.997 2s7.073 0 8.538 1.465S22 7.287 22 12.003c0 4.715 0 7.073-1.465 8.537c-1.241 1.242-3.123 1.431-6.537 1.46"></path>
+                                <path d="M4.999 13c-1.17.035-1.868.165-2.351.648s-.613 1.18-.648 2.35M8.001 13c1.17.035 1.868.165 2.351.648s.613 1.18.648 2.35m0 3.003c-.035 1.17-.165 1.868-.648 2.351s-1.18.613-2.35.648m-3.003 0c-1.17-.035-1.868-.165-2.351-.648s-.613-1.18-.648-2.35m14.413-7.996l-2.903-.066c-.432-.01-.777-.345-.782-.757l-.031-2.644m7.331-3.773l-6.747 6.601"></path>
+                            </g>
+                        </svg>
+                    </a>
+                </li>
 
+                <!-- Profile -->
+                <li class="header-element dropdown">
+                    <a class="header-link dropdown-toggle" data-bs-auto-close="outside" data-bs-toggle="dropdown" href="javascript:void(0);" id="mainHeaderProfile">
+                        <div class="d-flex align-items-center">
+                            <span class="avatar avatar-sm avatar-rounded bg-primary-transparent">
+                                <i class="ti ti-user fs-16"></i>
+                            </span>
+                            <div class="d-none d-lg-flex ms-2">
+                                <span class="user-name fs-13">@fullName</span>
+                            </div>
+                        </div>
+                    </a>
+                    <ul aria-labelledby="mainHeaderProfile" class="main-header-dropdown dropdown-menu pt-0 overflow-hidden header-profile-dropdown dropdown-menu-end">
+                        <li class="px-3 py-2 border-bottom d-lg-none">
+                            <span class="fw-semibold fs-13">@fullName</span>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" asp-controller="Home" asp-action="EditProfile">
+                                <i class="ti ti-user me-2 fs-16"></i>
+                                پروفایل
+                            </a>
+                        </li>
+                        @if (isAdmin)
+                        {
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center" asp-controller="Home" asp-action="Users">
+                                    <i class="ti ti-users me-2 fs-16"></i>
+                                    مدیریت کاربران
+                                </a>
+                            </li>
+                        }
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal">
+                                <i class="ti ti-headset me-2 fs-16"></i>
+                                پشتیبانی
+                            </a>
+                        </li>
+                        <li>
+                            <form id="logout-form" asp-controller="Home" asp-action="Logout" method="post" class="d-none">
+                                @Html.AntiForgeryToken()
+                            </form>
+                            <a class="dropdown-item d-flex align-items-center text-danger" href="javascript:void(0);" onclick="document.getElementById('logout-form').submit();">
+                                <i class="ti ti-logout me-2 fs-16"></i>
+                                خروج
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+            <!-- End::header-content-right -->
+        </div>
+    </header>
+    <!-- ========== END HEADER ========== -->
+    <!-- ========== MAIN CONTENT ========== -->
+    <div class="main-content app-content">
+        <div class="container-fluid">
+            @RenderBody()
         </div>
     </div>
-
+    <!-- ========== END MAIN CONTENT ========== -->
+    <!-- ========== FOOTER ========== -->
+    <footer class="footer mt-auto py-3 bg-white text-center">
+        <div class="container">
+            <span class="text-muted">
+                <a class="text-dark fw-medium" href="javascript:void(0);">اداره کل بنادر و دریانوردی هرمزگان</a>
+                — طراحی و توسعه توسط
+                <a href="javascript:void(0);"><span class="fw-medium text-primary">تیم فناوری اطلاعات</span></a>
+                — @FaDigits(pc.GetYear(now))
+                تمام حقوق محفوظ است
+            </span>
+        </div>
+    </footer>
+    <!-- ========== END FOOTER ========== -->
     <!-- Support Modal -->
-    <div class="modal fade" id="supportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade ims-modal" id="supportModal" tabindex="-1" aria-labelledby="supportModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h6 class="modal-title"><i class="ti ti-headset me-2"></i>شماره‌های پشتیبانی</h6>
+                    <span class="avatar avatar-md avatar-rounded bg-primary-transparent modal-icon"><i class="ti ti-headset fs-18"></i></span>
+                    <div>
+                        <h6 class="modal-title" id="supportModalLabel">پشتیبانی</h6>
+                        <div class="modal-subtitle">در ساعات اداری پاسخگوی شما هستیم</div>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="d-flex align-items-center gap-3 mb-3">
-                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ti ti-phone"></i></span>
-                        <div>
-                            <div class="fs-13 text-muted">اداره فاوا واحد نرم‌افزار (ساعات اداری)</div>
-                            <div class="fw-semibold" style="direction:ltr;text-align:right;">۰۹۹۴۰۶۵۷۷۵۳ — فاطمه صادقی</div>
+                    <div class="support-numbers">
+                        <div class="support-number-item">
+                            <i class="ti ti-phone"></i>
+                            <div>
+                                <div class="label">اداره فاوا واحد نرم‌افزار — فاطمه صادقی</div>
+                                <div class="number">۰۹۹۴۰۶۵۷۷۵۳</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-3 mb-3">
-                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ti ti-phone"></i></span>
-                        <div>
-                            <div class="fs-13 text-muted">داخلی</div>
-                            <div class="fw-semibold" style="direction:ltr;text-align:right;">۴۶۴۷</div>
+                        <div class="support-number-item">
+                            <i class="ti ti-phone-call"></i>
+                            <div>
+                                <div class="label">داخلی</div>
+                                <div class="number">۴۶۴۷</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="avatar avatar-rounded bg-primary-transparent"><i class="ti ti-mail"></i></span>
-                        <div>
-                            <div class="fs-13 text-muted">ایمیل پشتیبانی</div>
-                            <div class="fw-semibold">sdi10fateme@@gmail.com</div>
+                        <div class="support-number-item">
+                            <i class="ti ti-mail"></i>
+                            <div>
+                                <div class="label">ایمیل پشتیبانی</div>
+                                <div class="number">sdi10fateme@@gmail.com</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <style>
+        .support-numbers {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
 
+        .support-number-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 18px;
+            background: rgb(var(--light-rgb));
+            border-radius: 10px;
+            border: 1px solid var(--default-border, #e9ecef);
+            transition: all 0.2s;
+        }
+
+            .support-number-item:hover {
+                border-color: var(--primary-color, #0d6efd);
+            }
+
+            .support-number-item i {
+                font-size: 20px;
+                color: var(--primary-color, #0d6efd);
+                width: 30px;
+                text-align: center;
+            }
+
+            .support-number-item .number {
+                font-weight: 600;
+                direction: ltr;
+                text-align: right;
+                font-size: 14px;
+            }
+
+            .support-number-item .label {
+                color: var(--text-muted);
+                font-size: 13px;
+            }
+    </style>
+    <!-- Scroll To Top -->
+    <div class="scrollToTop">
+        <span class="arrow lh-1">
+            <i class="ti ti-caret-up fs-20"></i>
+        </span>
+    </div>
     <div id="responsive-overlay"></div>
-
-    <!-- ==================== SCRIPTS ==================== -->
-    <!-- jQuery اول از همه -->
-    <script src="~/assets/js/jquery.min.js"></script>
-
-    <!-- Bootstrap -->
+    <!-- ========== SCRIPTS ========== -->
+    <!-- jQuery -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <!-- Bootstrap (yzen / Bootstrap 5) -->
+    <script src="~/assets/libs/%40popperjs/core/umd/popper.min.js"></script>
     <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
-
-    <!-- Toastr (باید قبل از کدهای خودمون لود بشه) -->
-    <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
-
+    <!-- jQuery Validation / Unobtrusive -->
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+    <!-- Block UI -->
+    <script src="~/app-assets/vendors/js/ui/blockUI.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="~/assets/libs/sweetalert2/sweetalert2.min.js"></script>
+    <!-- Select2 -->
+    <script src="~/assets/plugins/select2/select2.full.min.js"></script>
+    <!-- yzen Theme JS -->
+    <script src="~/assets/libs/node-waves/waves.min.js"></script>
+    <script src="~/assets/libs/flatpickr/flatpickr.min.js"></script>
+    <script src="~/assets/js/custom.js"></script>
+    <!-- Toastify JS -->
+    <script src="~/assets/libs/toastify-js/src/toastify.js"></script>
+    <!-- Persian Date Picker (used by .fc-datepicker inputs) -->
+    <script src="~/assets/libs/persian-datepicker/persian-date.min.js"></script>
+    <script src="~/assets/libs/persian-datepicker/persian-datepicker.min.js"></script>
+    <!-- App Custom JS -->
+    <script src="~/assets/js/scripts.js" asp-append-version="true"></script>
+    <!-- توست یکپارچه (بعد از scripts.js تا showToster/toastr رو با ظاهر yzen جایگزین کنه) -->
+    <script src="~/js/ims-toast.js" asp-append-version="true"></script>
     <script>
-        // مخفی کردن لودر به محض آماده شدن صفحه
-        (function () {
-            const loader = document.getElementById('global-loader');
-            if (loader) {
-                loader.style.display = 'none';
+        function openFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen();
             }
-        })();
+        }
 
-        $(document).ready(function () {
-            // سال شمسی
-            const yearEl = document.getElementById("year");
-            if (yearEl) {
-                yearEl.textContent = new Date().toLocaleDateString("fa-IR", { year: "numeric" });
-            }
-
-            // تنظیمات Toastr
-            if (typeof toastr !== 'undefined') {
-                toastr.options = {
-                    closeButton: true,
-                    progressBar: true,
-                    positionClass: "toast-top-left",
-                    timeOut: 5000,
-                    rtl: true
-                };
-            }
-
-            // Fullscreen
-            const fullScreenBtn = document.getElementById('fullScreenBtn');
-            const fullScreenIcon = document.getElementById('fullScreenIcon');
-            if (fullScreenBtn && fullScreenIcon) {
-                fullScreenBtn.addEventListener('click', function () {
-                    if (!document.fullscreenElement) {
-                        document.documentElement.requestFullscreen()
-                            .then(() => fullScreenIcon.className = 'ti ti-minimize')
-                            .catch(console.error);
-                    } else {
-                        document.exitFullscreen()
-                            .then(() => fullScreenIcon.className = 'ti ti-maximize');
-                    }
-                });
-            }
+        document.addEventListener('fullscreenchange', function () {
+            var isFullscreen = !!document.fullscreenElement;
+            document.querySelectorAll('.full-screen-open').forEach(function (el) {
+                el.classList.toggle('d-none', isFullscreen);
+            });
+            document.querySelectorAll('.full-screen-close').forEach(function (el) {
+                el.classList.toggle('d-none', !isFullscreen);
+            });
         });
     </script>
-
-    @* اسکریپت‌های صفحه *@
     @await RenderSectionAsync("Scripts", required: false)
+    <!-- END: Page JS-->
 </body>
 </html>

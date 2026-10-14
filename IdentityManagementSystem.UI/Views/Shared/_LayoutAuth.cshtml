@@ -31,14 +31,12 @@
     <!-- Icons -->
     <link href="~/assets/css/icons.css" rel="stylesheet" />
 
-    <!-- Toastr -->
-    <link href="~/lib/bootstrap/dist/css/toastr.min.css" rel="stylesheet" />
-
     <!-- Toastify CSS -->
     <link href="~/assets/libs/toastify-js/src/toastify.css" rel="stylesheet" />
 
     <!-- Site Custom CSS -->
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/ims.css" asp-append-version="true" />
 
     @RenderSection("Styles", required: false)
 </head>
@@ -59,40 +57,15 @@
     <!-- Bootstrap -->
     <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Toastr -->
-    <script src="~/lib/bootstrap/dist/js/toastr.min.js"></script>
-
     <!-- Authentication scripts -->
     <script src="~/assets/js/two-step-verification.js"></script>
     <script src="~/assets/js/show-password.js"></script>
     
     <!-- Toastify JS -->
-    <link href="~/assets/libs/toastify-js/src/toastify.css" rel="stylesheet" />
     <script src="~/assets/libs/toastify-js/src/toastify.js"></script>
 
-    <!-- Toast JS -->
-    <script src="~/assets/js/toasts.js"> </script>
-
-    <script>
-        window.showToast = function (message, type = "info") {
-            let backgroundColor = "#5477f5"; //‌ آبی
-
-            if (type === "success") backgroundColor = "#28a745";
-            if (type === "error") backgroundColor = "#dc3545";
-            if (type === "warning") backgroundColor = "#ffc107";
-
-            Toastify({
-                text: message,
-                duration: 4000,
-                gravity: "top",
-                position: "left",
-                style: {
-                    background: backgroundColor,
-                },
-                close: true
-            }).showToast();
-        };
-    </script>
+    <!-- توست یکپارچه با ظاهر yzen (showToast / toastr / imsToast) -->
+    <script src="~/js/ims-toast.js" asp-append-version="true"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

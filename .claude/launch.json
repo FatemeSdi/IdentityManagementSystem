@@ -6,6 +6,12 @@
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "IdentityManagementSystem.PublicPortal", "--urls", "http://localhost:5169"],
       "port": 5169
+    },
+    {
+      "name": "UI",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.UI", "--urls", "http://localhost:5031"],
+      "port": 5031
     }
   ]
 }
