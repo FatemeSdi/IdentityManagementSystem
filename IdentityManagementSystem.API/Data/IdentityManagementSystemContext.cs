@@ -279,6 +279,11 @@ namespace IdentityManagementSystem.API.Data
                       .WithMany()
                       .HasForeignKey(g => g.CompanyId)
                       .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(g => g.RequestType)
+                      .WithMany()
+                      .HasForeignKey(g => g.RequestTypeId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ========== GroupPermission (Many-to-Many) ==========

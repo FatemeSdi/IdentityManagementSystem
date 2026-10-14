@@ -158,12 +158,12 @@
                     }
                 });
             }
-            // میانبر بالای هدر «ثبت درخواست جدید» — فعلاً چون فقط یک نوع درخواست هست، مستقیم فرم رو نشون می‌ده
+            // میانبر بالای هدر «ثبت درخواست جدید» — اول مودال انتخاب نوع درخواست (قبض انبار / نوبت‌دهی ارزیابی) باز می‌شه
             var headerBtnNewRequest = document.getElementById('headerBtnNewRequest');
             if (headerBtnNewRequest) {
                 headerBtnNewRequest.addEventListener('click', function () {
-                    if (typeof window.showNewRequestSection === 'function') {
-                        window.showNewRequestSection();
+                    if (typeof window.openRequestTypeModal === 'function') {
+                        window.openRequestTypeModal();
                     }
                 });
             }

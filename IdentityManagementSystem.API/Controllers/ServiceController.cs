@@ -110,26 +110,20 @@ namespace IdentityManagementSystem.API.Controllers
                 return new JsonResult(new { success = false, message = "کاربر شناسایی نشد." });
             }
 
-            // گروهی که به شرکت انتخاب‌شده مقیده (مثلاً «قبض انبار - افق») — کارتابل این درخواست همینجا می‌شینه.
-            // فعلاً تنها نوع درخواست، ترکیبی با قبض انباره؛ وقتی نوع‌های دیگه اضافه بشن، این‌جا باید بر
-            // اساس نوع درخواست + شرکت گروه مناسب انتخاب بشه.
-            int? groupId = await _context.Groups
-                .Where(g => g.CompanyId == model.CompanyId)
-                .Select(g => (int?)g.Id)
-                .FirstOrDefaultAsync();
-
-            if (groupId == null)
-            {
-                _logger.LogError("No Group is configured for CompanyId={CompanyId}", model.CompanyId);
-                return new JsonResult(new { success = false, message = "برای این شرکت گروه کارشناسی تعریف نشده است." });
-            }
-
-            // نوع این درخواست (فعلاً تنها نوع موجود: قبض انبار) — از روی همین، Cartable مقصد مشخص می‌شه.
+            // نوع این درخواست (قبض انبار) — از روی همین، Cartable مقصد مشخص می‌شه.
             var requestType = await _context.RequestTypes.FirstOrDefaultAsync(rt => rt.Code == "WAREHOUSE_RECEIPT" && rt.IsActive);
             if (requestType == null)
             {
                 _logger.LogError("RequestType با Code=WAREHOUSE_RECEIPT تعریف نشده است.");
                 return new JsonResult(new { success = false, message = "نوع درخواست تعریف نشده است." });
+            }
+
+            // گروهی که به (نوع درخواست + شرکت انتخاب‌شده) مقیده (مثلاً «قبض انبار - افق») — کارتابل این درخواست همینجا می‌شینه.
+            int? groupId = await FindGroupIdAsync(requestType.RequestTypeId, model.CompanyId);
+            if (groupId == null)
+            {
+                _logger.LogError("No Group is configured for RequestType={RequestType}, CompanyId={CompanyId}", requestType.Code, model.CompanyId);
+                return new JsonResult(new { success = false, message = "برای این شرکت گروه کارشناسی تعریف نشده است." });
             }
 
             // اگه فراخوانی از سمت متقاضی (anonymous، از طریق حساب سرویسی public-portal-service با RoleId=2) بوده،
@@ -322,6 +316,179 @@ namespace IdentityManagementSystem.API.Controllers
             };
 
             return new JsonResult(new { success = true, data = combinedResult });
+        }
+
+        /// <summary>
+        /// ثبت درخواست «نوبت‌دهی ارزیابی» — متقاضی فقط کد ملی/موبایل (تاییدشده با OTP سمت پورتال) و شرکتِ
+        /// محوطه رو می‌ده. درخواست بلافاصله تو کارتابل گروه نوبت‌دهی ارزیابیِ همون شرکت می‌شینه و پیامک
+        /// ثبت موفق برای متقاضی ارسال می‌شه. سند/قبض انباری در کار نیست؛ فقط شاهکار (از کش) دوباره چک می‌شه
+        /// چون این endpoint می‌تونه مستقیم هم صدا زده بشه.
+        /// </summary>
+        [HttpPost("ProcessEvaluationAppointment")]
+        [Authorize(Policy = "CanAccessServices")]
+        public async Task<IActionResult> ProcessEvaluationAppointment([FromBody] EvaluationAppointmentViewModel model)
+        {
+            if (string.IsNullOrWhiteSpace(model.NationalId) || string.IsNullOrWhiteSpace(model.MobileNumber))
+            {
+                return new JsonResult(new { success = false, message = "کد ملی و شماره موبایل الزامی است." });
+            }
+
+            var company = await _context.Companies
+                .FirstOrDefaultAsync(c => c.CompanyId == model.CompanyId && c.IsActive);
+            if (company == null)
+            {
+                return new JsonResult(new { success = false, message = "شرکت انتخاب‌شده معتبر نیست." });
+            }
+
+            var userIdClaim = User.FindFirst("UserId")?.Value;
+            if (!long.TryParse(userIdClaim, out long userId))
+            {
+                _logger.LogWarning("Could not extract UserId from JWT token.");
+                return new JsonResult(new { success = false, message = "کاربر شناسایی نشد." });
+            }
+
+            var requestType = await _context.RequestTypes.FirstOrDefaultAsync(rt => rt.Code == "EVALUATION_APPOINTMENT" && rt.IsActive);
+            if (requestType == null)
+            {
+                _logger.LogError("RequestType با Code=EVALUATION_APPOINTMENT تعریف نشده است.");
+                return new JsonResult(new { success = false, message = "نوع درخواست تعریف نشده است." });
+            }
+
+            int? groupId = await FindGroupIdAsync(requestType.RequestTypeId, model.CompanyId);
+            if (groupId == null)
+            {
+                _logger.LogError("No Group is configured for RequestType={RequestType}, CompanyId={CompanyId}", requestType.Code, model.CompanyId);
+                return new JsonResult(new { success = false, message = "برای این شرکت کارشناس نوبت‌دهی ارزیابی تعریف نشده است." });
+            }
+
+            // شاهکار قبل از ساخت رکورد — نتیجه‌ی CheckShahkarMatch (قبل از OTP) کش شده، پس معمولاً سرویس دوباره صدا زده نمی‌شه
+            bool isMatch = false;
+            try
+            {
+                var shahkarResult = await CheckMobileNationalCode_Internal(
+                    model.NationalId, model.MobileNumber, GenerateRequestId(), requestId: null, expertId: userId);
+                var internalShahkarResponse = JsonSerializer.Deserialize<InternalShahkarResponse>(
+                    shahkarResult.ResponseText,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                isMatch = internalShahkarResponse?.Result?.Data?.Response == 200;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Shahkar check failed for evaluation appointment, Mobile={Mobile}", model.MobileNumber);
+                return new JsonResult(new { success = false, message = "خطا در ارتباط با سرویس احراز هویت. لطفاً دوباره تلاش کنید." });
+            }
+
+            if (!isMatch)
+            {
+                return new JsonResult(new { success = false, message = "کد ملی و شماره موبایل تطابق ندارند." });
+            }
+
+            var callerRoleId = User.FindFirst("RoleId")?.Value;
+            var createdBy = callerRoleId == "2"
+                ? model.MobileNumber
+                : (User.Identity?.Name ?? "Unknown");
+
+            var request = new Request
+            {
+                RequestCode = GenerateRequestId(),
+                NationalIdEnc = _encryptionHelper.Encrypt(model.NationalId),
+                NationalIdHash = _encryptionHelper.ComputeSearchHash(model.NationalId),
+                MobileNumber = model.MobileNumber,
+                IsMatch = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = createdBy,
+                GroupId = groupId,
+                CompanyId = model.CompanyId,
+                RequestTypeId = requestType.RequestTypeId
+            };
+
+            _context.Request.Add(request);
+            await _context.SaveChangesAsync();
+
+            request.TrackingCode = $"REQ{request.RequestId:D8}";
+
+            _context.RequestHistory.Add(new RequestHistory
+            {
+                RequestId = request.RequestId,
+                StatusId = 1,                                          // 1 = در انتظار بررسی
+                ExpertId = userId.ToString(),
+                ActionDescription = $"درخواست نوبت‌دهی ارزیابی برای محوطه شرکت {company.CompanyName} ثبت شد.",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedStatus = "در انتظار بررسی",
+                UpdatedStatusBy = createdBy,
+                UpdatedStatusDate = DateTime.UtcNow
+            });
+
+            _context.CartableItems.Add(new CartableItem
+            {
+                RequestId = request.RequestId,
+                AssignedTo = groupId,
+                CartableId = requestType.CartableId,
+                Status = "New",
+                AssignedAt = request.CreatedAt
+            });
+
+            await _context.SaveChangesAsync();
+
+            // پیامک ثبت موفق — best-effort، شکستش نباید ثبت درخواست رو خراب کنه
+            var smsText = $"کاربر گرامی، درخواست نوبت ارزیابی شما برای محوطه شرکت {company.CompanyName} با موفقیت ثبت شد.\nکد پیگیری: {request.TrackingCode}\nاداره کل بنادر و دریانوردی استان هرمزگان";
+            await SendAndLogSmsAsync(model.MobileNumber, smsText, "General", request.RequestId, userId);
+
+            await _actionLogger.Info(userId, "ProcessEvaluationAppointment", $"RequestId={request.RequestId}, CompanyId={model.CompanyId}");
+
+            return new JsonResult(new
+            {
+                success = true,
+                data = new { RequestId = request.RequestId, TrackingCode = request.TrackingCode }
+            });
+        }
+
+        private Task<int?> FindGroupIdAsync(int requestTypeId, int companyId)
+        {
+            return _context.Groups
+                .Where(g => g.CompanyId == companyId && g.RequestTypeId == requestTypeId)
+                .Select(g => (int?)g.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        private async Task SendAndLogSmsAsync(string mobileNumber, string messageText, string purpose, long? requestId, long userId)
+        {
+            var log = new SmsLog
+            {
+                UserId = userId,
+                RequestId = requestId,
+                MobileNumberEnc = _encryptionHelper.Encrypt(mobileNumber),
+                MobileNumberHash = _encryptionHelper.ComputeSearchHash(mobileNumber),
+                // مقادیر مجاز طبق CK_Sms_Purpose: General/RequestRejected/RequestApproved/RequestStageUpdate/Otp
+                Purpose = purpose,
+                MessageText = messageText,
+                Status = "Queued",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                var result = await _smsService.SendAsync(mobileNumber, messageText);
+                log.Status = result.IsSuccess ? "Sent" : "Failed";
+                log.ErrorMessage = result.IsSuccess ? null : (result.ErrorMessage ?? result.RawResponse);
+                log.SentAt = result.IsSuccess ? DateTime.UtcNow : null;
+            }
+            catch (Exception ex)
+            {
+                log.Status = "Failed";
+                log.ErrorMessage = ex.Message;
+                _logger.LogError(ex, "خطا در ارسال پیامک ({Purpose}) برای درخواست {RequestId}", purpose, requestId);
+            }
+
+            try
+            {
+                _context.SmsLogs.Add(log);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ثبت لاگ پیامک برای درخواست {RequestId} ناموفق بود", requestId);
+            }
         }
 
         /// <summary>
@@ -1598,6 +1765,15 @@ namespace IdentityManagementSystem.API.Controllers
         public string? WarehouseReceiptNumber { get; set; }
 
         // شرکتی که متقاضی موقع ثبت درخواست انتخاب کرده — تعیین می‌کنه درخواست تو کارتابل کدوم گروه/شرکت بشینه
+        public int CompanyId { get; set; }
+    }
+
+    public class EvaluationAppointmentViewModel
+    {
+        public string NationalId { get; set; } = string.Empty;
+        public string MobileNumber { get; set; } = string.Empty;
+
+        // شرکتی که متقاضی برای محوطه‌ش نوبت ارزیابی می‌خواد
         public int CompanyId { get; set; }
     }
 

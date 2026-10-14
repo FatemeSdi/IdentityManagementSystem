@@ -463,6 +463,11 @@ namespace IdentityManagementSystem.API.Models
         public int? CompanyId { get; set; }
         public Company? Company { get; set; }
 
+        // نوع درخواستی که این گروه بررسی می‌کنه (قبض انبار / نوبت‌دهی ارزیابی) — همراه CompanyId، گروه مقصد
+        // یک درخواست رو مشخص می‌کنه
+        public int? RequestTypeId { get; set; }
+        public RequestType? RequestType { get; set; }
+
         public ICollection<GroupPermission> GroupPermissions { get; set; } = new List<GroupPermission>();
         public ICollection<UserGroup> UserGroups { get; set; } = new List<UserGroup>();
     }

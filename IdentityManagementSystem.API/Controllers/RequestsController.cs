@@ -201,6 +201,7 @@ namespace IdentityManagementSystem.API.Controllers
             var request = await _context.Request
                 .Include(r => r.AssignedToUser)
                 .Include(r => r.Company)
+                .Include(r => r.RequestType)
                 .FirstOrDefaultAsync(r => r.TrackingCode == trackingCode.Trim() && r.MobileNumber == mobileNumber.Trim());
 
             if (request == null)
@@ -232,6 +233,8 @@ namespace IdentityManagementSystem.API.Controllers
                 createdAt = request.CreatedAt,
                 status = statusText,
                 companyName = request.Company?.CompanyName,
+                requestTypeName = request.RequestType?.TypeName,
+                requestTypeCode = request.RequestType?.Code,
                 description = request.ValidateByExpert == false ? request.Description : null,
                 handlerName,
                 handlerExtension
@@ -253,6 +256,7 @@ namespace IdentityManagementSystem.API.Controllers
 
             var rawPendingRequests = await _context.Request
                 .Include(r => r.Company)
+                .Include(r => r.RequestType)
                 // TrackingCode خالی یعنی رکورد قدیمی/ناقصه (قبل از این‌که تولید خودکار کد پیگیری همیشگی بشه) —
                 // بدون کد پیگیری، متقاضی هیچ راهی برای تشخیص این درخواست نداره، پس نشونش نمی‌دیم.
                 .Where(r => r.MobileNumber == mobileNumber.Trim() && r.ValidateByExpert == null && r.TrackingCode != null)
@@ -264,6 +268,7 @@ namespace IdentityManagementSystem.API.Controllers
                 trackingCode = r.TrackingCode,
                 warehouseReceiptNumber = _encryptionHelper.DecryptOrFallback(r.WarehouseReceiptNumberEnc, r.WarehouseReceiptNumber),
                 companyName = r.Company?.CompanyName,
+                requestTypeCode = r.RequestType?.Code,
                 createdAt = r.CreatedAt
             });
 
