@@ -5,118 +5,112 @@
     Layout = "_Layout";
 }
 
-<div class="my-4 page-header-breadcrumb d-flex align-items-center justify-content-between flex-wrap gap-2">
+<div class="ims-page-header">
     <div>
         <nav>
             <ol class="breadcrumb mb-0">
-                <li class="breadcrumb-item"><a asp-controller="Cartable" asp-action="Index">داشبورد</a></li>
+                <li class="breadcrumb-item"><a asp-controller="Cartable" asp-action="Index">کارتابل</a></li>
                 <li aria-current="page" class="breadcrumb-item active">مدیریت کاربران</li>
             </ol>
         </nav>
     </div>
+    <button id="AddUser" type="button" class="btn btn-primary btn-wave">
+        <i class="ti ti-user-plus me-1"></i> افزودن کاربر
+    </button>
 </div>
 
-@if (ViewBag.ErrorMessage != null)
+@if (!string.IsNullOrEmpty(ViewBag.SuccessMessage))
+{
+    <div class="alert alert-success">@ViewBag.SuccessMessage</div>
+}
+@if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
 {
     <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
 }
 
 <div class="card custom-card">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="card-title mb-0">کاربران</div>
-        <div class="d-flex align-items-center gap-2">
-            <div class="input-group" style="max-width: 260px;">
+        <div class="card-title mb-0">
+            <i class="ti ti-users me-1"></i>
+            لیست کاربران
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-primary-transparent fs-12">@(Model?.Count() ?? 0) کاربر</span>
+            <div class="input-group ims-users-search">
                 <span class="input-group-text"><i class="ti ti-search"></i></span>
-                <input type="text" class="form-control" placeholder="جستجو" id="searchInput">
+                <input type="search" class="form-control" placeholder="جستجو در کاربران..." id="searchInput" autocomplete="off">
             </div>
-            <button id="AddUser" type="button" class="btn btn-primary">
-                <i class="ti ti-user-plus me-1"></i> افزودن کاربر
-            </button>
         </div>
     </div>
     <div class="card-body">
-        @if (!string.IsNullOrEmpty(ViewBag.SuccessMessage))
-        {
-            <div class="alert alert-success">@ViewBag.SuccessMessage</div>
-        }
-        @if (!string.IsNullOrEmpty(ViewBag.ErrorMessage))
-        {
-            <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
-        }
         <div class="table-responsive">
-            <table class="table table-bordered text-nowrap mb-0" id="usersTable">
+            <table class="table table-hover text-nowrap w-100 ims-table" id="usersTable">
                 <thead>
                     <tr>
                         <th>کاربر</th>
                         <th>نام کاربری</th>
-                        <th>موقعیت</th>
+                        <th>نقش</th>
                         <th>تاریخ ثبت</th>
                         <th>آخرین ورود</th>
                         <th>وضعیت</th>
-                        <th>عملیات</th>
+                        <th data-orderable="false">عملیات</th>
                     </tr>
                 </thead>
                 <tbody id="usersTableBody">
-                    @if (Model != null && Model.Any())
+                    @if (Model != null)
                     {
                         foreach (var user in Model)
                         {
                             <tr data-user-id="@user.UserId">
-                                <td>
+                                <td data-order="@user.Name @user.LastName">
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="avatar avatar-sm avatar-rounded bg-primary-transparent">
                                             @((user.Name?.Trim().FirstOrDefault().ToString() ?? "").ToUpper())
                                         </span>
-                                        <div>
-                                            <div class="fw-medium">@user.Name @user.LastName</div>
-                                        </div>
+                                        <div class="fw-medium">@user.Name @user.LastName</div>
                                     </div>
                                 </td>
-                                <td>@user.Username</td>
-                                <td>@user.Role</td>
-                                <td>
+                                <td class="dir-ltr text-end">@user.Username</td>
+                                <td><span class="badge bg-info-transparent">@user.Role</span></td>
+                                <td data-order="@user.CreatedAt?.ToString("yyyyMMddHHmmss")">
                                     <div>@user.CreatedAt.ToPersianDate()</div>
-                                    <small class="text-muted">@user.CreatedAt.ToPersianTime()</small>
+                                    <small class="text-muted dir-ltr d-inline-block">@user.CreatedAt.ToPersianTime()</small>
                                 </td>
-                                <td>
+                                <td data-order="@user.LastLogin?.ToString("yyyyMMddHHmmss")">
                                     <div>@user.LastLogin.ToPersianDate()</div>
-                                    <small class="text-muted">@user.LastLogin.ToPersianTime()</small>
+                                    <small class="text-muted dir-ltr d-inline-block">@user.LastLogin.ToPersianTime()</small>
                                 </td>
                                 <td class="text-center">
                                     @if (user.IsActive)
                                     {
-                                        <span class="badge bg-success-transparent">فعال</span>
+                                        <span class="badge bg-success-transparent"><i class="ti ti-circle-check me-1"></i>فعال</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-danger-transparent">غیرفعال</span>
+                                        <span class="badge bg-danger-transparent"><i class="ti ti-circle-x me-1"></i>غیرفعال</span>
                                     }
                                 </td>
                                 <td class="text-center">
-                                    <button class="btn btn-sm btn-icon btn-outline-primary btn-edit" data-id="@user.UserId" title="ویرایش">
-                                        <i class="ti ti-edit"></i>
-                                    </button>
-                                    @if (user.IsActive)
-                                    {
-                                        <button class="btn btn-sm btn-icon btn-outline-danger btn-delete" data-id="@user.UserId" title="غیرفعال‌سازی">
-                                            <i class="ti ti-trash"></i>
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-icon btn-sm btn-primary-light btn-edit" data-id="@user.UserId" data-bs-toggle="tooltip" title="ویرایش">
+                                            <i class="ti ti-edit"></i>
                                         </button>
-                                    }
-                                    else
-                                    {
-                                        <button class="btn btn-sm btn-icon btn-outline-success btn-restore" data-id="@user.UserId" title="فعال‌سازی">
-                                            <i class="ti ti-rotate-clockwise"></i>
-                                        </button>
-                                    }
+                                        @if (user.IsActive)
+                                        {
+                                            <button type="button" class="btn btn-icon btn-sm btn-danger-light btn-delete" data-id="@user.UserId" data-bs-toggle="tooltip" title="غیرفعال‌سازی">
+                                                <i class="ti ti-user-off"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-icon btn-sm btn-success-light btn-restore" data-id="@user.UserId" data-bs-toggle="tooltip" title="فعال‌سازی">
+                                                <i class="ti ti-user-check"></i>
+                                            </button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
-                    }
-                    else
-                    {
-                        <tr id="noDataRow">
-                            <td colspan="7" class="text-center">هیچ کاربری یافت نشد.</td>
-                        </tr>
                     }
                 </tbody>
             </table>
@@ -125,11 +119,15 @@
 </div>
 
 <!-- Modal افزودن کاربر  -->
-<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade ims-modal" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title" id="addUserModalLabel">افزودن کاربر جدید</h6>
+                <span class="avatar avatar-md avatar-rounded bg-primary-transparent modal-icon"><i class="ti ti-user-plus fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="addUserModalLabel">افزودن کاربر جدید</h6>
+                    <div class="modal-subtitle">اطلاعات هویتی، نقش و رمز عبور کاربر را وارد کنید</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
             </div>
             <div class="modal-body">
@@ -195,7 +193,7 @@
 
                     <div class="modal-footer">
                         <button class="btn btn-light" type="button" data-bs-dismiss="modal">انصراف</button>
-                        <button class="btn btn-primary" type="submit">ثبت کاربر</button>
+                        <button class="btn btn-primary btn-wave" type="submit"><i class="ti ti-check me-1"></i>ثبت کاربر</button>
                     </div>
                 </form>
             </div>
@@ -204,11 +202,15 @@
 </div>
 
 <!-- Modal ویرایش کاربر -->
-<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade ims-modal" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title" id="editUserModalLabel">ویرایش کاربر</h6>
+                <span class="avatar avatar-md avatar-rounded bg-primary-transparent modal-icon"><i class="ti ti-user-edit fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="editUserModalLabel">ویرایش کاربر</h6>
+                    <div class="modal-subtitle">برای عدم تغییر رمز عبور، فیلدهای رمز را خالی بگذارید</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
             </div>
             <div class="modal-body">
@@ -264,7 +266,7 @@
 
                     <div class="modal-footer">
                         <button class="btn btn-light" type="button" data-bs-dismiss="modal">انصراف</button>
-                        <button class="btn btn-primary" type="submit">به‌روزرسانی</button>
+                        <button class="btn btn-primary btn-wave" type="submit"><i class="ti ti-check me-1"></i>به‌روزرسانی</button>
                     </div>
                 </form>
             </div>
@@ -272,6 +274,8 @@
     </div>
 </div>
 
+@section Scripts {
+<script src="~/assets/plugins/datatable/datatables.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         let addModal, editModal;
@@ -311,19 +315,29 @@
             addModal.show();
         });
 
-        function filterTable() {
-            var searchText = document.getElementById('searchInput').value.toLowerCase();
-            var rows = document.querySelectorAll('#usersTableBody tr');
+        // جدول با DataTables قالب یزن: جستجو، مرتب‌سازی و صفحه‌بندی
+        var usersDt = $('#usersTable').DataTable({
+            order: [[3, 'desc']],
+            pageLength: 10,
+            lengthMenu: [10, 25, 50, 100],
+            dom: "<'ims-dt-top'l>t<'ims-dt-footer'<'dt-info'i><'dt-pages'p>>",
+            language: {
+                lengthMenu: 'نمایش _MENU_ ردیف',
+                zeroRecords: 'هیچ کاربری یافت نشد.',
+                emptyTable: 'هیچ کاربری یافت نشد.',
+                info: 'نمایش _START_ تا _END_ از _TOTAL_ کاربر',
+                infoEmpty: 'کاربری برای نمایش وجود ندارد',
+                infoFiltered: '(فیلتر شده از _MAX_ کاربر)',
+                paginate: { first: 'اول', last: 'آخر', next: 'بعدی', previous: 'قبلی' }
+            }
+        });
 
-            rows.forEach(function(row) {
-                if (row.id === 'noDataRow') return;
+        document.getElementById('searchInput').addEventListener('input', function() {
+            usersDt.search(this.value).draw();
+        });
 
-                var text = row.textContent.toLowerCase();
-                row.style.display = text.indexOf(searchText) > -1 ? '' : 'none';
-            });
-        }
-
-        document.getElementById('searchInput').addEventListener('keyup', filterTable);
+        // رویدادها delegated هستن چون DataTables ردیف‌های صفحه‌های دیگه رو از DOM برمی‌داره
+        var tableBody = document.getElementById('usersTableBody');
 
         document.querySelectorAll('.toggle-password').forEach(function(element) {
             element.addEventListener('click', function() {
@@ -340,9 +354,11 @@
         });
 
         // ویرایش کاربر
-        document.querySelectorAll('.btn-edit').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var userId = this.dataset.id;
+        tableBody.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.btn-edit');
+            if (!btn) return;
+            {
+                var userId = btn.dataset.id;
 
                 fetch('@Url.Action("EditUser", "Home")?id=' + userId, {
                     method: 'GET',
@@ -373,13 +389,15 @@
                 .catch(function() {
                     imsToast('error', 'خطا در دریافت اطلاعات کاربر');
                 });
-            });
+            }
         });
 
         // غیرفعال‌سازی کاربر
-        document.querySelectorAll('.btn-delete').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var userId = this.dataset.id;
+        tableBody.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.btn-delete');
+            if (!btn) return;
+            {
+                var userId = btn.dataset.id;
                 if (!confirm('آیا از غیرفعال‌سازی این کاربر اطمینان دارید؟')) return;
 
                 var token = document.querySelector('input[name="__RequestVerificationToken"]').value;
@@ -401,13 +419,15 @@
                     }
                 })
                 .catch(function() { imsToast('error', 'خطا در غیرفعال‌سازی کاربر'); });
-            });
+            }
         });
 
         // فعال‌سازی مجدد کاربر
-        document.querySelectorAll('.btn-restore').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var userId = this.dataset.id;
+        tableBody.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.btn-restore');
+            if (!btn) return;
+            {
+                var userId = btn.dataset.id;
                 var token = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
                 fetch('@Url.Action("RestoreUser", "Home")', {
@@ -427,7 +447,7 @@
                     }
                 })
                 .catch(function() { imsToast('error', 'خطا در فعال‌سازی کاربر'); });
-            });
+            }
         });
 
         // ارسال فرم ویرایش
@@ -541,3 +561,4 @@
         });
     }
 </script>
+}

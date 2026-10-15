@@ -429,3 +429,177 @@
 [data-theme-mode=dark] .toastify.ims-toast {
     box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .45);
 }
+
+/* ---------- تب‌های کارتابل + نوار اطلاعات ---------- */
+.ims-cartable-tabs.nav.tab-style-1 {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin-block-end: 1rem;
+    border: 1px solid var(--default-border);
+    background: var(--custom-white, #fff);
+}
+
+    .ims-cartable-tabs.nav.tab-style-1 .nav-item {
+        margin-inline-end: 0;
+    }
+
+    .ims-cartable-tabs.nav.tab-style-1 .nav-link {
+        display: inline-flex;
+        align-items: center;
+        padding: .5rem 1.125rem;
+        font-size: .875rem;
+    }
+
+.ims-cartable-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem 1.5rem;
+    margin-bottom: 1rem;
+    padding: .625rem 1rem;
+    border: 1px solid var(--default-border);
+    border-radius: .5rem;
+    background: rgb(var(--light-rgb));
+    font-size: .85rem;
+}
+
+    .ims-cartable-info .info-item {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+/* ---------- جدول‌ها داخل کارت (بدون فاصله‌ی اضافه‌ی زیر جدول) ---------- */
+.card-body > .table-responsive {
+    padding-bottom: 0;
+}
+
+.ims-table thead th {
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.ims-table tbody td {
+    vertical-align: middle;
+}
+
+.ims-table .btn-icon.btn-sm {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* ---------- صفحه‌ی مدیریت کاربران (DataTables) ---------- */
+.ims-users-search {
+    width: 16rem;
+    max-width: 100%;
+}
+
+.card-body .dataTables_wrapper .dataTables_length {
+    margin-bottom: 1rem;
+}
+
+.card-body .dataTables_wrapper .dataTables_length select {
+    display: inline-block;
+    width: auto;
+    margin-inline: .375rem;
+}
+
+.ims-dt-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+    .ims-dt-footer .dataTables_paginate {
+        margin-top: 0;
+    }
+
+    .ims-dt-footer .pagination {
+        margin-bottom: 0;
+    }
+
+table.dataTable thead .sorting,
+table.dataTable thead .sorting_asc,
+table.dataTable thead .sorting_desc {
+    cursor: pointer;
+}
+
+/* فلش‌های مرتب‌سازی DataTables (CSS رسمی دیتاتیبل در لایوت لود نمی‌شود) */
+table.dataTable thead > tr > th.sorting,
+table.dataTable thead > tr > th.sorting_asc,
+table.dataTable thead > tr > th.sorting_desc {
+    background-repeat: no-repeat;
+    background-position: left .75rem center;
+    padding-inline-start: 1.75rem;
+}
+
+table.dataTable thead > tr > th.sorting { background-image: url("../assets/plugins/datatable/images/sort_both.png"); }
+table.dataTable thead > tr > th.sorting_asc { background-image: url("../assets/plugins/datatable/images/sort_asc.png"); }
+table.dataTable thead > tr > th.sorting_desc { background-image: url("../assets/plugins/datatable/images/sort_desc.png"); }
+
+.ims-dt-top {
+    margin-bottom: 1rem;
+}
+
+    .ims-dt-top .dataTables_length label {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        margin: 0;
+        font-size: .8125rem;
+        color: var(--text-muted);
+    }
+
+/* چک‌باکس «متن سند بررسی شد» — واضح و قابل دیدن */
+.ims-doc-check {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem .875rem;
+    border: 1px solid var(--default-border);
+    border-radius: .5rem;
+    background: rgb(var(--light-rgb));
+}
+
+    .ims-doc-check .form-check-input {
+        float: none;
+        margin: 0;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid var(--primary-color);
+        cursor: pointer;
+    }
+
+    .ims-doc-check .form-check-label {
+        cursor: pointer;
+    }
+
+.ims-dt-search .dataTables_filter {
+    text-align: start;
+}
+
+    .ims-dt-search .dataTables_filter label {
+        display: inline-flex;
+        align-items: center;
+        margin: 0;
+    }
+
+    .ims-dt-search .dataTables_filter input {
+        width: 16rem;
+        margin: 0;
+    }
+
+/* ---------- تب‌ها هم‌ردیف دکمه‌ها؛ badge درشت‌تر در جدول‌ها ---------- */
+.ims-cartable-header .ims-cartable-tabs.nav.tab-style-1 {
+    margin-block-end: 0;
+}
+
+.ims-table .badge {
+    font-size: .8125rem;
+    font-weight: 500;
+    padding: .4rem .7rem;
+}

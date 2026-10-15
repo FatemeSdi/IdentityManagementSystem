@@ -49,51 +49,30 @@
     }
 }
 
-<!-- کارد اطلاعات کارتابل: اسم کارتابل + شرکت(های) مربوط به کاربر جاری -->
-@if (currentTypeInfo != null)
-{
-    <div class="card custom-card mb-3">
-        <div class="card-body d-flex flex-wrap align-items-center gap-4 py-3">
-            <div class="d-flex align-items-center gap-2">
-                <span class="avatar avatar-md avatar-rounded bg-primary-transparent">
-                    <i class="ti @(isEval ? "ti-calendar-check" : "ti-building-warehouse") fs-18"></i>
-                </span>
-                <div>
-                    <div class="text-muted fs-12">کارتابل</div>
-                    <div class="fw-semibold">@(currentTypeInfo.CartableName ?? currentTypeInfo.Name)</div>
-                </div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="avatar avatar-md avatar-rounded bg-info-transparent">
-                    <i class="ti ti-building fs-18"></i>
-                </span>
-                <div>
-                    <div class="text-muted fs-12">شرکت</div>
-                    <div class="fw-semibold">
-                        @if (currentTypeInfo.Companies.Count == 0)
-                        {
-                            <span>—</span>
-                        }
-                        else
-                        {
-                            @string.Join("، ", currentTypeInfo.Companies)
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- سربرگ صفحه -->
-<div class="ims-page-header">
-    <div>
-        <h1 class="page-title">کارتابل درخواست‌ها</h1>
-    </div>
+<!-- سربرگ صفحه: تب‌ها و دکمه‌های عملیات هم‌ردیف -->
+<div class="ims-page-header ims-cartable-header">
+    @if (requestTypes.Count > 1)
+    {
+        <ul class="nav nav-pills tab-style-1 ims-cartable-tabs mb-0" role="tablist">
+            @foreach (var t in requestTypes)
+            {
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link @(t.Code == currentRequestType ? "active" : "")"
+                       href="@Url.Action("Index", new { requestType = t.Code })">
+                        <i class="ti @(t.Code == IdentityManagementSystem.UI.Controllers.RequestTypeCodes.EvaluationAppointment ? "ti-calendar-check" : "ti-building-warehouse") me-1"></i>@t.Name
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <div></div>
+    }
     <div class="d-flex gap-2">
-        @if (isAdmin)
+        @if (isEval && isAdmin)
         {
-            <a asp-controller="EvalAppointment" asp-action="Slots" class="btn btn-outline-primary btn-wave">
+            <a asp-controller="EvalAppointment" asp-action="Slots" class="btn btn-primary btn-wave">
                 <i class="ti ti-calendar-cog me-1"></i> مدیریت نوبت‌های ارزیابی
             </a>
         }
@@ -106,19 +85,34 @@
     </div>
 </div>
 
-@if (requestTypes.Count > 1)
+<!-- اطلاعات کارتابل: اسم کارتابل + شرکت(های) مربوط به کاربر جاری -->
+@if (currentTypeInfo != null)
 {
-    <ul class="nav nav-tabs mb-3" role="tablist">
-        @foreach (var t in requestTypes)
-        {
-            <li class="nav-item" role="presentation">
-                <a class="nav-link @(t.Code == currentRequestType ? "active" : "")"
-                   href="@Url.Action("Index", new { requestType = t.Code })">
-                    <i class="ti @(t.Code == IdentityManagementSystem.UI.Controllers.RequestTypeCodes.EvaluationAppointment ? "ti-calendar-check" : "ti-building-warehouse") me-1"></i>@t.Name
-                </a>
-            </li>
-        }
-    </ul>
+    <div class="ims-cartable-info">
+        <div class="info-item">
+            <span class="avatar avatar-sm avatar-rounded bg-primary-transparent">
+                <i class="ti @(isEval ? "ti-calendar-check" : "ti-building-warehouse")"></i>
+            </span>
+            <span class="text-muted">کارتابل:</span>
+            <span class="fw-semibold">@(currentTypeInfo.CartableName ?? currentTypeInfo.Name)</span>
+        </div>
+        <div class="info-item">
+            <span class="avatar avatar-sm avatar-rounded bg-info-transparent">
+                <i class="ti ti-building"></i>
+            </span>
+            <span class="text-muted">شرکت:</span>
+            <span class="fw-semibold">
+                @if (currentTypeInfo.Companies.Count == 0)
+                {
+                    <span>—</span>
+                }
+                else
+                {
+                    @string.Join("، ", currentTypeInfo.Companies)
+                }
+            </span>
+        </div>
+    </div>
 }
 
 <!-- ==================== جستجو و فیلتر ==================== -->
@@ -537,9 +531,9 @@
             </div>
             <div class="modal-body" id="documentModalBody"></div>
             <div class="modal-footer justify-content-between">
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" role="switch" id="documentChecked">
-                    <label class="form-check-label" for="documentChecked">متن سند بررسی شد</label>
+                <div class="form-check ims-doc-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="documentChecked">
+                    <label class="form-check-label fw-medium" for="documentChecked">متن سند بررسی شد</label>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">بستن</button>
@@ -757,8 +751,32 @@
 </div>
 
 @section Scripts {
+    <script src="~/assets/plugins/datatable/datatables.min.js"></script>
     <script>
         $(function () {
+            // دیتاتیبل جدول‌های کارتابل (صفحه‌بندی سمت سرور حفظ می‌شود؛ مرتب‌سازی/جستجو روی ردیف‌های همین صفحه)
+            (function initCartableTables() {
+                var dtLang = {
+                    search: '', searchPlaceholder: 'جستجو در این صفحه...',
+                    zeroRecords: 'موردی یافت نشد.', emptyTable: 'موردی یافت نشد.',
+                    info: '', infoEmpty: '', infoFiltered: ''
+                };
+                var cfgs = [
+                    { sel: '#cartableTable', noSort: [8, 9, 10, 11, 12, 13, 14, 15, 16] },
+                    { sel: '#evalTable', noSort: [2, 4, 5, 6] }
+                ];
+                cfgs.forEach(function (c) {
+                    var $t = $(c.sel);
+                    if (!$t.length || !$t.find('tbody tr[data-request-id]').length) return;
+                    $t.DataTable({
+                        paging: false, info: false, order: [],
+                        columnDefs: [{ orderable: false, targets: c.noSort }],
+                        dom: "<'ims-dt-top ims-dt-search'f>t",
+                        language: dtLang
+                    });
+                });
+            })();
+
             @if (ViewBag.ErrorMessage != null)
             {
                 <text>imsToast('error', @Json.Serialize((string)ViewBag.ErrorMessage));</text>
