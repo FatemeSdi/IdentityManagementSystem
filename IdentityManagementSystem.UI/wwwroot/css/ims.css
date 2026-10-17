@@ -603,3 +603,35 @@ table.dataTable thead > tr > th.sorting_desc { background-image: url("../assets/
     font-weight: 500;
     padding: .4rem .7rem;
 }
+
+/* جدول نوبت‌دهی ارزیابی: همه‌ی ستون‌ها (هدر و داده) راست‌چین */
+#evalTable thead th,
+#evalTable tbody td,
+#evalTable tbody td.text-center,
+#evalTable tbody td.dir-ltr {
+    text-align: right !important;
+    vertical-align: middle;
+}
+
+/* روزهای هفته در ساخت نوبت: وضعیت انتخاب بلافاصله بعد از کلیک دیده شود (بدون نیاز به کلیک بیرون) */
+.btn-check + .btn.btn-outline-primary {
+    background-color: transparent;
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    transition: background-color .15s, color .15s;
+}
+
+.btn-check:checked + .btn.btn-outline-primary,
+.btn-check:checked:focus + .btn.btn-outline-primary,
+.btn-check:active + .btn.btn-outline-primary,
+.btn-check + .btn.btn-outline-primary:active {
+    background-color: var(--primary-color) !important;
+    color: #fff !important;
+    border-color: var(--primary-color) !important;
+}
+
+.btn-check:not(:checked):focus + .btn.btn-outline-primary,
+.btn-check:not(:checked) + .btn.btn-outline-primary:active {
+    background-color: transparent !important;
+    color: var(--primary-color) !important;
+}
