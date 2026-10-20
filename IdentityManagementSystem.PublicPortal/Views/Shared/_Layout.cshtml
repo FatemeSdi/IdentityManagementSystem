@@ -28,6 +28,39 @@
             margin-top: auto;
         }
 
+        /* فوتر: هر بخش (نام اداره، طراحی و توسعه، حقوق، تماس با ما) یک تکه‌ی نشکن است تا وسط عبارت
+           (مثلاً «تماس با / ما») به خط بعد نره؛ اگه جا کم باشه کل بخش‌ها مرتب و وسط‌چین می‌شکنن. */
+        .portal-footer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: .25rem .5rem;
+            line-height: 1.6;
+        }
+
+        .portal-footer-item {
+            white-space: nowrap;
+        }
+
+        .portal-footer-contact {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+        }
+
+        /* زیر ۹۰۰px ممکنه یک خط جا نشه؛ به‌جای شکستن از وسط (و جا موندن جداکننده ته خط)، بخش‌ها زیر هم و وسط‌چین می‌شن */
+        @@media (max-width: 899.98px) {
+            .portal-footer {
+                flex-direction: column;
+                gap: .125rem;
+            }
+
+            .portal-footer-sep {
+                display: none;
+            }
+        }
+
         .small, small {
             font-size: 0.8125rem;
         }
@@ -71,18 +104,22 @@
     @RenderBody()
 
     <footer class="footer mt-auto py-3 bg-white text-center">
-        <div class="container">
-            <span class="text-muted">
+        <div class="container-fluid portal-footer text-muted">
+            <span class="portal-footer-item">
                 <span id="year"></span>
                 <a class="text-dark fw-medium" href="javascript:void(0);">اداره کل بنادر و دریانوردی هرمزگان</a>
-                — طراحی و توسعه توسط
-                <a href="javascript:void(0);"><span class="fw-medium text-primary">تیم فناوری اطلاعات</span></a>
-                — تمام حقوق محفوظ است
-                <span class="mx-2">|</span>
-                <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="text-muted">
-                    <i class="ri-phone-line me-1"></i>تماس با ما
-                </a>
             </span>
+            <span class="portal-footer-sep">—</span>
+            <span class="portal-footer-item">
+                طراحی و توسعه توسط
+                <a href="javascript:void(0);"><span class="fw-medium text-primary">تیم فناوری اطلاعات</span></a>
+            </span>
+            <span class="portal-footer-sep">—</span>
+            <span class="portal-footer-item">تمام حقوق محفوظ است</span>
+            <span class="portal-footer-sep">|</span>
+            <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal" class="portal-footer-item portal-footer-contact text-muted">
+                <i class="ri-phone-line"></i>تماس با ما
+            </a>
         </div>
     </footer>
 

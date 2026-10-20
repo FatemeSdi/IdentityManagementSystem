@@ -1,3 +1,4 @@
+using IdentityManagementSystem.Shared.Configuration;
 ﻿using DNTCaptcha.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -5,6 +6,10 @@ using IdentityManagementSystem.UI.Filters;
 using IdentityManagementSystem.Shared.Http;
 
 var builder = WebApplication.CreateBuilder(args);
+// ApiKey و رمز حساب سرویس پورتال از appsettings.Secrets.json (خارج از گیت) خونده می‌شن
+IdentityManagementSystem.Shared.Configuration.SecretsConfigurationExtensions.AddSecretsFile(builder.Configuration);
+// اگه appsettings*.json موقع اجرا خراب ذخیره بشه، همه‌ی درخواست‌ها تا اصلاحش با 503 رد می‌شن (نه اینکه با تنظیمات خالی ادامه بده)
+IdentityManagementSystem.Shared.Configuration.ConfigurationGuardExtensions.AddConfigurationGuard(builder);
 
 var portEnv = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(portEnv))
@@ -45,6 +50,8 @@ var apiKey = builder.Configuration["ApiSettings:ApiKey"];
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<ClientContextForwardingHandler>();
+// اگه ApiSettings:Gateway:Enabled روشن باشه، درخواست‌ها به‌جای مسیر مستقیم از هندلرهای gateway (auth/ehraz/service) رد می‌شن
+builder.Services.AddTransient<IdentityManagementSystem.Shared.Gateway.ApiGatewayRoutingHandler>();
 
 builder.Services.AddHttpClient("PomixApi", client =>
 {
@@ -60,12 +67,15 @@ builder.Services.AddHttpClient("PomixApi", client =>
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
     };
 })
-.AddHttpMessageHandler<ClientContextForwardingHandler>();
+.AddHttpMessageHandler<ClientContextForwardingHandler>()
+.AddHttpMessageHandler<IdentityManagementSystem.Shared.Gateway.ApiGatewayRoutingHandler>();
 
 builder.Services.AddHttpClient("PomixApiPublic", client =>
 {
     client.BaseAddress = new Uri($"{apiUrl}/api/");
     client.DefaultRequestHeaders.Add("Accept", "application/json");
+    // API همه‌ی /api/* رو بدون X-API-Key معتبر رد می‌کنه
+    client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
 })
 .ConfigurePrimaryHttpMessageHandler(() =>
 {
@@ -75,7 +85,8 @@ builder.Services.AddHttpClient("PomixApiPublic", client =>
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
     };
 })
-.AddHttpMessageHandler<ClientContextForwardingHandler>();
+.AddHttpMessageHandler<ClientContextForwardingHandler>()
+.AddHttpMessageHandler<IdentityManagementSystem.Shared.Gateway.ApiGatewayRoutingHandler>();
 
 // ================= Captcha =================
 builder.Services.AddDNTCaptcha(options =>
@@ -107,6 +118,9 @@ builder.Services.AddControllersWithViews(options =>
 
 // ================= Build =================
 var app = builder.Build();
+
+// باید اولین middleware باشه — جلوی اجرای درخواست با تنظیمات خالی/خراب رو می‌گیره
+app.UseConfigurationGuard();
 
 // ================= Pipeline =================
 if (!app.Environment.IsDevelopment())

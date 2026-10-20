@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Secrets (کلیدها و رمزها) — نمونه‌ی ساختار در appsettings.Secrets.example.json
+appsettings.Secrets.json
