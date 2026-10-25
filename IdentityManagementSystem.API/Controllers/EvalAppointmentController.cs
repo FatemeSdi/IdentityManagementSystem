@@ -388,7 +388,7 @@ namespace IdentityManagementSystem.API.Controllers
             bool smsSent = false;
             if (!string.IsNullOrWhiteSpace(mobile))
             {
-                var smsText = $"کاربر گرامی، نوبت ارزیابی شما در محوطه شرکت {request.Company?.CompanyName} روز {text} تعیین شد. لطفاً به‌موقع در محل حاضر باشید.\nکد پیگیری: {request.TrackingCode}\nاداره کل بنادر و دریانوردی استان هرمزگان";
+                var smsText = $"کاربر گرامی، نوبت ارزیابی شما در محوطه شرکت {request.Company?.CompanyName} روز {text} تعیین شد.\nکد پیگیری: {request.TrackingCode}\nاداره کل بنادر و دریانوردی استان هرمزگان";
                 smsSent = await SendAndLogSmsAsync(mobile, smsText, request.RequestId, userId);
             }
             else

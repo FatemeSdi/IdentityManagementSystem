@@ -15,12 +15,15 @@ namespace IdentityManagementSystem.UI.Controllers
     {
         private readonly IDNTCaptchaValidatorService _captchaValidatorService;
         private readonly HttpClient _client;
+        private readonly ILogger<HomeController> _logger;
 
         public HomeController(
             IHttpClientFactory httpClientFactory,
-            IDNTCaptchaValidatorService captchaValidatorService)
+            IDNTCaptchaValidatorService captchaValidatorService,
+            ILogger<HomeController> logger)
         {
             _client = httpClientFactory.CreateClient("PomixApi");
+            _logger = logger;
             _captchaValidatorService = captchaValidatorService ?? throw new ArgumentNullException(nameof(captchaValidatorService));
         }
 
@@ -71,7 +74,17 @@ namespace IdentityManagementSystem.UI.Controllers
                 }
                 else
                 {
-                    return Json(new { success = false, message = "نام کاربری یا رمز عبور اشتباه است." });
+                    // هر خطای غیر از 401 خودِ لاگین (کلید API، آدرس اشتباه، خطای دیتابیس و ...) رو با status واقعی نشون بده
+                    var apiError = await response.Content.ReadAsStringAsync();
+                    var isWrongCredentials = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                        && apiError.Contains("نام کاربری یا رمز عبور");
+                    if (isWrongCredentials)
+                        return Json(new { success = false, message = "نام کاربری یا رمز عبور اشتباه است." });
+
+                    // جزئیات فقط تو لاگ سرور؛ به مرورگر فقط کد وضعیت می‌ره
+                    _logger.LogError("Login API call failed: {Status} {Uri} {Body}",
+                        (int)response.StatusCode, response.RequestMessage?.RequestUri, apiError);
+                    return Json(new { success = false, message = $"خطا در ارتباط با سرور (کد {(int)response.StatusCode})" });
                 }
             }
             catch (Exception ex)
