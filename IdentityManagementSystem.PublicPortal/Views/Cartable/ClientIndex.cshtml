@@ -738,7 +738,13 @@
                 clearInterval(otpTimerInterval);
                 $('#otpTimer').hide();
                 $('#termsNotice').show();
-                if (companyChoices) companyChoices.setChoiceByValue('');
+                // Choices.js موقع reset فرم لیست رو به state خالیِ لحظه‌ی init برمی‌گردونه و همه‌ی شرکت‌ها پاک می‌شن
+                // (مثلاً وقتی نوع درخواست عوض می‌شه). پس destroy می‌کنیم — option های اصلی select برمی‌گردن و
+                // listener ریستِ خودش هم قبل از اجرا حذف می‌شه — و تو مرحله‌ی ۲ دوباره init می‌شه.
+                if (companyChoices) {
+                    companyChoices.destroy();
+                    companyChoices = null;
+                }
                 showWizardStep(1);
             });
 

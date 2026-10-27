@@ -8,6 +8,12 @@
       "port": 5169
     },
     {
+      "name": "API",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "IdentityManagementSystem.API", "--launch-profile", "http"],
+      "port": 5066
+    },
+    {
       "name": "UI",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "IdentityManagementSystem.UI", "--urls", "http://localhost:5031"],
