@@ -6,8 +6,8 @@ namespace IdentityManagementSystem.API.Gateway
 {
     /// <summary>
     /// Swagger فقط سه هندلر (auth-handler / ehraz-handler / service-handler) رو نشون می‌ده، نه مسیرهای مستقیم کنترلرها.
-    /// هر هندلر فقط یک operation با POST داره (همه‌ی سرویس‌های GET/PUT/DELETE/POST پشتش هستن) که پارامتر action، پارامترهای query سرویس‌ها
-    /// و نام مدل body هر سرویس رو (از همون مستند اصلی) داره، پس "Try it out" مستقیم از هندلر رد می‌شه.
+    /// هر هندلر فقط یک operation با POST و body ثابت (ApiGatewayEnvelope) داره (همه‌ی سرویس‌های GET/PUT/DELETE/POST پشتش هستن)؛
+    /// توضیحاتش فهرست سرویس‌ها با متد، پارامترهای query و نام مدل body هر کدوم رو داره، پس "Try it out" مستقیم از هندلر رد می‌شه.
     /// </summary>
     public class GatewayHandlersDocumentFilter : IDocumentFilter
     {
@@ -44,70 +44,95 @@ namespace IdentityManagementSystem.API.Gateway
             var actionList = string.Join("\n", actions.Select(a =>
             {
                 var body = GetBodySchemaName(a.Operation);
+                var queryNames = (a.Operation.Parameters ?? new List<OpenApiParameter>())
+                    .Where(p => p.In == ParameterLocation.Query)
+                    .Select(p => $"`{p.Name}`")
+                    .ToList();
                 var summary = string.IsNullOrWhiteSpace(a.Operation.Summary) ? "" : $" — {a.Operation.Summary}";
-                return $"- `{a.Action}` — متد اصلی: {a.Method.ToString().ToUpperInvariant()}{(body != null ? $" (body: `{body}`)" : "")}{summary}";
+                return $"- `{a.Action}` — method: {a.Method.ToString().ToUpperInvariant()}"
+                    + (queryNames.Count > 0 ? $" (query: {string.Join("، ", queryNames)})" : "")
+                    + (body != null ? $" (body: `{body}`)" : "")
+                    + summary;
             }));
 
+            // قرارداد ثابت هندلر: فقط POST با یک body JSON (ApiGatewayEnvelope)؛ بدون پارامتر query و هدر سفارشی
+            var first = actions[0];
             var operation = new OpenApiOperation
             {
                 Tags = new List<OpenApiTag> { new OpenApiTag { Name = handler } },
                 OperationId = handler,
-                Summary = $"POST /api/{handler}?action=...",
-                Description = "همه‌ی سرویس‌ها با POST صدا زده می‌شن؛ API متد اصلی هر سرویس رو خودش اعمال می‌کنه. "
+                Summary = $"POST /api/{handler}",
+                Description = "همه‌ی سرویس‌ها با POST و یک body ثابت صدا زده می‌شن: سرویس مقصد در `action`، متد اصلی در `method`، "
+                    + "پارامترهای query سرویس در `query` و بدنه‌ی خود سرویس در `body`. "
                     + "بخش‌های `{...}` رو با مقدار واقعی جایگزین کنید، مثلاً `Auth/UpdateUser/12`:\n\n" + actionList,
-                Parameters = new List<OpenApiParameter>
+                Parameters = new List<OpenApiParameter>(),
+                RequestBody = new OpenApiRequestBody
                 {
-                    new OpenApiParameter
+                    Required = true,
+                    Content = new Dictionary<string, OpenApiMediaType>
                     {
-                        Name = ApiGatewayRoutes.ActionParameter,
-                        In = ParameterLocation.Query,
-                        Required = true,
-                        Description = "مسیر سرویس مقصد (همون مسیر قبلی بعد از /api/)",
-                        Schema = new OpenApiSchema { Type = "string" },
-                        Example = new Microsoft.OpenApi.Any.OpenApiString(actions[0].Action)
+                        [ApiGatewayEnvelope.ContentType] = new OpenApiMediaType
+                        {
+                            Schema = EnvelopeSchema(),
+                            Example = new Microsoft.OpenApi.Any.OpenApiObject
+                            {
+                                [ApiGatewayEnvelope.ActionField] = new Microsoft.OpenApi.Any.OpenApiString(first.Action),
+                                [ApiGatewayEnvelope.MethodField] = new Microsoft.OpenApi.Any.OpenApiString(first.Method.ToString().ToUpperInvariant()),
+                                [ApiGatewayEnvelope.QueryField] = new Microsoft.OpenApi.Any.OpenApiObject(),
+                                [ApiGatewayEnvelope.BodyField] = first.Operation.RequestBody != null
+                                    ? new Microsoft.OpenApi.Any.OpenApiObject()
+                                    : new Microsoft.OpenApi.Any.OpenApiNull()
+                            }
+                        }
                     }
                 },
                 Responses = new OpenApiResponses
                 {
                     ["200"] = new OpenApiResponse { Description = "پاسخ سرویس مقصد" },
+                    ["400"] = new OpenApiResponse { Description = "body هندلر نامعتبر، یا method با تعریف سرویس جور نیست" },
                     ["401"] = new OpenApiResponse { Description = "توکن نامعتبر یا ارسال نشده" },
                     ["404"] = new OpenApiResponse { Description = "سرویس پشت این هندلر تعریف نشده" }
                 }
             };
 
-            // پارامترهای query سرویس‌ها (مثل trackingCode یا page) — همه اختیاری، چون هر کدوم مال یک سرویس خاصه
-            foreach (var group in actions
-                .SelectMany(a => (a.Operation.Parameters ?? new List<OpenApiParameter>())
-                    .Where(p => p.In == ParameterLocation.Query)
-                    .Select(p => (a.Action, Parameter: p)))
-                .GroupBy(p => p.Parameter.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                var first = group.First().Parameter;
-                operation.Parameters.Add(new OpenApiParameter
-                {
-                    Name = first.Name,
-                    In = ParameterLocation.Query,
-                    Required = false,
-                    Schema = first.Schema,
-                    Description = "مخصوص: " + string.Join("، ", group.Select(p => p.Action).Distinct())
-                });
-            }
-
-            if (actions.Any(a => a.Operation.RequestBody != null))
-            {
-                operation.RequestBody = new OpenApiRequestBody
-                {
-                    Required = false,
-                    Description = "بدنه‌ی JSON همون سرویسی که در action انتخاب شده (مدل هر سرویس در توضیحات بالا آمده)",
-                    Content = new Dictionary<string, OpenApiMediaType>
-                    {
-                        ["application/json"] = new OpenApiMediaType { Schema = new OpenApiSchema { Type = "object" } }
-                    }
-                };
-            }
-
             return operation;
         }
+
+        private static OpenApiSchema EnvelopeSchema() => new()
+        {
+            Type = "object",
+            Required = new HashSet<string> { ApiGatewayEnvelope.ActionField },
+            Properties = new Dictionary<string, OpenApiSchema>
+            {
+                [ApiGatewayEnvelope.ActionField] = new() { Type = "string", Description = "مسیر سرویس مقصد (همون مسیر قبلی بعد از /api/)" },
+                [ApiGatewayEnvelope.MethodField] = new()
+                {
+                    Type = "string",
+                    Nullable = true,
+                    Description = "متد اصلی سرویس؛ اگه نیاد API از تعریف سرویس پیدا می‌کنه",
+                    Enum = new List<Microsoft.OpenApi.Any.IOpenApiAny>
+                    {
+                        new Microsoft.OpenApi.Any.OpenApiString("GET"),
+                        new Microsoft.OpenApi.Any.OpenApiString("POST"),
+                        new Microsoft.OpenApi.Any.OpenApiString("PUT"),
+                        new Microsoft.OpenApi.Any.OpenApiString("DELETE")
+                    }
+                },
+                [ApiGatewayEnvelope.QueryField] = new()
+                {
+                    Type = "object",
+                    Nullable = true,
+                    Description = "پارامترهای query سرویس (فهرست هر سرویس در توضیحات بالا)؛ مقدار: رشته، عدد، بولین یا آرایه",
+                    AdditionalPropertiesAllowed = true
+                },
+                [ApiGatewayEnvelope.BodyField] = new()
+                {
+                    Type = "object",
+                    Nullable = true,
+                    Description = "بدنه‌ی JSON خود سرویس (مدل هر سرویس در توضیحات بالا)"
+                }
+            }
+        };
 
         private static string? GetBodySchemaName(OpenApiOperation operation)
         {

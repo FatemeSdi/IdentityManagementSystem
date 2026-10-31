@@ -8,34 +8,53 @@
 | ehraz-handler | `https://{host}:5066/api/ehraz-handler` | `Request/*`، `Cartables/*`، `Company`، `Reports/*`، `EvalAppointment/*` |
 | service-handler | `https://{host}:5066/api/service-handler` | `Service/*` (شاهکار، پیامک، متن سند، قبض انبار، ...) |
 
-> هر سه آدرس **فقط متد `POST`** دارند. Gateway سازمان فقط باید `POST` را عبور دهد، query string را نگه دارد و
-> هدرهای `Authorization`، `Content-Type`، `X-API-Key` و `X-Forwarded-For` را حذف نکند.
+> هر سه آدرس **فقط متد `POST`** با یک **body ثابت JSON** دارند؛ هیچ پارامتر query و هیچ هدر سفارشی لازم نیست.
+> Gateway سازمان فقط باید body را دست‌نخورده عبور دهد و هدرهای `Authorization`، `Content-Type`، `X-API-Key` و `X-Forwarded-For` را حذف نکند.
 
 ## نحوه‌ی فراخوانی
 
-همه‌ی سرویس‌ها (چه قبلاً GET بوده‌اند، چه PUT یا DELETE) با **POST** به هندلر فرستاده می‌شوند. سرویس مقصد با پارامتر
-`action` (یا هدر `X-Gateway-Action`) مشخص می‌شود؛ مقدار آن همان مسیر قبلی بعد از `/api/` است. API متد اصلی
-هر سرویس را از تعریف آن پیدا می‌کند و خودش اعمال می‌کند. بدنه، توکن و بقیه‌ی پارامترهای query مثل قبل فرستاده می‌شوند.
+همه‌ی سرویس‌ها (چه قبلاً GET بوده‌اند، چه PUT یا DELETE) با **POST** به هندلر فرستاده می‌شوند و همه‌ی مشخصات درخواست اصلی داخل body می‌آید:
 
-| قبل | بعد |
-|---|---|
-| `POST /api/Auth/login` | `POST /api/auth-handler?action=Auth/login` |
-| `PUT /api/Auth/UpdateUser/12` | `POST /api/auth-handler?action=Auth/UpdateUser/12` |
-| `GET /api/Request/Track?trackingCode=X&mobileNumber=Y` | `POST /api/ehraz-handler?action=Request/Track&trackingCode=X&mobileNumber=Y` |
-| `GET /api/Service/GetTextByRequestId/101` | `POST /api/service-handler?action=Service/GetTextByRequestId/101` |
-
-```bash
-curl -X POST "https://{host}:5066/api/auth-handler?action=Auth/login" -H "Content-Type: application/json" -H "X-API-Key: ..." -d '{"username":"...","password":"..."}'
+```json
+{
+  "action": "Request/Track",
+  "method": "GET",
+  "query":  { "trackingCode": "X", "mobileNumber": "Y" },
+  "body":   null
+}
 ```
 
-فراخوانی هر هندلر **بدون** `action` فهرست سرویس‌های پشت آن را (با متد اصلی هر کدام) برمی‌گرداند — برای تست اتصال مناسب است.
+| فیلد | الزامی | توضیح |
+|---|---|---|
+| `action` | * | مسیر سرویس مقصد، همان مسیر قبلی بعد از `/api/` (مثلاً `Auth/UpdateUser/12`) |
+| `method` | | متد اصلی سرویس (`GET`/`POST`/`PUT`/`DELETE`)؛ اگر نیاید API از تعریف سرویس پیدا می‌کند |
+| `query` | | پارامترهای query سرویس؛ مقدار هر کلید رشته، عدد، بولین یا آرایه |
+| `body` | | بدنه‌ی JSON خود سرویس (همان مدل قبلی) |
+
+| قبل | body ارسالی به هندلر |
+|---|---|
+| `POST /api/Auth/login` | `POST /api/auth-handler` ← `{"action":"Auth/login","method":"POST","body":{"username":"...","password":"..."}}` |
+| `PUT /api/Auth/UpdateUser/12` | `POST /api/auth-handler` ← `{"action":"Auth/UpdateUser/12","method":"PUT","body":{...}}` |
+| `GET /api/Request/Track?trackingCode=X&mobileNumber=Y` | `POST /api/ehraz-handler` ← `{"action":"Request/Track","method":"GET","query":{"trackingCode":"X","mobileNumber":"Y"}}` |
+| `GET /api/Service/GetTextByRequestId/101` | `POST /api/service-handler` ← `{"action":"Service/GetTextByRequestId/101","method":"GET"}` |
+
+```bash
+curl -X POST "https://{host}:5066/api/auth-handler" -H "Content-Type: application/json" -H "X-API-Key: ..." -d '{"action":"Auth/login","method":"POST","body":{"username":"...","password":"..."}}'
+```
+
+API قبل از اجرا، درخواست را به همان `{method} /api/{action}?{query}` با `body` اصلی برمی‌گرداند؛ پس احراز هویت و دسترسی همان سرویس مقصد اعمال می‌شود.
+UI و PublicPortal این body را خودکار می‌سازند و کد کنترلرها تغییری نکرده است.
+
+- body بدون `action` یا JSON نامعتبر ← `400`؛ `method` که با تعریف سرویس جور نباشد ← `400` (همراه فهرست متدهای مجاز).
+- فراخوانی هر هندلر **بدون body** فهرست سرویس‌های پشت آن را (با متد اصلی هر کدام) برمی‌گرداند — برای تست اتصال مناسب است.
+- شکل قدیمی (`?action=...` در query با body خام و هدر `X-HTTP-Method-Override`) برای سازگاری هنوز پذیرفته می‌شود، ولی پشت Pomix استفاده نکنید.
 
 ## حالت‌های ارتباط (Pomix / DirectGateway / DirectApi)
 
 | حالت | مسیر | کاربرد |
 |---|---|---|
-| `Pomix` | `POST {PomixUrls:<handler>}?action=...` از طریق Gateway سازمان | حالت عادی روی سرور |
-| `DirectGateway` | `POST {URL}/api/<handler>?action=...` مستقیم به سرور API | تست، یا وقتی Gateway سازمان مشکل دارد |
+| `Pomix` | `POST {PomixUrls:<handler>}` با body بالا، از طریق Gateway سازمان | حالت عادی روی سرور |
+| `DirectGateway` | `POST {URL}/api/<handler>` با همان body، مستقیم به سرور API | تست، یا وقتی Gateway سازمان مشکل دارد |
 | `DirectApi` | `{URL}/api/Auth/login` و ... (همه‌ی اندپوینت‌ها) | فقط عیب‌یابی در شبکه‌ی داخلی |
 
 **سمت UI و PublicPortal** (`appsettings.json`) فقط `Mode` را عوض کنید؛ آدرس هر سه حالت از قبل در کانفیگ است:

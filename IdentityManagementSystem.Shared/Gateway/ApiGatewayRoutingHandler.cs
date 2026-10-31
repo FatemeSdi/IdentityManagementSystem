@@ -5,9 +5,10 @@ namespace IdentityManagementSystem.Shared.Gateway
     /// <summary>
     /// هر درخواست خروجی UI/PublicPortal به API (مثلاً api/Auth/login) رو بر اساس ApiSettings:Mode مسیردهی می‌کنه،
     /// بدون اینکه کد کنترلرها عوض بشه:
-    ///   Pomix         → POST {PomixUrls:auth-handler}?action=Auth/login
-    ///   DirectGateway → POST {URL}/api/auth-handler?action=Auth/login
+    ///   Pomix         → POST {PomixUrls:auth-handler}     با body: {"action":"Auth/login","method":"POST","query":{},"body":{...}}
+    ///   DirectGateway → POST {URL}/api/auth-handler       با همون body
     ///   DirectApi     → همون درخواست اصلی به {URL}/api/Auth/login
+    /// (ساختار body در ApiGatewayEnvelope)
     ///
     /// تنظیمات (بخش ApiSettings):
     ///   Mode       — Pomix | DirectGateway | DirectApi (نبودنش = DirectApi، رفتار قبلی)
@@ -25,19 +26,19 @@ namespace IdentityManagementSystem.Shared.Gateway
             _configuration = configuration;
         }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (request.RequestUri != null)
             {
                 var settings = _configuration.GetSection("ApiSettings");
                 var mode = ApiGatewayModes.Parse(settings["Mode"], ApiGatewayMode.DirectApi);
-                Route(request, settings, mode);
+                await Route(request, settings, mode, cancellationToken);
             }
 
-            return base.SendAsync(request, cancellationToken);
+            return await base.SendAsync(request, cancellationToken);
         }
 
-        private static void Route(HttpRequestMessage request, IConfigurationSection settings, ApiGatewayMode mode)
+        private static async Task Route(HttpRequestMessage request, IConfigurationSection settings, ApiGatewayMode mode, CancellationToken cancellationToken)
         {
             var uri = request.RequestUri!;
             var path = uri.AbsolutePath;
@@ -76,22 +77,24 @@ namespace IdentityManagementSystem.Shared.Gateway
                     : new UriBuilder($"{directUrl}{ApiSegment}{handler}");
             }
 
-            // action اول، بعد query string خودِ آدرس هندلر (اگه داشت) و query اصلی درخواست
-            var queryParts = new List<string> { $"{ApiGatewayRoutes.ActionParameter}={Uri.EscapeDataString(action)}" };
-            if (target.Query.Length > 1) queryParts.Add(target.Query.TrimStart('?'));
-            if (uri.Query.Length > 1) queryParts.Add(uri.Query.TrimStart('?'));
-            target.Query = string.Join("&", queryParts);
+            // action، متد و query اصلی همه توی body (envelope) می‌رن، نه query string یا هدر — Pomix فقط body رو
+            // دست‌نخورده عبور می‌ده. query string خودِ آدرس هندلر (اگه تو PomixUrls داشت) دست‌نخورده می‌مونه.
+            string? bodyJson = null;
+            if (request.Content != null)
+            {
+                var mediaType = request.Content.Headers.ContentType?.MediaType;
+                bodyJson = await request.Content.ReadAsStringAsync(cancellationToken);
+                if (!string.IsNullOrWhiteSpace(bodyJson) && mediaType != null && !mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"هندلرهای Gateway فقط body از نوع JSON را پشتیبانی می‌کنند (درخواست {action} با {mediaType}).");
+                request.Content.Dispose();
+            }
+
+            var envelope = ApiGatewayEnvelope.Build(action, request.Method.Method, uri.Query, bodyJson);
+            request.Content = new ByteArrayContent(envelope);
+            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(ApiGatewayEnvelope.ContentType) { CharSet = "utf-8" };
 
             request.RequestUri = target.Uri;
-
-            // هندلرها فقط POST قبول می‌کنن؛ API متد واقعی رو خودش از route پیدا می‌کنه. هدر override فقط برای وقتیه
-            // که یک مسیر چند متد داشته باشه.
-            if (request.Method != HttpMethod.Post)
-            {
-                request.Headers.Remove(ApiGatewayRoutes.MethodOverrideHeader);
-                request.Headers.TryAddWithoutValidation(ApiGatewayRoutes.MethodOverrideHeader, request.Method.Method);
-                request.Method = HttpMethod.Post;
-            }
+            request.Method = HttpMethod.Post;
         }
     }
 }

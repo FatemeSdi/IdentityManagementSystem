@@ -3,10 +3,10 @@ namespace IdentityManagementSystem.Shared.Gateway
     /// <summary>
     /// زیرساخت سازمان هر URL رو جدا باید هاست کنه؛ برای اینکه به‌جای +۴۰ سرویس فقط چند آدرس ثابت منتشر بشه،
     /// همه‌ی کنترلرهای API پشت این چند هندلر (gateway) قرار می‌گیرن. سرویس مقصد با پارامتر action مشخص می‌شه:
-    /// همه با POST (متد واقعی سرویس رو API از route پیدا می‌کنه):
-    ///   POST /api/auth-handler?action=Auth/login
-    ///   POST /api/ehraz-handler?action=Request/Track&amp;trackingCode=...&amp;mobileNumber=...
-    ///   POST /api/service-handler?action=Service/GetTextByRequestId/101
+    /// همه با POST و یک body ثابت (ApiGatewayEnvelope):
+    ///   POST /api/auth-handler      {"action":"Auth/login","method":"POST","body":{...}}
+    ///   POST /api/ehraz-handler     {"action":"Request/Track","method":"GET","query":{"trackingCode":"...","mobileNumber":"..."}}
+    ///   POST /api/service-handler   {"action":"Service/GetTextByRequestId/101","method":"GET"}
     /// هم سمت API (ApiGatewayMiddleware) و هم سمت UI/PublicPortal (ApiGatewayRoutingHandler) از همین جدول استفاده می‌کنن.
     /// </summary>
     public static class ApiGatewayRoutes
