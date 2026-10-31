@@ -707,6 +707,7 @@ namespace IdentityManagementSystem.API.Controllers
             try
             {
                 var roles = await _context.Roles
+                    .Where(r => r.IsActive)
                     .Select(r => new
                     {
                         roleId = r.RoleId,
@@ -720,6 +721,103 @@ namespace IdentityManagementSystem.API.Controllers
             {
                 return StatusCode(500, new { message = $"خطا در دریافت نقش‌ها: {ex.Message}" });
             }
+        }
+
+        // ===== مدیریت نقش‌ها (فقط ادمین) — حذف نداریم، فقط فعال/غیرفعال =====
+        private const int AdminRoleId = 3;
+
+        [HttpGet("GetAllRoles")]
+        [Authorize]
+        public async Task<IActionResult> GetAllRoles()
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var roles = await _context.Roles
+                .OrderBy(r => r.RoleId)
+                .Select(r => new
+                {
+                    roleId = r.RoleId,
+                    roleName = r.RoleName,
+                    isActive = r.IsActive,
+                    createdAt = r.CreatedAt,
+                    userCount = _context.UserRoles.Count(ur => ur.RoleId == r.RoleId)
+                })
+                .ToListAsync();
+
+            return Ok(roles);
+        }
+
+        [HttpPost("CreateRole")]
+        [Authorize]
+        public async Task<IActionResult> CreateRole([FromBody] RoleUpsertRequest model)
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var name = model?.RoleName?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest(new { success = false, message = "نام نقش الزامی است." });
+            if (name.Length > 100)
+                return BadRequest(new { success = false, message = "نام نقش حداکثر ۱۰۰ کاراکتر است." });
+            if (await _context.Roles.AnyAsync(r => r.RoleName == name))
+                return BadRequest(new { success = false, message = "نقشی با این نام وجود دارد." });
+
+            var role = new Role { RoleName = name, IsActive = true, CreatedAt = DateTime.UtcNow };
+            _context.Roles.Add(role);
+            await _context.SaveChangesAsync();
+            await LogAction(0, "CreateRole", name, "Role created");
+
+            return Ok(new { success = true, message = "نقش با موفقیت ایجاد شد.", roleId = role.RoleId });
+        }
+
+        [HttpPut("UpdateRole/{id}")]
+        [Authorize]
+        public async Task<IActionResult> UpdateRole(int id, [FromBody] RoleUpsertRequest model)
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var role = await _context.Roles.FindAsync(id);
+            if (role == null)
+                return NotFound(new { success = false, message = "نقش یافت نشد." });
+
+            var name = model?.RoleName?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest(new { success = false, message = "نام نقش الزامی است." });
+            if (name.Length > 100)
+                return BadRequest(new { success = false, message = "نام نقش حداکثر ۱۰۰ کاراکتر است." });
+            if (await _context.Roles.AnyAsync(r => r.RoleName == name && r.RoleId != id))
+                return BadRequest(new { success = false, message = "نقشی با این نام وجود دارد." });
+
+            role.RoleName = name;
+            role.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await LogAction(0, "UpdateRole", name, "Role updated");
+
+            return Ok(new { success = true, message = "نقش به‌روزرسانی شد." });
+        }
+
+        [HttpPost("SetRoleActive/{id}")]
+        [Authorize]
+        public async Task<IActionResult> SetRoleActive(int id, [FromQuery] bool active)
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var role = await _context.Roles.FindAsync(id);
+            if (role == null)
+                return NotFound(new { success = false, message = "نقش یافت نشد." });
+            if (id == AdminRoleId && !active)
+                return BadRequest(new { success = false, message = "نقش ادمین قابل غیرفعال‌سازی نیست." });
+
+            role.IsActive = active;
+            role.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await LogAction(0, active ? "ActivateRole" : "DeactivateRole", role.RoleName, "Role active=" + active);
+
+            return Ok(new { success = true, message = active ? "نقش فعال شد." : "نقش غیرفعال شد." });
+        }
+
+        public class RoleUpsertRequest
+        {
+            public string? RoleName { get; set; }
         }
 
         private async Task LogAction(long userId, string action, string? username, string result)

@@ -1,0 +1,208 @@
+@using IdentityManagementSystem.UI.Controllers
+@model IEnumerable<IdentityManagementSystem.UI.Controllers.RoleRow>
+@{
+    ViewData["Title"] = "مدیریت نقش‌ها";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    const int adminRoleId = 3;
+}
+
+@Html.AntiForgeryToken()
+
+<div class="ims-page-header">
+    <div>
+        <nav>
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a asp-controller="Cartable" asp-action="Index">کارتابل</a></li>
+                <li class="breadcrumb-item">مدیریت</li>
+                <li aria-current="page" class="breadcrumb-item active">نقش‌ها</li>
+            </ol>
+        </nav>
+    </div>
+    <button id="AddRole" type="button" class="btn btn-primary btn-wave">
+        <i class="ti ti-plus me-1"></i> افزودن نقش
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(ViewBag.ErrorMessage as string))
+{
+    <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
+}
+
+<div class="card custom-card">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="card-title mb-0"><i class="ti ti-shield-lock me-1"></i>لیست نقش‌ها</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-primary-transparent fs-12">@(Model?.Count() ?? 0) نقش</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="input-group ims-table-search mb-3">
+            <span class="input-group-text"><i class="ti ti-search"></i></span>
+            <input type="search" class="form-control" placeholder="جستجو در نقش‌ها..." id="rolesSearch" autocomplete="off">
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover text-nowrap w-100 ims-table" id="rolesTable">
+                <thead>
+                    <tr>
+                        <th>نام نقش</th>
+                        <th>تعداد کاربران</th>
+                        <th>تاریخ ایجاد</th>
+                        <th>وضعیت</th>
+                        <th data-orderable="false">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody id="rolesBody">
+                    @if (Model != null)
+                    {
+                        foreach (var r in Model)
+                        {
+                            <tr data-role-id="@r.RoleId">
+                                <td data-order="@r.RoleName">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="avatar avatar-sm avatar-rounded bg-primary-transparent"><i class="ti ti-shield"></i></span>
+                                        <span class="fw-medium">@r.RoleName</span>
+                                    </div>
+                                </td>
+                                <td><span class="badge bg-light text-default">@r.UserCount</span></td>
+                                <td data-order="@r.CreatedAt?.ToString("yyyyMMddHHmmss")">@r.CreatedAt.ToPersianDate()</td>
+                                <td class="text-center">
+                                    @if (r.IsActive)
+                                    {
+                                        <span class="badge bg-success-transparent"><i class="ti ti-circle-check me-1"></i>فعال</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger-transparent"><i class="ti ti-circle-x me-1"></i>غیرفعال</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-icon btn-sm btn-primary-light btn-edit-role" data-id="@r.RoleId" data-name="@r.RoleName" data-bs-toggle="tooltip" title="ویرایش">
+                                            <i class="ti ti-edit"></i>
+                                        </button>
+                                        @if (r.RoleId != adminRoleId)
+                                        {
+                                            if (r.IsActive)
+                                            {
+                                                <button type="button" class="btn btn-icon btn-sm btn-danger-light btn-role-active" data-id="@r.RoleId" data-active="false" data-bs-toggle="tooltip" title="غیرفعال‌سازی">
+                                                    <i class="ti ti-shield-off"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-icon btn-sm btn-success-light btn-role-active" data-id="@r.RoleId" data-active="true" data-bs-toggle="tooltip" title="فعال‌سازی">
+                                                    <i class="ti ti-shield-check"></i>
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade ims-modal" id="roleModal" tabindex="-1" aria-labelledby="roleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="avatar avatar-md avatar-rounded bg-primary-transparent modal-icon"><i class="ti ti-shield-plus fs-18"></i></span>
+                <div>
+                    <h6 class="modal-title" id="roleModalLabel">افزودن نقش</h6>
+                    <div class="modal-subtitle">نام نقش باید یکتا باشد</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="roleId" />
+                <label class="form-label" for="roleName">نام نقش <span class="text-danger">*</span></label>
+                <input class="form-control" id="roleName" maxlength="100" autocomplete="off" />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" type="button" data-bs-dismiss="modal">انصراف</button>
+                <button class="btn btn-primary btn-wave" type="button" id="saveRole"><i class="ti ti-check me-1"></i>ذخیره</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/assets/plugins/datatable/datatables.min.js"></script>
+    <script>
+        $(function () {
+            const token = () => $('input[name="__RequestVerificationToken"]').first().val();
+            const post = (url, data) => fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': token() },
+                body: new URLSearchParams(data).toString()
+            }).then(r => r.json());
+
+            const dt = $('#rolesTable').DataTable({
+                order: [[0, 'asc']],
+                pageLength: 10,
+                lengthMenu: [10, 25, 50],
+                dom: "<'ims-dt-top'l>t<'ims-dt-footer'<'dt-info'i><'dt-pages'p>>",
+                language: {
+                    lengthMenu: 'نمایش _MENU_ ردیف',
+                    zeroRecords: 'نقشی یافت نشد.',
+                    emptyTable: 'نقشی تعریف نشده است.',
+                    info: 'نمایش _START_ تا _END_ از _TOTAL_ نقش',
+                    infoEmpty: '',
+                    infoFiltered: '(فیلتر شده از _MAX_ نقش)',
+                    paginate: { first: 'اول', last: 'آخر', next: 'بعدی', previous: 'قبلی' }
+                }
+            });
+            $('#rolesSearch').on('input', function () { dt.search(this.value).draw(); });
+
+            const modal = new bootstrap.Modal(document.getElementById('roleModal'));
+            function openModal(id, name) {
+                $('#roleId').val(id || '');
+                $('#roleName').val(name || '');
+                $('#roleModalLabel').text(id ? 'ویرایش نقش' : 'افزودن نقش');
+                modal.show();
+            }
+            $('#AddRole').on('click', function () { openModal(); });
+            $('#rolesBody').on('click', '.btn-edit-role', function () { openModal($(this).data('id'), $(this).attr('data-name')); });
+            document.getElementById('roleModal').addEventListener('shown.bs.modal', function () { $('#roleName').trigger('focus'); });
+            $('#roleName').on('keydown', function (e) { if (e.key === 'Enter') $('#saveRole').click(); });
+
+            $('#saveRole').on('click', function () {
+                const id = $('#roleId').val();
+                const name = ($('#roleName').val() || '').trim();
+                if (!name) { imsToast('warning', 'نام نقش را وارد کنید.'); return; }
+                const btn = $(this).prop('disabled', true);
+                post(id ? '@Url.Action("Update", "Roles")' : '@Url.Action("Create", "Roles")', id ? { id: id, roleName: name } : { roleName: name })
+                    .then(function (res) {
+                        if (res.success) { modal.hide(); imsToast('success', res.message); setTimeout(function () { location.reload(); }, 700); }
+                        else imsToast('error', res.message);
+                    })
+                    .catch(function () { imsToast('error', 'خطا در ارتباط با سرور'); })
+                    .finally(function () { btn.prop('disabled', false); });
+            });
+
+            $('#rolesBody').on('click', '.btn-role-active', function () {
+                const id = $(this).data('id');
+                const active = String($(this).attr('data-active')) === 'true';
+                const go = function () {
+                    post('@Url.Action("SetActive", "Roles")', { id: id, active: active })
+                        .then(function (res) {
+                            if (res.success) { imsToast('success', res.message); setTimeout(function () { location.reload(); }, 700); }
+                            else imsToast('error', res.message);
+                        })
+                        .catch(function () { imsToast('error', 'خطا در ارتباط با سرور'); });
+                };
+                if (active) { go(); return; }
+                Swal.fire({
+                    title: 'غیرفعال‌سازی نقش',
+                    text: 'با غیرفعال شدن، نقش در لیست انتخاب نقش کاربران نمایش داده نمی‌شود. ادامه می‌دهید؟',
+                    icon: 'warning', showCancelButton: true,
+                    confirmButtonText: 'بله، غیرفعال شود', cancelButtonText: 'انصراف'
+                }).then(function (r) { if (r.isConfirmed) go(); });
+            });
+        });
+    </script>
+}

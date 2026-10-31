@@ -140,6 +140,9 @@ namespace IdentityManagementSystem.UI.Controllers
             }
             ViewBag.RequestTypes = requestTypes;
             ViewBag.RequestType = requestType;
+            // منوی افقی لایوت از روی همین لیست ساخته می‌شه (لایوت به ViewBag این اکشن دسترسی نداره)
+            HttpContext.Session.SetString("MyRequestTypes",
+                Newtonsoft.Json.JsonConvert.SerializeObject(requestTypes.Select(t => new { t.Code, t.Name })));
 
             // گرفتن داده‌ها از API
             var model = await GetCartableData(page, search, filterStatus, fromDate, toDate, requestType);

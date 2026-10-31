@@ -7,6 +7,24 @@
     var fullName = $"{userName ?? "کاربر"} {userLastName ?? ""}".Trim();
     var pc = new System.Globalization.PersianCalendar();
     var now = DateTime.Now;
+    var navController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "").ToLowerInvariant();
+    var navAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? "").ToLowerInvariant();
+    // نوع‌های کارتابل مجاز کاربر (کنترلر کارتابل تو سشن می‌ذاره)؛ اگه هنوز نیست فقط یک لینک «کارتابل» نمایش داده می‌شه
+    var navTypes = new List<(string Code, string Name)>();
+    try
+    {
+        var typesJson = Context.Session.GetString("MyRequestTypes");
+        if (!string.IsNullOrEmpty(typesJson))
+        {
+            navTypes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Newtonsoft.Json.Linq.JObject>>(typesJson)!
+                .Select(o => (o.Value<string>("Code") ?? "", o.Value<string>("Name") ?? "")).ToList();
+        }
+    }
+    catch { /* سشن خراب → منوی ساده */ }
+    var navCurrentType = (ViewBag.RequestType as string) ?? Context.Request.Query["requestType"].ToString();
+    var isCartableActive = navController == "cartable" || navController == "evalappointment";
+    var isManageActive = (navController == "home" && navAction == "users") || navController == "roles";
+    string NavTypeIcon(string code) => code == "EVALUATION_APPOINTMENT" ? "ti-calendar-check" : "ti-building-warehouse";
     string FaDigits(object n) => string.Concat(n.ToString()!.Select(ch => char.IsDigit(ch) ? (char)('۰' + (ch - '0')) : ch));
 }
 <!DOCTYPE html>
@@ -119,15 +137,6 @@
                                 پروفایل
                             </a>
                         </li>
-                        @if (isAdmin)
-                        {
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" asp-controller="Home" asp-action="Users">
-                                    <i class="ti ti-users me-2 fs-16"></i>
-                                    مدیریت کاربران
-                                </a>
-                            </li>
-                        }
                         <li>
                             <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#supportModal">
                                 <i class="ti ti-headset me-2 fs-16"></i>
@@ -150,6 +159,68 @@
         </div>
     </header>
     <!-- ========== END HEADER ========== -->
+    <!-- ========== HORIZONTAL MENU ========== -->
+    <nav class="ims-navbar" id="imsNavbar" aria-label="منوی اصلی">
+        <div class="container-fluid ims-navbar-inner">
+            <button class="ims-navbar-toggler" type="button" id="imsNavToggle" aria-expanded="false" aria-controls="imsNavMenu">
+                <i class="ti ti-menu-2"></i><span>منو</span>
+            </button>
+            <ul class="ims-nav" id="imsNavMenu">
+                @if (navTypes.Count > 1)
+                {
+                    <li class="ims-nav-item dropdown">
+                        <a class="ims-nav-link dropdown-toggle @(isCartableActive ? "active" : "")" href="javascript:void(0);" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="ti ti-inbox"></i>کارتابل
+                        </a>
+                        <ul class="dropdown-menu ims-nav-dropdown">
+                            @foreach (var t in navTypes)
+                            {
+                                <li>
+                                    <a class="dropdown-item @(navController == "cartable" && t.Code == navCurrentType ? "active" : "")" asp-controller="Cartable" asp-action="Index" asp-route-requestType="@t.Code">
+                                        <i class="ti @NavTypeIcon(t.Code)"></i>@t.Name
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </li>
+                }
+                else
+                {
+                    <li class="ims-nav-item">
+                        <a class="ims-nav-link @(navController == "cartable" ? "active" : "")" asp-controller="Cartable" asp-action="Index">
+                            <i class="ti ti-inbox"></i>@(navTypes.Count == 1 ? navTypes[0].Name : "کارتابل")
+                        </a>
+                    </li>
+                }
+                <li class="ims-nav-item">
+                    <a class="ims-nav-link @(navController == "reports" ? "active" : "")" asp-controller="Reports" asp-action="Index">
+                        <i class="ti ti-chart-bar"></i>گزارش‌گیری
+                    </a>
+                </li>
+                @if (isAdmin)
+                {
+                    <li class="ims-nav-item dropdown">
+                        <a class="ims-nav-link dropdown-toggle @(isManageActive ? "active" : "")" href="javascript:void(0);" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="ti ti-settings"></i>مدیریت
+                        </a>
+                        <ul class="dropdown-menu ims-nav-dropdown">
+                            <li>
+                                <a class="dropdown-item @(navController == "home" && navAction == "users" ? "active" : "")" asp-controller="Home" asp-action="Users">
+                                    <i class="ti ti-users"></i>مدیریت کاربران
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item @(navController == "roles" ? "active" : "")" asp-controller="Roles" asp-action="Index">
+                                    <i class="ti ti-shield-lock"></i>مدیریت نقش‌ها
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                }
+            </ul>
+        </div>
+    </nav>
+    <!-- ========== END HORIZONTAL MENU ========== -->
     <!-- ========== MAIN CONTENT ========== -->
     <div class="main-content app-content">
         <div class="container-fluid">
@@ -287,6 +358,19 @@
     <!-- توست یکپارچه (بعد از scripts.js تا showToster/toastr رو با ظاهر yzen جایگزین کنه) -->
     <script src="~/js/ims-toast.js" asp-append-version="true"></script>
     <script>
+        // منوی موبایل
+        (function () {
+            var t = document.getElementById('imsNavToggle'), m = document.getElementById('imsNavMenu');
+            if (!t || !m) return;
+            t.addEventListener('click', function () {
+                var open = m.classList.toggle('show');
+                t.setAttribute('aria-expanded', open);
+            });
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('#imsNavbar')) { m.classList.remove('show'); t.setAttribute('aria-expanded', false); }
+            });
+        })();
+
         function openFullscreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen();

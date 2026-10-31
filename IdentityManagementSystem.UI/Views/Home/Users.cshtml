@@ -36,13 +36,13 @@
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="badge bg-primary-transparent fs-12">@(Model?.Count() ?? 0) کاربر</span>
-            <div class="input-group ims-users-search">
-                <span class="input-group-text"><i class="ti ti-search"></i></span>
-                <input type="search" class="form-control" placeholder="جستجو در کاربران..." id="searchInput" autocomplete="off">
-            </div>
         </div>
     </div>
     <div class="card-body">
+        <div class="input-group ims-table-search mb-3">
+            <span class="input-group-text"><i class="ti ti-search"></i></span>
+            <input type="search" class="form-control" placeholder="جستجو در کاربران (نام، نام کاربری، نقش، وضعیت...)" id="searchInput" autocomplete="off">
+        </div>
         <div class="table-responsive">
             <table class="table table-hover text-nowrap w-100 ims-table" id="usersTable">
                 <thead>

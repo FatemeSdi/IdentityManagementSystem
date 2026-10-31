@@ -635,3 +635,260 @@ table.dataTable thead > tr > th.sorting_desc { background-image: url("../assets/
     background-color: transparent !important;
     color: var(--primary-color) !important;
 }
+
+/* =====================================================================
+   منوی افقی (yzen-style): نوار ثابت زیر هدر، فشرده، سازگار با حالت تاریک
+   ===================================================================== */
+:root {
+    --ims-header-h: 4.25rem;
+    --ims-nav-h: 2.75rem;
+}
+
+.ims-navbar {
+    position: fixed;
+    inset-block-start: var(--ims-header-h);
+    inset-inline: 0;
+    height: var(--ims-nav-h);
+    z-index: 99;
+    background: var(--custom-white, #fff);
+    border-block-end: 1px solid var(--default-border);
+    box-shadow: 0 .25rem 1rem rgba(118, 200, 254, .03);
+}
+
+    .ims-navbar .ims-navbar-inner {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        padding-inline: 1rem;
+    }
+
+/* فضای محتوا = هدر + منو */
+.app-content {
+    margin-block-start: calc(var(--ims-header-h) + var(--ims-nav-h)) !important;
+}
+
+.ims-nav {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.ims-nav-item {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.ims-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    height: 2.125rem;
+    padding: 0 .875rem;
+    border-radius: .4rem;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--default-text-color);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color .15s, color .15s;
+}
+
+    .ims-nav-link i {
+        font-size: 1.05rem;
+        color: var(--text-muted);
+        transition: color .15s;
+    }
+
+    .ims-nav-link:hover,
+    .ims-nav-link:focus-visible,
+    .ims-nav-link.show {
+        background: rgba(var(--primary-rgb), .08);
+        color: var(--primary-color);
+    }
+
+        .ims-nav-link:hover i,
+        .ims-nav-link.show i {
+            color: var(--primary-color);
+        }
+
+    .ims-nav-link.active {
+        background: rgba(var(--primary-rgb), .12);
+        color: var(--primary-color);
+    }
+
+        .ims-nav-link.active i {
+            color: var(--primary-color);
+        }
+
+    .ims-nav-link.dropdown-toggle::after {
+        margin-inline-start: .15rem;
+        font-size: .7rem;
+        vertical-align: .1em;
+    }
+
+.ims-nav-dropdown {
+    min-width: 12.5rem;
+    padding: .375rem;
+    margin-top: .25rem !important;
+    border: 1px solid var(--default-border);
+    border-radius: .5rem;
+    background: var(--custom-white, #fff);
+    box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .1);
+    font-size: .8125rem;
+}
+
+    .ims-nav-dropdown .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        border-radius: .35rem;
+        padding: .45rem .75rem;
+        color: var(--default-text-color);
+    }
+
+        .ims-nav-dropdown .dropdown-item i {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+        }
+
+        .ims-nav-dropdown .dropdown-item:hover,
+        .ims-nav-dropdown .dropdown-item:focus {
+            background: rgba(var(--primary-rgb), .08);
+            color: var(--primary-color);
+        }
+
+        .ims-nav-dropdown .dropdown-item.active {
+            background: rgba(var(--primary-rgb), .12);
+            color: var(--primary-color);
+        }
+
+            .ims-nav-dropdown .dropdown-item.active i,
+            .ims-nav-dropdown .dropdown-item:hover i {
+                color: var(--primary-color);
+            }
+
+[data-theme-mode=dark] .ims-navbar {
+    box-shadow: none;
+}
+
+[data-theme-mode=dark] .ims-nav-dropdown {
+    box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .5);
+}
+
+.ims-navbar-toggler {
+    display: none;
+}
+
+/* موبایل/تبلت: دکمه‌ی «منو» + پنل بازشونده (بدون جابه‌جایی محتوا) */
+@media (max-width: 991.98px) {
+    .ims-navbar-toggler {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        height: 2.125rem;
+        padding: 0 .875rem;
+        border: 1px solid var(--default-border);
+        border-radius: .4rem;
+        background: transparent;
+        color: var(--default-text-color);
+        font-size: .8125rem;
+        font-weight: 500;
+    }
+
+    .ims-nav {
+        display: none;
+        position: absolute;
+        inset-inline: 0;
+        inset-block-start: 100%;
+        height: auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: .125rem;
+        padding: .5rem 1rem 1rem;
+        background: var(--custom-white, #fff);
+        border-block-end: 1px solid var(--default-border);
+        box-shadow: 0 1rem 1.5rem rgba(0, 0, 0, .08);
+    }
+
+        .ims-nav.show {
+            display: flex;
+        }
+
+    .ims-nav-item {
+        height: auto;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ims-nav-link {
+        height: 2.5rem;
+    }
+
+    .ims-nav-dropdown {
+        position: static !important;
+        transform: none !important;
+        box-shadow: none;
+        border: 0;
+        margin: 0 !important;
+        padding-inline-start: 1.25rem;
+        background: transparent;
+    }
+}
+
+/* ---------- گزارش‌گیری: کارت‌های شاخص ---------- */
+.ims-kpi .kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.ims-kpi {
+    transition: transform .15s, box-shadow .15s;
+}
+
+    .ims-kpi:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 .5rem 1.25rem rgba(0, 0, 0, .08);
+    }
+
+/* ---------- جدول‌های مدیریت: هدر و داده راست‌چین؛ جستجوی تمام‌عرض بالای جدول ---------- */
+#usersTable thead th,
+#usersTable tbody td,
+#usersTable tbody td.text-center,
+#usersTable tbody td.text-end,
+#rolesTable thead th,
+#rolesTable tbody td,
+#rolesTable tbody td.text-center,
+#slotsTable thead th,
+#slotsTable tbody td,
+#slotsTable tbody td.text-center {
+    text-align: right !important;
+}
+
+.ims-table-search {
+    width: 100%;
+}
+
+    .ims-table-search .input-group-text {
+        background: var(--custom-white, #fff);
+        color: var(--primary-color);
+        font-size: 1.05rem;
+    }
+
+    .ims-table-search .form-control {
+        height: 2.625rem;
+    }
+
+/* دکمه‌های عملیات کارتابل: انتهای نوار اطلاعات (سمت چپ در RTL) */
+.ims-cartable-info .info-actions {
+    margin-inline-start: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}

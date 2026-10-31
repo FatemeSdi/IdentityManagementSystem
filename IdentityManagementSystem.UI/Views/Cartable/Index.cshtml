@@ -49,46 +49,10 @@
     }
 }
 
-<!-- سربرگ صفحه: تب‌ها و دکمه‌های عملیات هم‌ردیف -->
-<div class="ims-page-header ims-cartable-header">
-    @if (requestTypes.Count > 1)
+<!-- اطلاعات کارتابل (اسم کارتابل + شرکت‌ها) + دکمه‌های عملیات سمت چپ -->
+<div class="ims-cartable-info">
+    @if (currentTypeInfo != null)
     {
-        <ul class="nav nav-pills tab-style-1 ims-cartable-tabs mb-0" role="tablist">
-            @foreach (var t in requestTypes)
-            {
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link @(t.Code == currentRequestType ? "active" : "")"
-                       href="@Url.Action("Index", new { requestType = t.Code })">
-                        <i class="ti @(t.Code == IdentityManagementSystem.UI.Controllers.RequestTypeCodes.EvaluationAppointment ? "ti-calendar-check" : "ti-building-warehouse") me-1"></i>@t.Name
-                    </a>
-                </li>
-            }
-        </ul>
-    }
-    else
-    {
-        <div></div>
-    }
-    <div class="d-flex gap-2">
-        @if (isEval && isAdmin)
-        {
-            <a asp-controller="EvalAppointment" asp-action="Slots" class="btn btn-primary btn-wave">
-                <i class="ti ti-calendar-cog me-1"></i> مدیریت نوبت‌های ارزیابی
-            </a>
-        }
-        @if (!isEval)
-        {
-            <button id="AddDoc" type="button" class="btn btn-primary btn-wave" data-bs-toggle="modal" data-bs-target="#scrollingmodal">
-                <i class="ti ti-file-plus me-1"></i> ثبت درخواست جدید
-            </button>
-        }
-    </div>
-</div>
-
-<!-- اطلاعات کارتابل: اسم کارتابل + شرکت(های) مربوط به کاربر جاری -->
-@if (currentTypeInfo != null)
-{
-    <div class="ims-cartable-info">
         <div class="info-item">
             <span class="avatar avatar-sm avatar-rounded bg-primary-transparent">
                 <i class="ti @(isEval ? "ti-calendar-check" : "ti-building-warehouse")"></i>
@@ -112,8 +76,22 @@
                 }
             </span>
         </div>
+    }
+    <div class="info-actions">
+        @if (isEval && isAdmin)
+        {
+            <a asp-controller="EvalAppointment" asp-action="Slots" class="btn btn-primary btn-sm btn-wave">
+                <i class="ti ti-calendar-cog me-1"></i> مدیریت نوبت‌های ارزیابی
+            </a>
+        }
+        @if (!isEval)
+        {
+            <button id="AddDoc" type="button" class="btn btn-primary btn-sm btn-wave" data-bs-toggle="modal" data-bs-target="#scrollingmodal">
+                <i class="ti ti-file-plus me-1"></i> ثبت درخواست جدید
+            </button>
+        }
     </div>
-}
+</div>
 
 <!-- ==================== جستجو و فیلتر ==================== -->
 <div class="card custom-card ims-search">

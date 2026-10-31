@@ -1,195 +1,268 @@
 ﻿@{
-    ViewData["Title"] = "گزارش‌گیری سامانه";
+    ViewData["Title"] = "گزارش‌گیری";
     Layout = "~/Views/Shared/_Layout.cshtml";
+
+    // ───────── داده‌ی نمونه — فقط برای طراحی UI؛ بعداً از سرویس‌های گزارش پر می‌شود ─────────
+    var kpis = new[]
+    {
+        (Title: "کل درخواست‌ها", Value: "۱٬۲۴۸", Delta: "+۱۲٪", Up: true, Icon: "ti-inbox", Color: "primary"),
+        (Title: "تایید شده", Value: "۸۹۶", Delta: "+۸٪", Up: true, Icon: "ti-circle-check", Color: "success"),
+        (Title: "رد شده", Value: "۱۹۴", Delta: "-۳٪", Up: false, Icon: "ti-circle-x", Color: "danger"),
+        (Title: "در انتظار بررسی", Value: "۱۵۸", Delta: "+۵٪", Up: true, Icon: "ti-hourglass", Color: "warning"),
+    };
+    var topDocs = new[]
+    {
+        (Doc: "140232155760000666", Count: 14, Company: "شرکت نمونه ۱"),
+        (Doc: "140232155760000412", Count: 11, Company: "شرکت نمونه ۲"),
+        (Doc: "140232155760000987", Count: 9, Company: "شرکت نمونه ۱"),
+        (Doc: "140232155760000150", Count: 7, Company: "شرکت نمونه ۳"),
+        (Doc: "140232155760000333", Count: 6, Company: "شرکت نمونه ۲"),
+    };
+    var topExperts = new[]
+    {
+        (Name: "کارشناس نمونه ۱", Handled: 212, Rate: 92),
+        (Name: "کارشناس نمونه ۲", Handled: 187, Rate: 88),
+        (Name: "کارشناس نمونه ۳", Handled: 143, Rate: 81),
+        (Name: "کارشناس نمونه ۴", Handled: 96, Rate: 76),
+    };
 }
 
-<!-- Chart.js محلی (بدون اینترنت) -->
-<script src="~/js/chart.min.js"></script>
-
-<style>
-    .card-hover:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
-        transition: all 0.3s;
-    }
-
-    .doc-search {
-        max-width: 400px;
-    }
-</style>
-
-<div class="container-fluid py-4">
-    <h1 class="text-primary mb-4">
-        <i class="fa fa-chart-bar"></i> گزارش‌گیری زنده
-    </h1>
-
-    <!-- جستجوی سند -->
-    <div class="card shadow mb-4">
-        <div class="card-body">
-            <form asp-action="Index" method="get" class="row g-3">
-                <div class="col-md-8">
-                    <input type="text" name="docNumber" class="form-control doc-search"
-                           placeholder="شناسه سند را وارد کنید (مثال: 140232155760000666)"
-                           value="@Model.SearchedDocNumber" />
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fa fa-search"></i> جستجو
-                    </button>
-                </div>
-            </form>
-
-            @if (!string.IsNullOrEmpty(Model.SearchedDocNumber))
-            {
-                <div class="alert alert-info mt-3">
-                    <strong>سند @Model.SearchedDocNumber:</strong>
-                    <span class="badge bg-success fs-5">@Model.DocRequestCount درخواست</span>
-                </div>
-            }
-        </div>
+<div class="ims-page-header">
+    <div>
+        <nav>
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a asp-controller="Cartable" asp-action="Index">کارتابل</a></li>
+                <li aria-current="page" class="breadcrumb-item active">گزارش‌گیری</li>
+            </ol>
+        </nav>
     </div>
-
-    <div class="row g-4">
-        <div class="col-md-3">
-            <div class="card text-white bg-primary card-hover">
-                <div class="card-body">
-                    <h5>کل درخواست‌ها</h5>
-                    <h2>@Model.Stats.Total</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-white bg-success card-hover">
-                <div class="card-body">
-                    <h5>تایید شده</h5>
-                    <h2>@Model.Stats.Approved</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-white bg-danger card-hover">
-                <div class="card-body">
-                    <h5>رد شده</h5>
-                    <h2>@Model.Stats.Rejected</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-white bg-warning card-hover">
-                <div class="card-body">
-                    <h5>در انتظار</h5>
-                    <h2>@Model.Stats.Pending</h2>
-                </div>
-            </div>
-        </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <span class="badge bg-warning-transparent align-self-center"><i class="ti ti-flask me-1"></i>داده‌ی نمونه — سرویس‌ها بعداً متصل می‌شوند</span>
+        <button type="button" class="btn btn-outline-primary btn-wave" disabled><i class="ti ti-file-spreadsheet me-1"></i>خروجی Excel</button>
+        <button type="button" class="btn btn-outline-primary btn-wave" disabled><i class="ti ti-printer me-1"></i>چاپ</button>
     </div>
+</div>
 
-    <div class="row mt-4 g-4">
-        <div class="col-lg-6">
-            <div class="card shadow">
-                <div class="card-header bg-info text-white">
-                    <h5>وضعیت درخواست‌ها</h5>
+<!-- ==================== فیلتر گزارش ==================== -->
+<div class="card custom-card ims-search">
+    <div class="card-header"><div class="card-title mb-0"><i class="ti ti-adjustments-horizontal me-1"></i>فیلتر گزارش</div></div>
+    <div class="card-body">
+        <form id="reportFilter" autocomplete="off" onsubmit="return false;">
+            <div class="row gy-3">
+                <div class="col-xl-3 col-md-6">
+                    <label class="form-label" for="repType">نوع درخواست</label>
+                    <select id="repType" class="form-select">
+                        <option value="">همه</option>
+                        <option value="WAREHOUSE_RECEIPT">قبض انبار</option>
+                        <option value="EVALUATION_APPOINTMENT">نوبت‌دهی ارزیابی</option>
+                    </select>
                 </div>
-                <div class="card-body">
-                    <canvas id="pieChart"></canvas>
+                <div class="col-xl-3 col-md-6">
+                    <label class="form-label" for="repFrom">از تاریخ</label>
+                    <div class="input-group">
+                        <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="repFrom"><i class="ti ti-calendar"></i></span>
+                        <input id="repFrom" type="text" class="form-control dir-ltr fc-datepicker" placeholder="۱۴۰۵/۰۱/۰۱" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6">
+                    <label class="form-label" for="repTo">تا تاریخ</label>
+                    <div class="input-group">
+                        <span class="input-group-text cursor-pointer fc-datepicker-icon" data-target="repTo"><i class="ti ti-calendar"></i></span>
+                        <input id="repTo" type="text" class="form-control dir-ltr fc-datepicker" placeholder="۱۴۰۵/۱۲/۲۹" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6">
+                    <label class="form-label" for="repDoc">شناسه سند</label>
+                    <input id="repDoc" type="text" class="form-control dir-ltr" placeholder="مثال: 140232155760000666">
                 </div>
             </div>
-        </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="reset" class="btn btn-light btn-wave"><i class="ti ti-refresh me-1"></i>حذف فیلتر</button>
+                <button type="submit" class="btn btn-primary btn-wave"><i class="ti ti-search me-1"></i>اعمال فیلتر</button>
+            </div>
+        </form>
+    </div>
+</div>
 
-        <div class="col-lg-6">
-            <div class="card shadow">
-                <div class="card-header bg-dark text-white">
-                    <h5>کارمند برتر</h5>
-                </div>
+<!-- ==================== شاخص‌ها ==================== -->
+<div class="row">
+    @foreach (var k in kpis)
+    {
+        <div class="col-xxl-3 col-md-6">
+            <div class="card custom-card ims-kpi">
                 <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-4">
-                            <div class="p-3 border rounded">
-                                <small class="text-muted">هفته</small>
-                                <h5 class="text-primary">@Model.TopUserWeek.Username</h5>
-                                <span class="badge bg-primary fs-6">@Model.TopUserWeek.RequestCount</span>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="p-3 border rounded">
-                                <small class="text-muted">ماه</small>
-                                <h5 class="text-success">@Model.TopUserMonth.Username</h5>
-                                <span class="badge bg-success fs-6">@Model.TopUserMonth.RequestCount</span>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="p-3 border rounded">
-                                <small class="text-muted">سال</small>
-                                <h5 class="text-danger">@Model.TopUserYear.Username</h5>
-                                <span class="badge bg-danger fs-6">@Model.TopUserYear.RequestCount</span>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="avatar avatar-lg avatar-rounded bg-@(k.Color)-transparent"><i class="ti @k.Icon fs-22"></i></span>
+                        <div class="flex-fill">
+                            <div class="text-muted fs-13">@k.Title</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="kpi-value">@k.Value</span>
+                                <span class="badge @(k.Up ? "bg-success-transparent" : "bg-danger-transparent")"><i class="ti @(k.Up ? "ti-trending-up" : "ti-trending-down") me-1"></i>@k.Delta</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    }
+</div>
 
-    <div class="card shadow mt-4">
-        <div class="card-header bg-secondary text-white">
-            <h5>10 سند پر درخواست</h5>
+<!-- ==================== نمودارها ==================== -->
+<div class="row">
+    <div class="col-xl-8">
+        <div class="card custom-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="card-title mb-0"><i class="ti ti-chart-area-line me-1"></i>روند درخواست‌ها (۳۰ روز اخیر)</div>
+            </div>
+            <div class="card-body"><div id="chartTrend"></div></div>
         </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>شناسه سند</th>
-                            <th class="text-center">تعداد درخواست</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var doc in Model.TopDocuments)
-                        {
-                            <tr>
-                                <td><code>@doc.DocumentNumber</code></td>
-                                <td class="text-center">
-                                    <span class="badge bg-@(doc.RequestCount > 5 ? "danger" : "warning")">
-                                        @doc.RequestCount
-                                    </span>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+    </div>
+    <div class="col-xl-4">
+        <div class="card custom-card">
+            <div class="card-header"><div class="card-title mb-0"><i class="ti ti-chart-donut me-1"></i>وضعیت درخواست‌ها</div></div>
+            <div class="card-body"><div id="chartStatus"></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card custom-card">
+            <div class="card-header"><div class="card-title mb-0"><i class="ti ti-building me-1"></i>درخواست‌ها به تفکیک شرکت</div></div>
+            <div class="card-body"><div id="chartCompany"></div></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card custom-card">
+            <div class="card-header"><div class="card-title mb-0"><i class="ti ti-user-star me-1"></i>عملکرد کارشناسان</div></div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover text-nowrap w-100 mb-0 ims-table">
+                        <thead>
+                            <tr><th>کارشناس</th><th>درخواست رسیدگی‌شده</th><th>نرخ تایید</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in topExperts)
+                            {
+                                <tr>
+                                    <td><span class="fw-medium">@e.Name</span></td>
+                                    <td><span class="badge bg-primary-transparent">@e.Handled</span></td>
+                                    <td style="min-width:10rem">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress progress-sm flex-fill"><div class="progress-bar bg-success" style="width:@(e.Rate)%"></div></div>
+                                            <span class="fs-12">@(e.Rate)٪</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        // کاملاً آفلاین کار می‌کنه!
-        const ctx = document.getElementById('pieChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['تایید شده', 'رد شده', 'در انتظار'],
-                datasets: [{
-                    data: [@Model.Stats.Approved, @Model.Stats.Rejected, @Model.Stats.Pending],
-                    backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(ctx) {
-                                return `${ctx.label}: ${ctx.raw} درخواست`;
-                            }
-                        }
+<div class="card custom-card">
+    <div class="card-header"><div class="card-title mb-0"><i class="ti ti-file-search me-1"></i>اسناد پرتکرار</div></div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover text-nowrap w-100 mb-0 ims-table">
+                <thead>
+                    <tr><th>شناسه سند</th><th>شرکت</th><th>تعداد درخواست</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in topDocs)
+                    {
+                        <tr>
+                            <td class="dir-ltr text-end"><code>@d.Doc</code></td>
+                            <td>@d.Company</td>
+                            <td><span class="badge bg-info-transparent">@d.Count</span></td>
+                        </tr>
                     }
-                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/assets/libs/apexcharts/apexcharts.min.js"></script>
+    <script>
+        (function () {
+            const root = document.documentElement;
+            const charts = [];
+            const css = (v, fb) => (getComputedStyle(root).getPropertyValue(v) || '').trim() || fb;
+            const rgb = (v, fb) => 'rgb(' + css(v, fb) + ')';
+
+            function palette() {
+                return {
+                    primary: rgb('--primary-rgb', '2, 76, 147'),
+                    success: rgb('--success-rgb', '83, 196, 5'),
+                    danger: rgb('--danger-rgb', '253, 73, 99'),
+                    warning: rgb('--warning-rgb', '255, 169, 9'),
+                    info: rgb('--info-rgb', '39, 160, 254'),
+                    text: css('--text-muted', '#8c9097'),
+                    grid: css('--default-border', '#ededf1')
+                };
             }
-        });
+
+            const toFa = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+            const days = Array.from({ length: 30 }, (_, i) => toFa(i + 1));
+            const trendA = [12, 18, 15, 22, 30, 28, 35, 31, 26, 40, 38, 44, 36, 41, 52, 47, 39, 55, 61, 49, 58, 63, 57, 66, 72, 64, 70, 78, 69, 74];
+            const trendB = [4, 6, 5, 9, 11, 10, 14, 12, 9, 15, 13, 17, 14, 16, 19, 18, 15, 21, 24, 19, 22, 25, 21, 26, 29, 24, 27, 31, 26, 28];
+
+            function build() {
+                charts.splice(0).forEach(c => c.destroy());
+                const p = palette();
+                const base = {
+                    chart: { fontFamily: 'Vazir, Tahoma, sans-serif', toolbar: { show: false }, animations: { speed: 400 }, background: 'transparent' },
+                    theme: { mode: root.getAttribute('data-theme-mode') === 'dark' ? 'dark' : 'light' },
+                    grid: { borderColor: p.grid },
+                    legend: { fontFamily: 'Vazir, Tahoma, sans-serif', labels: { colors: p.text } },
+                    tooltip: { style: { fontFamily: 'Vazir, Tahoma, sans-serif' } }
+                };
+                const rtlAxis = { labels: { style: { colors: p.text } } };
+
+                charts.push(new ApexCharts(document.querySelector('#chartTrend'), Object.assign({}, base, {
+                    chart: Object.assign({}, base.chart, { type: 'area', height: 300 }),
+                    series: [{ name: 'قبض انبار', data: trendA }, { name: 'نوبت‌دهی ارزیابی', data: trendB }],
+                    colors: [p.primary, p.success],
+                    stroke: { curve: 'smooth', width: 2 },
+                    fill: { type: 'gradient', gradient: { opacityFrom: .35, opacityTo: .02 } },
+                    dataLabels: { enabled: false },
+                    xaxis: { categories: days, labels: { style: { colors: p.text } }, tickAmount: 10 },
+                    yaxis: { opposite: true, labels: { style: { colors: p.text }, formatter: v => toFa(Math.round(v)) } }
+                })));
+
+                charts.push(new ApexCharts(document.querySelector('#chartStatus'), Object.assign({}, base, {
+                    chart: Object.assign({}, base.chart, { type: 'donut', height: 300 }),
+                    series: [896, 194, 158],
+                    labels: ['تایید شده', 'رد شده', 'در انتظار'],
+                    colors: [p.success, p.danger, p.warning],
+                    legend: Object.assign({}, base.legend, { position: 'bottom' }),
+                    dataLabels: { enabled: false },
+                    stroke: { width: 0 },
+                    plotOptions: { pie: { donut: { size: '70%' } } }
+                })));
+
+                charts.push(new ApexCharts(document.querySelector('#chartCompany'), Object.assign({}, base, {
+                    chart: Object.assign({}, base.chart, { type: 'bar', height: 280 }),
+                    series: [{ name: 'تعداد درخواست', data: [420, 310, 255, 160, 103] }],
+                    colors: [p.primary],
+                    plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '55%' } },
+                    dataLabels: { enabled: false },
+                    xaxis: { categories: ['شرکت نمونه ۱', 'شرکت نمونه ۲', 'شرکت نمونه ۳', 'شرکت نمونه ۴', 'شرکت نمونه ۵'], labels: { style: { colors: p.text }, formatter: v => toFa(Math.round(v)) } },
+                    yaxis: { opposite: true, labels: { style: { colors: p.text } } }
+                })));
+
+                charts.forEach(c => c.render());
+            }
+
+            build();
+            // تغییر حالت روشن/تاریک → نمودارها با رنگ‌های جدید ساخته شوند
+            new MutationObserver(function () { setTimeout(build, 50); })
+                .observe(root, { attributes: true, attributeFilter: ['data-theme-mode'] });
+        })();
     </script>
 }
